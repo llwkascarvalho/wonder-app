@@ -216,3 +216,22 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Ambiente
+.env
+*.env
+
+# Docker
+docker-compose.override.yml
+
+# VS Code
+.vscode/
+
+# Banco de dados local
+*.sql.bak
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
