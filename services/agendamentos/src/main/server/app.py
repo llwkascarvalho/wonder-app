@@ -7,7 +7,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-app.include_router(agendamento_routes.router, prefix="/agendamentos")
+app.include_router(agendamento_routes.router)
 
 @app.get("/health", tags=["Infraestrutura"])
 def health_check():
