@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS Historico_agendamento (
     id              SERIAL PRIMARY KEY,
     agendamento_id  INTEGER NOT NULL REFERENCES Agendamento(id) ON DELETE CASCADE,
     usuario_id      INTEGER NOT NULL,
-    status_anterior VARCHAR(20) NOT NULL,
+    status_anterior VARCHAR(20),
     status_novo     VARCHAR(20) NOT NULL,
     motivo          VARCHAR(100),
     data_hora       TIMESTAMP NOT NULL DEFAULT NOW()

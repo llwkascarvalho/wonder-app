@@ -7,9 +7,19 @@ class Settings(BaseSettings):
     AGENDAMENTOS_DB_USER: str
     AGENDAMENTOS_DB_PASSWORD: str
 
+    RABBITMQ_HOST: str = "rabbitmq"
+    RABBITMQ_PORT: int = 5672
+    RABBITMQ_USER: str = "wonder_user"
+    RABBITMQ_PASSWORD: str = ""
+    RABBITMQ_QUEUE: str = "wonder.eventos"
+
     @property
     def database_url(self) -> str:
-        return f"postgresql+psycopg2://{self.AGENDAMENTOS_DB_USER}:{self.AGENDAMENTOS_DB_PASSWORD}@{self.AGENDAMENTOS_DB_HOST}:{self.AGENDAMENTOS_DB_PORT}/{self.AGENDAMENTOS_DB_NAME}"
+        return (
+            f"postgresql+psycopg2://{self.AGENDAMENTOS_DB_USER}:"
+            f"{self.AGENDAMENTOS_DB_PASSWORD}@{self.AGENDAMENTOS_DB_HOST}:"
+            f"{self.AGENDAMENTOS_DB_PORT}/{self.AGENDAMENTOS_DB_NAME}"
+        )
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
