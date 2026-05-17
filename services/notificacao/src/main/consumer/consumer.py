@@ -17,7 +17,7 @@ def processar_mensagem(ch, method, properties, body):
         dados = json.loads(body)
         print(f"[consumer] Mensagem recebida: {dados}")
 
-        cliente_id  = str(dados.get("cliente_id"))
+        cliente_id  = int(dados.get("cliente_id"))
         agendamento_id = dados.get("agendamento_id")
         inicio      = dados.get("inicio", "horário não informado")
 
@@ -29,7 +29,7 @@ def processar_mensagem(ch, method, properties, body):
         db = SessionLocal()
         try:
             notificacao_repo.criar(db, usuario_id=cliente_id, mensagem=mensagem)
-            print(f"[consumer] Notificação criada para usuário {cliente_id}.")
+            print(f"[consumer] Notificação criada para usuário {cliente_id}.", flush=True)
         finally:
             db.close()
 
@@ -73,14 +73,14 @@ def iniciar_consumer():
                 on_message_callback=processar_mensagem
             )
 
-            print("[consumer] Aguardando mensagens na fila wonder.eventos...")
+            print("[consumer] Aguardando mensagens na fila wonder.eventos...", flush=True)
             channel.start_consuming()
 
         except pika.exceptions.AMQPConnectionError:
-            print("[consumer] RabbitMQ indisponível. Tentando novamente em 5s...")
+            print("[consumer] RabbitMQ indisponível. Tentando novamente em 5s...", flush=True)
             time.sleep(5)
         except Exception as e:
-            print(f"[consumer] Erro inesperado: {e}. Reiniciando em 5s...")
+            print(f"[consumer] Erro inesperado: {e}. Reiniciando em 5s...", flush=True)
             time.sleep(5)
 
 
@@ -90,4 +90,4 @@ def iniciar_consumer_em_background():
     """
     thread = threading.Thread(target=iniciar_consumer, daemon=True)
     thread.start()
-    print("[consumer] Thread do consumer iniciada em background.")
+    print("[consumer] Thread do consumer iniciada em background.", flush=True)
