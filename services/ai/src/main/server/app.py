@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from src.main.core.config import settings
+from src.main.routes.ai_routes import router as ai_router
 
 app = FastAPI(
     title="Wonder - Serviço AI",
@@ -9,10 +10,12 @@ app = FastAPI(
 
 @app.on_event("startup")
 def verificar_configuracao():
-    if settings.GEMINI_API_KEY:
-        print("✅ GEMINI_API_KEY carregada com sucesso via Pydantic.")
+    if settings.OPENROUTER_API_KEY:
+        print("✅ OPENROUTER_API_KEY carregada com sucesso.", flush=True)
     else:
-        print("⚠️  GEMINI_API_KEY não encontrada no .env.")
+        print("⚠️  OPENROUTER_API_KEY não encontrada. Endpoint /ai/chat retornará 503.", flush=True)
+
+app.include_router(ai_router)
 
 @app.get("/health", tags=["Infraestrutura"])
 def health_check():

@@ -1,7 +1,8 @@
+from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    GEMINI_API_KEY: str
+    OPENROUTER_API_KEY: Optional[str] = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
