@@ -21,7 +21,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-app.include_router(notificacao_routes.router, prefix="/notificacoes")
+app.include_router(notificacao_routes.router)
 
 
 @app.get("/health", tags=["Infraestrutura"])

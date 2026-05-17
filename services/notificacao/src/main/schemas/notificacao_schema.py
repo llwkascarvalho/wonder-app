@@ -5,11 +5,11 @@ class NotificacaoBase(BaseModel):
     mensagem: str
 
 class NotificacaoCreate(NotificacaoBase):
-    usuario_id: str
+    usuario_id: int
 
 class NotificacaoResponse(NotificacaoBase):
     id: int
-    usuario_id: str
+    usuario_id: int
     status: str
     criado_em: datetime
 
