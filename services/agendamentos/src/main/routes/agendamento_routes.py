@@ -1,42 +1,45 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Header
 from sqlalchemy.orm import Session
 from src.main.dependencies.db import get_db
 from src.main.schemas.agendamento_schema import (
     AgendamentoCreate,
     AgendamentoResponse,
+    AgendamentoStatusUpdate,
+    HistoricoResponse,
 )
 from src.main.repositories.agendamento_repo import (
     listar_agendamentos,
     obter_agendamento,
     criar_agendamento,
+    atualizar_status,
 )
 
 router = APIRouter(tags=["Agendamentos"])
 
-def get_cliente_id(request: Request) -> int:
-    """Extrai o ID do usuário logado do header injetado pelo Gateway."""
-    user_id = request.headers.get("X-User-ID")
-    if not user_id:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=401, detail="Usuário não identificado.")
-    return int(user_id)
 
 @router.get("/agendamentos", response_model=list[AgendamentoResponse])
-def route_listar(request: Request, db: Session = Depends(get_db)):
+def route_listar(
+    x_user_id: int = Header(..., alias="X-User-ID"),
+    db: Session = Depends(get_db)
+):
     """Lista todos os agendamentos do usuário logado."""
-    cliente_id = get_cliente_id(request)
-    return listar_agendamentos(db, cliente_id)
+    return listar_agendamentos(db, x_user_id)
+
 
 @router.get("/agendamentos/{agendamento_id}", response_model=AgendamentoResponse)
-def route_obter(agendamento_id: int, request: Request, db: Session = Depends(get_db)):
+def route_obter(
+    agendamento_id: int,
+    x_user_id: int = Header(..., alias="X-User-ID"),
+    db: Session = Depends(get_db)
+):
     """Retorna detalhes de um agendamento específico do usuário logado."""
-    cliente_id = get_cliente_id(request)
-    return obter_agendamento(db, agendamento_id, cliente_id)
+    return obter_agendamento(db, agendamento_id, x_user_id)
+
 
 @router.post("/agendamentos", response_model=AgendamentoResponse, status_code=201)
 def route_criar(
     dados: AgendamentoCreate,
-    request: Request,
+    x_user_id: int = Header(..., alias="X-User-ID"),
     db: Session = Depends(get_db)
 ):
     """
@@ -44,5 +47,20 @@ def route_criar(
     Controle de concorrência via SELECT FOR UPDATE impede double booking.
     Após criação, publica evento no RabbitMQ para o serviço de Notificação.
     """
-    cliente_id = get_cliente_id(request)
-    return criar_agendamento(db, dados, cliente_id)
+    return criar_agendamento(db, dados, x_user_id)
+
+
+@router.patch("/agendamentos/{agendamento_id}/status", response_model=AgendamentoResponse)
+def route_atualizar_status(
+    agendamento_id: int,
+    dados: AgendamentoStatusUpdate,
+    x_user_id: int = Header(..., alias="X-User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Atualiza o status de um agendamento (confirmar, cancelar, concluir).
+    Registra histórico com status_anterior e status_novo.
+    O UPDATE e o INSERT disparam triggers de auditoria automaticamente.
+    Retorna 404 se o agendamento não existir ou não pertencer ao usuário logado.
+    """
+    return atualizar_status(db, agendamento_id, x_user_id, dados)
