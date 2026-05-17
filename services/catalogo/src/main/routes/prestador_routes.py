@@ -4,7 +4,7 @@ from typing import List
 
 from src.main.dependencies.db import get_db
 from src.main.repositories import prestador_repo
-from src.main.schemas.prestador_schema import PrestadorResponse, ServicoResponse
+from src.main.schemas.prestador_schema import (PrestadorCreate, PrestadorUpdate, PrestadorResponse, ServicoCreate, ServicoResponse)
 
 router = APIRouter(tags=["Catálogo"])
 
@@ -13,6 +13,8 @@ def get_user_id(request: Request) -> str:
 
 def is_admin(request: Request) -> bool:
     return request.headers.get("X-User-Role", "").lower() == "admin"
+
+# LEITURA
 
 @router.get("/prestadores", response_model=List[PrestadorResponse])
 def listar_prestadores(request: Request, db: Session = Depends(get_db)):
@@ -35,7 +37,7 @@ def obter_prestador(prestador_id: int, request: Request, db: Session = Depends(g
         prestador_repo.registrar_auditoria(
             db, get_user_id(request), "prestador", f"Admin consultou prestador id={prestador_id}"
         )
-        
+
     return prestador
 
 @router.get("/prestadores/{prestador_id}/servicos", response_model=List[ServicoResponse])
@@ -52,3 +54,25 @@ def listar_servicos_prestador(prestador_id: int, request: Request, db: Session =
         )
         
     return servicos
+
+# ESCRITA
+
+@router.post("/prestadores", response_model=PrestadorResponse, status_code=201)
+def criar_prestador(dados: PrestadorCreate, request: Request, db: Session = Depends(get_db)):
+    usuario_id = get_user_id(request)
+    return prestador_repo.criar_prestador(db, dados, usuario_id)
+
+@router.post("/prestadores/{prestador_id}/servicos", response_model=ServicoResponse, status_code=201)
+def criar_servico(prestador_id: int, dados: ServicoCreate, request: Request, db: Session = Depends(get_db)):
+    usuario_id = get_user_id(request)
+    return prestador_repo.criar_servico(db, prestador_id, dados, usuario_id)
+
+@router.put("/prestadores/{prestador_id}", response_model=PrestadorResponse)
+def atualizar_prestador(prestador_id: int, dados: PrestadorUpdate, request: Request, db: Session = Depends(get_db)):
+    usuario_id = get_user_id(request)
+    return prestador_repo.atualizar_prestador(db, prestador_id, dados, usuario_id)
+
+@router.delete("/prestadores/{prestador_id}")
+def remover_prestador(prestador_id: int, request: Request, db: Session = Depends(get_db)):
+    usuario_id = get_user_id(request)
+    return prestador_repo.remover_prestador(db, prestador_id, usuario_id)
