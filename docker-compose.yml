@@ -74,7 +74,7 @@ services:
     container_name: wonder_ai
     ports:
       - "8005:8005"
-    env_file: .env
+    env_file: ./services/ai/.env
     networks:
       - wonder-network
 
