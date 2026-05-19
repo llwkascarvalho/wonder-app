@@ -3,7 +3,7 @@ from sqlalchemy.sql import func
 from src.main.core.database import Base
 
 class CustomUser(Base):
-    __tablename__ = "CustomUser"
+    __tablename__ = "customuser"
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(255), nullable=False)
