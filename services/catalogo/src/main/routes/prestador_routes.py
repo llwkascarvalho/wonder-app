@@ -4,7 +4,10 @@ from typing import List
 
 from src.main.dependencies.db import get_db
 from src.main.repositories import prestador_repo
-from src.main.schemas.prestador_schema import (PrestadorCreate, PrestadorUpdate, PrestadorResponse, ServicoCreate, ServicoResponse)
+from src.main.schemas.prestador_schema import (
+    AvaliacaoCreate, AvaliacaoResponse, HorarioCreate, HorarioResponse,
+    PrestadorCreate, PrestadorUpdate, PrestadorResponse, ServicoCreate, ServicoResponse
+)
 
 router = APIRouter(tags=["Catálogo"])
 
@@ -55,6 +58,20 @@ def listar_servicos_prestador(prestador_id: int, request: Request, db: Session =
         
     return servicos
 
+@router.get("/prestadores/{prestador_id}/horarios", response_model=List[HorarioResponse])
+def listar_horarios(prestador_id: int, db: Session = Depends(get_db)):
+    prestador = prestador_repo.obter_por_id(db, prestador_id)
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Prestador não encontrado.")
+    return prestador_repo.listar_horarios(db, prestador_id)
+
+@router.get("/prestadores/{prestador_id}/avaliacoes", response_model=List[AvaliacaoResponse])
+def listar_avaliacoes(prestador_id: int, db: Session = Depends(get_db)):
+    prestador = prestador_repo.obter_por_id(db, prestador_id)
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Prestador não encontrado.")
+    return prestador_repo.listar_avaliacoes(db, prestador_id)
+
 # ESCRITA
 
 @router.post("/prestadores", response_model=PrestadorResponse, status_code=201)
@@ -67,6 +84,14 @@ def criar_servico(prestador_id: int, dados: ServicoCreate, request: Request, db:
     usuario_id = get_user_id(request)
     return prestador_repo.criar_servico(db, prestador_id, dados, usuario_id)
 
+@router.post("/prestadores/{prestador_id}/horarios", response_model=HorarioResponse, status_code=201)
+def criar_horario(prestador_id: int, dados: HorarioCreate, request: Request, db: Session = Depends(get_db)):
+    return prestador_repo.criar_horario(db, prestador_id, dados, get_user_id(request))
+
+@router.post("/prestadores/{prestador_id}/avaliacoes", response_model=AvaliacaoResponse, status_code=201)
+def criar_avaliacao(prestador_id: int, dados: AvaliacaoCreate, request: Request, db: Session = Depends(get_db)):
+    return prestador_repo.criar_avaliacao(db, prestador_id, dados, get_user_id(request))
+
 @router.put("/prestadores/{prestador_id}", response_model=PrestadorResponse)
 def atualizar_prestador(prestador_id: int, dados: PrestadorUpdate, request: Request, db: Session = Depends(get_db)):
     usuario_id = get_user_id(request)
@@ -76,3 +101,7 @@ def atualizar_prestador(prestador_id: int, dados: PrestadorUpdate, request: Requ
 def remover_prestador(prestador_id: int, request: Request, db: Session = Depends(get_db)):
     usuario_id = get_user_id(request)
     return prestador_repo.remover_prestador(db, prestador_id, usuario_id)
+
+@router.delete("/prestadores/{prestador_id}/horarios/{horario_id}")
+def deletar_horario(prestador_id: int, horario_id: int, request: Request, db: Session = Depends(get_db)):
+    return prestador_repo.deletar_horario(db, prestador_id, horario_id, get_user_id(request))

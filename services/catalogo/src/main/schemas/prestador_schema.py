@@ -1,4 +1,5 @@
-from pydantic import BaseModel
+from datetime import time
+from pydantic import BaseModel, Field
 from typing import Optional, List
 
 # SCHEMAS DE SERVIÇO
@@ -38,5 +39,32 @@ class PrestadorResponse(PrestadorBase):
     usuario_id: int | str
     status: str
     
+    class Config:
+        from_attributes = True
+
+# SCHEMAS DE HORARIO
+
+class HorarioCreate(BaseModel):
+    dia_semana: int
+    hora_inicio: time
+    hora_fim: time
+
+class HorarioResponse(HorarioCreate):
+    id: int
+    prestador_id: int
+
+    class Config:
+        from_attributes = True
+
+# SCHEMAS DE AVALIACAO
+
+class AvaliacaoCreate(BaseModel):
+    agendamento_id: int
+    nota: int = Field(ge=1, le=5)
+
+class AvaliacaoResponse(AvaliacaoCreate):
+    id: int
+    prestador_id: int
+
     class Config:
         from_attributes = True
