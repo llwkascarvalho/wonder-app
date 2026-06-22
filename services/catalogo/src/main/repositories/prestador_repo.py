@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from src.main.models.prestador_model import Prestador, Servico, LogAuditoria
-from src.main.schemas.prestador_schema import PrestadorCreate, PrestadorUpdate, ServicoCreate
+from src.main.models.prestador_model import Avaliacao, HorarioFuncionamento, LogAuditoria, Prestador, Servico
+from src.main.schemas.prestador_schema import AvaliacaoCreate, HorarioCreate, PrestadorCreate, PrestadorUpdate, ServicoCreate
 
 # LEITURA
 
@@ -13,6 +13,14 @@ def obter_por_id(db: Session, prestador_id: int):
 
 def listar_servicos(db: Session, prestador_id: int):
     return db.query(Servico).filter(Servico.prestador_id == prestador_id).order_by(Servico.nome).all()
+
+def listar_horarios(db: Session, prestador_id: int):
+    return db.query(HorarioFuncionamento).filter(
+        HorarioFuncionamento.prestador_id == prestador_id
+    ).order_by(HorarioFuncionamento.dia_semana, HorarioFuncionamento.hora_inicio).all()
+
+def listar_avaliacoes(db: Session, prestador_id: int):
+    return db.query(Avaliacao).filter(Avaliacao.prestador_id == prestador_id).all()
 
 def registrar_auditoria(db: Session, usuario_id: str, tabela: str, descricao: str):
     log = LogAuditoria(
@@ -56,6 +64,59 @@ def criar_servico(db: Session, prestador_id: int, dados: ServicoCreate, usuario_
     db.commit()
     db.refresh(servico)
     return servico
+
+def criar_horario(db: Session, prestador_id: int, dados: HorarioCreate, usuario_id: str) -> HorarioFuncionamento:
+    prestador = obter_por_id(db, prestador_id)
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Prestador não encontrado.")
+    if str(prestador.usuario_id) != str(usuario_id):
+        raise HTTPException(status_code=403, detail="Sem permissão para modificar este prestador.")
+
+    horario = HorarioFuncionamento(
+        prestador_id=prestador_id,
+        dia_semana=dados.dia_semana,
+        hora_inicio=dados.hora_inicio,
+        hora_fim=dados.hora_fim
+    )
+    db.add(horario)
+    db.commit()
+    db.refresh(horario)
+    return horario
+
+def deletar_horario(db: Session, prestador_id: int, horario_id: int, usuario_id: str) -> dict:
+    prestador = obter_por_id(db, prestador_id)
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Prestador não encontrado.")
+    if str(prestador.usuario_id) != str(usuario_id):
+        raise HTTPException(status_code=403, detail="Sem permissão para modificar este prestador.")
+
+    horario = db.query(HorarioFuncionamento).filter(
+        HorarioFuncionamento.id == horario_id,
+        HorarioFuncionamento.prestador_id == prestador_id
+    ).first()
+    if not horario:
+        raise HTTPException(status_code=404, detail="Horário não encontrado.")
+
+    db.delete(horario)
+    db.commit()
+    return {"mensagem": f"Horário id={horario_id} removido com sucesso."}
+
+def criar_avaliacao(db: Session, prestador_id: int, dados: AvaliacaoCreate, usuario_id: str) -> Avaliacao:
+    prestador = obter_por_id(db, prestador_id)
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Prestador não encontrado.")
+    if str(prestador.usuario_id) != str(usuario_id):
+        raise HTTPException(status_code=403, detail="Sem permissão para modificar este prestador.")
+
+    avaliacao = Avaliacao(
+        agendamento_id=dados.agendamento_id,
+        prestador_id=prestador_id,
+        nota=dados.nota
+    )
+    db.add(avaliacao)
+    db.commit()
+    db.refresh(avaliacao)
+    return avaliacao
 
 def atualizar_prestador(db: Session, prestador_id: int, dados: PrestadorUpdate, usuario_id: str) -> Prestador:
     prestador = obter_por_id(db, prestador_id)

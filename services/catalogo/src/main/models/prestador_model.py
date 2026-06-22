@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, JSON, SmallInteger, Time
 from sqlalchemy.orm import relationship
 from src.main.core.database import Base
 
@@ -12,6 +12,8 @@ class Prestador(Base):
     status = Column(String, default="ativo")
 
     servicos = relationship("Servico", back_populates="prestador")
+    horarios = relationship("HorarioFuncionamento", back_populates="prestador")
+    avaliacoes = relationship("Avaliacao", back_populates="prestador")
 
 class Categoria(Base):
     __tablename__ = "categoria"
@@ -31,6 +33,27 @@ class Servico(Base):
 
     prestador = relationship("Prestador", back_populates="servicos")
     categoria = relationship("Categoria")
+
+class HorarioFuncionamento(Base):
+    __tablename__ = "horariofuncionamento"
+
+    id = Column(Integer, primary_key=True, index=True)
+    prestador_id = Column(Integer, ForeignKey("prestador.id"), nullable=False)
+    dia_semana = Column(Integer, nullable=False)
+    hora_inicio = Column(Time, nullable=False)
+    hora_fim = Column(Time, nullable=False)
+
+    prestador = relationship("Prestador", back_populates="horarios")
+
+class Avaliacao(Base):
+    __tablename__ = "avaliacao"
+
+    id = Column(Integer, primary_key=True, index=True)
+    agendamento_id = Column(Integer, nullable=False, unique=True)
+    prestador_id = Column(Integer, ForeignKey("prestador.id"), nullable=False)
+    nota = Column(SmallInteger, nullable=False)
+
+    prestador = relationship("Prestador", back_populates="avaliacoes")
 
 class LogAuditoria(Base):
     __tablename__ = "logs_auditoria"
