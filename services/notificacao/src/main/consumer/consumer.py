@@ -19,12 +19,14 @@ def processar_mensagem(ch, method, properties, body):
 
         cliente_id  = int(dados.get("cliente_id"))
         agendamento_id = dados.get("agendamento_id")
-        inicio      = dados.get("inicio", "horário não informado")
-
-        mensagem = (
-            f"Seu agendamento #{agendamento_id} foi confirmado para {inicio}. "
-            f"Até breve!"
-        )
+        if dados.get("status_novo") == "cancelado":
+            mensagem = f"Seu agendamento #{agendamento_id} foi cancelado."
+        else:
+            inicio = dados.get("inicio", "horário não informado")
+            mensagem = (
+                f"Seu agendamento #{agendamento_id} foi confirmado para {inicio}. "
+                f"Até breve!"
+            )
 
         db = SessionLocal()
         try:
@@ -64,12 +66,12 @@ def iniciar_consumer():
             channel = connection.channel()
 
             # Garante que a fila existe antes de escutar
-            channel.queue_declare(queue="wonder.eventos", durable=True)
+            channel.queue_declare(queue=settings.RABBITMQ_QUEUE, durable=True)
 
             # Processa uma mensagem por vez
             channel.basic_qos(prefetch_count=1)
             channel.basic_consume(
-                queue="wonder.eventos",
+                queue=settings.RABBITMQ_QUEUE,
                 on_message_callback=processar_mensagem
             )
 
