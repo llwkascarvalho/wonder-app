@@ -3,9 +3,10 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from src.main.dependencies.db import get_db
+from src.main.models.prestador_model import Categoria
 from src.main.repositories import prestador_repo
 from src.main.schemas.prestador_schema import (
-    AvaliacaoCreate, AvaliacaoResponse, HorarioCreate, HorarioResponse,
+    AvaliacaoCreate, AvaliacaoResponse, CategoriaResponse, HorarioCreate, HorarioResponse,
     PrestadorCreate, PrestadorUpdate, PrestadorResponse, ServicoCreate, ServicoResponse
 )
 
@@ -20,8 +21,13 @@ def is_admin(request: Request) -> bool:
 # LEITURA
 
 @router.get("/prestadores", response_model=List[PrestadorResponse])
-def listar_prestadores(request: Request, db: Session = Depends(get_db)):
-    prestadores = prestador_repo.listar_ativos(db)
+def listar_prestadores(
+    request: Request,
+    nome: str = None,
+    categoria_id: int = None,
+    db: Session = Depends(get_db)
+):
+    prestadores = prestador_repo.listar_ativos(db, nome=nome, categoria_id=categoria_id)
     
     if is_admin(request):
         prestador_repo.registrar_auditoria(
@@ -29,6 +35,10 @@ def listar_prestadores(request: Request, db: Session = Depends(get_db)):
         )
         
     return prestadores
+
+@router.get("/categorias", response_model=List[CategoriaResponse])
+def listar_categorias(db: Session = Depends(get_db)):
+    return db.query(Categoria).all()
 
 @router.get("/prestadores/{prestador_id}", response_model=PrestadorResponse)
 def obter_prestador(prestador_id: int, request: Request, db: Session = Depends(get_db)):

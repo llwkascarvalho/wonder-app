@@ -5,8 +5,13 @@ from src.main.schemas.prestador_schema import AvaliacaoCreate, HorarioCreate, Pr
 
 # LEITURA
 
-def listar_ativos(db: Session):
-    return db.query(Prestador).filter(Prestador.status == "ativo").order_by(Prestador.nome_estab).all()
+def listar_ativos(db: Session, nome: str = None, categoria_id: int = None):
+    query = db.query(Prestador).filter(Prestador.status == "ativo")
+    if nome:
+        query = query.filter(Prestador.nome_estab.ilike(f"%{nome}%"))
+    if categoria_id:
+        query = query.join(Servico).filter(Servico.categoria_id == categoria_id)
+    return query.order_by(Prestador.nome_estab).all()
 
 def obter_por_id(db: Session, prestador_id: int):
     return db.query(Prestador).filter(Prestador.id == prestador_id).first()

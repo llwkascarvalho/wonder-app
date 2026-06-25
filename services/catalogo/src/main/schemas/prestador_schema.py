@@ -20,6 +20,13 @@ class ServicoResponse(ServicoBase):
     class Config:
         from_attributes = True
 
+class CategoriaResponse(BaseModel):
+    id: int
+    nome: str
+
+    class Config:
+        from_attributes = True
+
 # SCHEMAS DE PRESTADOR
 
 class PrestadorBase(BaseModel):
