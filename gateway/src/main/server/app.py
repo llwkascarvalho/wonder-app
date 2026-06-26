@@ -6,6 +6,10 @@ from src.main.core.config import settings
 
 PUBLIC_PREFIXES = ["/auth/", "/health"]
 
+SERVICE_PREFIX_ALIASES = {
+    "notificacoes": "notificacao",
+}
+
 app = FastAPI(
     title="Wonder - API Gateway",
     description="Ponto de entrada único para todos os microsserviços.",
@@ -31,6 +35,11 @@ def resolve_service(path: str):
     for name, url in settings.services.items():
         if path.startswith(f"/{name}"):
             return name, url
+
+    for prefix, service_name in SERVICE_PREFIX_ALIASES.items():
+        if path.startswith(f"/{prefix}"):
+            return service_name, settings.services[service_name]
+
     return None, None
 
 @app.get("/health", tags=["Infraestrutura"])
