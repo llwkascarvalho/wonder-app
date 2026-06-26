@@ -1,5 +1,6 @@
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -7,13 +8,20 @@ from src.main.core.config import settings
 from src.main.dependencies.db import get_db
 from src.main.repositories import user_repo
 from src.main.core.security import gerar_jwt
-from src.main.schemas.auth_schema import TokenResponse
+from src.main.schemas.auth_schema import TipoUpdate, TokenResponse, UsuarioResponse
 
 router = APIRouter(tags=["Autenticação"])
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USER_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
+
+def is_admin(request: Request) -> bool:
+    return request.headers.get("X-User-Role", "").lower() == "admin"
+
+def validar_admin(request: Request):
+    if not is_admin(request):
+        raise HTTPException(status_code=403, detail="Acesso restrito a administradores.")
 
 @router.get("/auth/google/login")
 def google_login():
@@ -70,3 +78,22 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
             "tipo_usuario": usuario.tipo_usuario
         }
     }
+
+@router.get("/auth/usuarios", response_model=List[UsuarioResponse])
+def listar_usuarios(request: Request, db: Session = Depends(get_db)):
+    validar_admin(request)
+    return user_repo.listar_usuarios(db)
+
+@router.get("/auth/usuarios/{user_id}", response_model=UsuarioResponse)
+def obter_usuario(user_id: int, request: Request, db: Session = Depends(get_db)):
+    validar_admin(request)
+    return user_repo.obter_usuario(db, user_id)
+
+@router.patch("/auth/usuarios/{user_id}/tipo", response_model=UsuarioResponse)
+def atualizar_tipo(user_id: int, dados: TipoUpdate, request: Request, db: Session = Depends(get_db)):
+    validar_admin(request)
+
+    if dados.tipo_usuario not in ["cliente", "prestador", "admin"]:
+        raise HTTPException(status_code=400, detail="Tipo inválido.")
+
+    return user_repo.atualizar_tipo(db, user_id, dados.tipo_usuario)
