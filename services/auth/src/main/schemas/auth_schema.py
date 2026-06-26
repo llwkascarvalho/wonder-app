@@ -8,6 +8,9 @@ class UsuarioResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class TipoUpdate(BaseModel):
+    tipo_usuario: str
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
