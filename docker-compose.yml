@@ -13,6 +13,7 @@ services:
       - agendamentos
       - notificacao
       - ai
+      - admin
     networks:
       - wonder-network
 
@@ -75,6 +76,24 @@ services:
     ports:
       - "8005:8005"
     env_file: ./services/ai/.env
+    networks:
+      - wonder-network
+
+  admin:
+    build: ./services/admin
+    container_name: wonder_admin
+    ports:
+      - "8006:8006"
+    env_file: .env
+    depends_on:
+      db_auth:
+        condition: service_healthy
+      db_catalogo:
+        condition: service_healthy
+      db_agendamentos:
+        condition: service_healthy
+      db_notificacoes:
+        condition: service_healthy
     networks:
       - wonder-network
 
