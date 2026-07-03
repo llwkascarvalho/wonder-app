@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     AGENDAMENTOS_SERVICE_URL: str = "http://agendamentos:8003"
     NOTIFICACAO_SERVICE_URL: str = "http://notificacao:8004"
     AI_SERVICE_URL: str = "http://ai:8005"
+    ADMIN_SERVICE_URL: str = "http://admin:8006"
 
     @property
     def services(self) -> Dict[str, str]:
@@ -19,6 +20,7 @@ class Settings(BaseSettings):
             "agendamentos": self.AGENDAMENTOS_SERVICE_URL,
             "notificacao": self.NOTIFICACAO_SERVICE_URL,
             "ai": self.AI_SERVICE_URL,
+            "admin": self.ADMIN_SERVICE_URL,
         }
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
