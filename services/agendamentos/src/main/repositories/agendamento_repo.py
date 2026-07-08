@@ -73,8 +73,31 @@ def publicar_evento_cancelamento(agendamento: Agendamento, motivo: str = None):
         print(f"⚠️  Falha ao publicar cancelamento no RabbitMQ: {e}")
 
 
-def listar_agendamentos(db: Session, cliente_id: int) -> list[Agendamento]:
-    return db.query(Agendamento).filter(Agendamento.cliente_id == cliente_id).all()
+def listar_agendamentos(
+    db: Session,
+    usuario_id: int,
+    tipo_usuario: str,
+    prestador_ids: list[int] | None = None
+) -> list[Agendamento]:
+    if tipo_usuario == "admin":
+        return db.query(Agendamento).order_by(Agendamento.inicio.desc()).all()
+
+    if tipo_usuario == "prestador":
+        if not prestador_ids:
+            return []
+        return (
+            db.query(Agendamento)
+            .filter(Agendamento.prestador_id.in_(prestador_ids))
+            .order_by(Agendamento.inicio.desc())
+            .all()
+        )
+
+    return (
+        db.query(Agendamento)
+        .filter(Agendamento.cliente_id == usuario_id)
+        .order_by(Agendamento.inicio.desc())
+        .all()
+    )
 
 
 def obter_agendamento(db: Session, agendamento_id: int, cliente_id: int) -> Agendamento:
@@ -141,8 +164,10 @@ def criar_agendamento(db: Session, dados: AgendamentoCreate, cliente_id: int) ->
 def atualizar_status(
     db: Session,
     agendamento_id: int,
-    cliente_id: int,
-    dados: AgendamentoStatusUpdate
+    usuario_id: int,
+    dados: AgendamentoStatusUpdate,
+    tipo_usuario: str,
+    prestador_ids: list[int] | None = None
 ) -> Agendamento:
     """
     Atualiza o status de um agendamento.
@@ -151,10 +176,19 @@ def atualizar_status(
     - O UPDATE em Agendamento dispara trigger e gera linha em logs_auditoria.
     - O INSERT em HistoricoAgendamento também dispara trigger e gera linha em logs_auditoria.
     """
-    agendamento = db.query(Agendamento).filter(
-        Agendamento.id == agendamento_id,
-        Agendamento.cliente_id == cliente_id
-    ).first()
+    query = db.query(Agendamento).filter(Agendamento.id == agendamento_id)
+
+    if tipo_usuario == "prestador":
+        if not prestador_ids:
+            raise HTTPException(
+                status_code=404,
+                detail="Agendamento nÃ£o encontrado ou nÃ£o pertence ao usuÃ¡rio logado."
+            )
+        query = query.filter(Agendamento.prestador_id.in_(prestador_ids))
+    elif tipo_usuario != "admin":
+        query = query.filter(Agendamento.cliente_id == usuario_id)
+
+    agendamento = query.first()
 
     if not agendamento:
         raise HTTPException(
@@ -167,7 +201,7 @@ def atualizar_status(
 
     historico = HistoricoAgendamento(
         agendamento_id=agendamento.id,
-        usuario_id=cliente_id,
+        usuario_id=usuario_id,
         status_anterior=status_anterior,
         status_novo=dados.status,
         motivo=dados.motivo

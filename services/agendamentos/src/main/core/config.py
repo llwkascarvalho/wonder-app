@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     RABBITMQ_USER: str = "wonder_user"
     RABBITMQ_PASSWORD: str = ""
     RABBITMQ_QUEUE: str = "wonder.eventos"
+    CATALOGO_URL: str = "http://catalogo:8002"
 
     @property
     def database_url(self) -> str:

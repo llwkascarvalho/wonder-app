@@ -1,38 +1,74 @@
-from fastapi import APIRouter, Depends, Request, Header
+import json
+from urllib.error import URLError
+from urllib.request import Request as UrlRequest, urlopen
+
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
+
+from src.main.core.config import settings
 from src.main.dependencies.db import get_db
+from src.main.repositories.agendamento_repo import (
+    atualizar_status,
+    criar_agendamento,
+    listar_agendamentos,
+    obter_agendamento,
+)
 from src.main.schemas.agendamento_schema import (
     AgendamentoCreate,
     AgendamentoResponse,
     AgendamentoStatusUpdate,
-    HistoricoResponse,
-)
-from src.main.repositories.agendamento_repo import (
-    listar_agendamentos,
-    obter_agendamento,
-    criar_agendamento,
-    atualizar_status,
 )
 
 router = APIRouter(tags=["Agendamentos"])
 
 
+def listar_prestadores_usuario(usuario_id: int, tipo_usuario: str) -> list[int]:
+    if tipo_usuario != "prestador":
+        return []
+
+    request = UrlRequest(
+        f"{settings.CATALOGO_URL}/catalogo/prestadores",
+        headers={
+            "X-User-ID": str(usuario_id),
+            "X-User-Role": tipo_usuario,
+        },
+    )
+
+    try:
+        with urlopen(request, timeout=5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Servico de Catalogo indisponivel para resolver prestador: {exc}",
+        )
+
+    return [
+        int(prestador["id"])
+        for prestador in payload
+        if str(prestador.get("usuario_id")) == str(usuario_id)
+    ]
+
+
 @router.get("/agendamentos", response_model=list[AgendamentoResponse])
 def route_listar(
     x_user_id: int = Header(..., alias="X-User-ID"),
-    db: Session = Depends(get_db)
+    x_user_role: str = Header("cliente", alias="X-User-Role"),
+    db: Session = Depends(get_db),
 ):
-    """Lista todos os agendamentos do usuário logado."""
-    return listar_agendamentos(db, x_user_id)
+    """Lista agendamentos conforme o papel do usuario logado."""
+    tipo_usuario = x_user_role.lower()
+    prestador_ids = listar_prestadores_usuario(x_user_id, tipo_usuario)
+    return listar_agendamentos(db, x_user_id, tipo_usuario, prestador_ids)
 
 
 @router.get("/agendamentos/{agendamento_id}", response_model=AgendamentoResponse)
 def route_obter(
     agendamento_id: int,
     x_user_id: int = Header(..., alias="X-User-ID"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """Retorna detalhes de um agendamento específico do usuário logado."""
+    """Retorna detalhes de um agendamento especifico do cliente logado."""
     return obter_agendamento(db, agendamento_id, x_user_id)
 
 
@@ -40,13 +76,8 @@ def route_obter(
 def route_criar(
     dados: AgendamentoCreate,
     x_user_id: int = Header(..., alias="X-User-ID"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-    Cria um novo agendamento.
-    Controle de concorrência via SELECT FOR UPDATE impede double booking.
-    Após criação, publica evento no RabbitMQ para o serviço de Notificação.
-    """
     return criar_agendamento(db, dados, x_user_id)
 
 
@@ -55,12 +86,9 @@ def route_atualizar_status(
     agendamento_id: int,
     dados: AgendamentoStatusUpdate,
     x_user_id: int = Header(..., alias="X-User-ID"),
-    db: Session = Depends(get_db)
+    x_user_role: str = Header("cliente", alias="X-User-Role"),
+    db: Session = Depends(get_db),
 ):
-    """
-    Atualiza o status de um agendamento (confirmar, cancelar, concluir).
-    Registra histórico com status_anterior e status_novo.
-    O UPDATE e o INSERT disparam triggers de auditoria automaticamente.
-    Retorna 404 se o agendamento não existir ou não pertencer ao usuário logado.
-    """
-    return atualizar_status(db, agendamento_id, x_user_id, dados)
+    tipo_usuario = x_user_role.lower()
+    prestador_ids = listar_prestadores_usuario(x_user_id, tipo_usuario)
+    return atualizar_status(db, agendamento_id, x_user_id, dados, tipo_usuario, prestador_ids)
