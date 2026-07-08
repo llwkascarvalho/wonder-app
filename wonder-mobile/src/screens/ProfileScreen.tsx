@@ -2,9 +2,12 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
+import { useAuth } from '../contexts/AuthContext';
 import { theme } from '../styles/theme';
 
 export function ProfileScreen() {
+  const { usuario, signOut } = useAuth();
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Perfil</Text>
@@ -15,10 +18,13 @@ export function ProfileScreen() {
           <Text style={styles.avatarText}>W</Text>
         </View>
         <Text style={styles.cardTitle}>Usuário Wonder</Text>
-        <Text style={styles.cardText}>user@wonder.com</Text>
+        <Text style={styles.cardText}>{usuario?.email || `ID ${usuario?.id}`}</Text>
+        {usuario?.tipo_usuario ? (
+          <Text style={styles.roleText}>{usuario.tipo_usuario}</Text>
+        ) : null}
       </Card>
 
-      <Button title="Entrar com Google" onPress={() => undefined} variant="outline" />
+      <Button title="Sair" onPress={signOut} variant="outline" />
     </View>
   );
 }
@@ -66,5 +72,11 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.md,
     textAlign: 'center',
+  },
+  roleText: {
+    color: theme.colors.primary,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.semibold,
+    textTransform: 'capitalize',
   },
 });

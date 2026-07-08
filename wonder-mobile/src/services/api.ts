@@ -1,5 +1,6 @@
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
+
+import { getStoredToken } from './auth';
 
 const baseURL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:8000';
 
@@ -9,7 +10,7 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use(async (config) => {
-  const token = await SecureStore.getItemAsync('jwt');
+  const token = await getStoredToken();
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

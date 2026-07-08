@@ -1,6 +1,7 @@
 import { useFonts } from 'expo-font';
 import { ActivityIndicator, View } from 'react-native';
 
+import { AuthProvider } from './src/contexts/AuthContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { theme } from './src/styles/theme';
 
@@ -22,5 +23,9 @@ export default function App() {
     );
   }
 
-  return <AppNavigator />;
+  return (
+    <AuthProvider>
+      <AppNavigator />
+    </AuthProvider>
+  );
 }
