@@ -230,6 +230,8 @@ docker-compose.override.yml
 
 # Banco de dados local
 *.sql.bak
+backups/
+*.sql.gz
 
 # Python
 __pycache__/

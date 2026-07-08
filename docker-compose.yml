@@ -196,12 +196,35 @@ services:
     networks:
       - wonder-network
 
+  # BACKUP
+  backup:
+    image: postgres:16-alpine
+    container_name: wonder_backup
+    env_file: .env
+    depends_on:
+      db_auth:
+        condition: service_healthy
+      db_catalogo:
+        condition: service_healthy
+      db_agendamentos:
+        condition: service_healthy
+      db_notificacoes:
+        condition: service_healthy
+    volumes:
+      - ./scripts/backup.sh:/scripts/backup.sh:ro
+      - backups_data:/backups
+    command: >
+      sh -c "while true; do sh /scripts/backup.sh; sleep $${BACKUP_INTERVAL_SECONDS:-86400}; done"
+    networks:
+      - wonder-network
+
 # ─── VOLUMES ─────────────────────────────────────────────────
 volumes:
   db_auth_data:
   db_catalogo_data:
   db_agendamentos_data:
   db_notificacoes_data:
+  backups_data:
 
 # ─── REDE ────────────────────────────────────────────────────
 networks:
