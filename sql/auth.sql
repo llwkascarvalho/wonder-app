@@ -2,7 +2,7 @@
 
 CREATE TABLE IF NOT EXISTS CustomUser (
     id            SERIAL PRIMARY KEY,
-    username      VARCHAR(150) NOT NULL UNIQUE,
+    username      VARCHAR(150) NOT NULL,
     email         VARCHAR(254) NOT NULL UNIQUE,
     tipo_usuario  VARCHAR(20) NOT NULL DEFAULT 'cliente',
     foto_perfil   VARCHAR(500),

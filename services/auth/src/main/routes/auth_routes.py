@@ -104,7 +104,25 @@ async def google_callback(code: str, state: str | None = None, db: Session = Dep
         })
 
         if token_response.status_code != 200:
-            raise HTTPException(status_code=400, detail="Falha ao obter token do Google.")
+            try:
+                google_error = token_response.json()
+            except ValueError:
+                google_error = {}
+
+            print(
+                "[auth][oauth] erro token google:",
+                "status_code=",
+                token_response.status_code,
+                "error=",
+                google_error.get("error"),
+                "error_description=",
+                google_error.get("error_description"),
+                flush=True,
+            )
+            raise HTTPException(
+                status_code=400,
+                detail="Falha na autenticação com Google. Tente novamente.",
+            )
         access_token = token_response.json().get("access_token")
 
         # Busca Usuário

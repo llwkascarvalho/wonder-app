@@ -13,7 +13,10 @@ def upsert_usuario(db: Session, email: str, username: str) -> CustomUser:
     
     stmt = stmt.on_conflict_do_update(
         index_elements=['email'],
-        set_={'atualizado_em': func.now()}
+        set_={
+            'username': stmt.excluded.username,
+            'atualizado_em': func.now()
+        }
     ).returning(CustomUser)
 
     result = db.execute(stmt)
