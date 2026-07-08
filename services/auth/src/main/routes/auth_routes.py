@@ -1,7 +1,10 @@
 import httpx
+import base64
+import json
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
+from urllib.parse import urlencode, urlparse
 from sqlalchemy.orm import Session
 
 from src.main.core.config import settings
@@ -15,6 +18,47 @@ router = APIRouter(tags=["Autenticação"])
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USER_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
+ALLOWED_MOBILE_REDIRECT_URIS = {"wonder://auth"}
+
+def encode_state(payload: dict) -> str:
+    state_json = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    return base64.urlsafe_b64encode(state_json).decode("utf-8").rstrip("=")
+
+def decode_state(state: str | None) -> dict:
+    if not state:
+        return {}
+
+    try:
+        padded_state = state + "=" * ((4 - len(state) % 4) % 4)
+        state_json = base64.urlsafe_b64decode(padded_state.encode("utf-8")).decode("utf-8")
+        payload = json.loads(state_json)
+        return payload if isinstance(payload, dict) else {}
+    except Exception:
+        return {}
+
+def validar_mobile_redirect_uri(redirect_uri: str) -> str:
+    parsed_uri = urlparse(redirect_uri)
+    is_expo_go_redirect = (
+        parsed_uri.scheme == "exp"
+        and parsed_uri.path == "/--/auth"
+        and bool(parsed_uri.hostname)
+        and bool(parsed_uri.port)
+    )
+    is_expo_web_redirect = (
+        parsed_uri.scheme == "http"
+        and parsed_uri.hostname in {"localhost", "127.0.0.1"}
+        and parsed_uri.path in {"/--/auth", "/auth"}
+        and bool(parsed_uri.port)
+    )
+
+    if (
+        redirect_uri not in ALLOWED_MOBILE_REDIRECT_URIS
+        and not is_expo_go_redirect
+        and not is_expo_web_redirect
+    ):
+        raise HTTPException(status_code=400, detail="Redirect URI mobile inválida.")
+
+    return redirect_uri
 
 def is_admin(request: Request) -> bool:
     return request.headers.get("X-User-Role", "").lower() == "admin"
@@ -24,18 +68,31 @@ def validar_admin(request: Request):
         raise HTTPException(status_code=403, detail="Acesso restrito a administradores.")
 
 @router.get("/auth/google/login")
-def google_login():
-    params = (
-        f"?client_id={settings.GOOGLE_CLIENT_ID}"
-        f"&redirect_uri={settings.GOOGLE_REDIRECT_URI}"
-        f"&response_type=code"
-        f"&scope=openid%20email%20profile"
-        f"&access_type=offline"
-    )
-    return RedirectResponse(url=GOOGLE_AUTH_URL + params)
+def google_login(
+    mobile: bool = False,
+    redirect_uri: str | None = None
+):
+    params = {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+    }
+
+    if mobile:
+        mobile_redirect_uri = validar_mobile_redirect_uri(redirect_uri or "wonder://auth")
+        params["state"] = encode_state({
+            "mobile": True,
+            "redirect_uri": mobile_redirect_uri,
+        })
+
+    return RedirectResponse(url=f"{GOOGLE_AUTH_URL}?{urlencode(params)}")
 
 @router.get("/auth/google/callback", response_model=TokenResponse)
-async def google_callback(code: str, db: Session = Depends(get_db)):
+async def google_callback(code: str, state: str | None = None, db: Session = Depends(get_db)):
+    state_payload = decode_state(state)
+
     async with httpx.AsyncClient() as client:
         # Busca Token
         token_response = await client.post(GOOGLE_TOKEN_URL, data={
@@ -68,6 +125,12 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
 
     # Gera JWT
     token = gerar_jwt(usuario_id=usuario.id, email=usuario.email, tipo_usuario=usuario.tipo_usuario)
+
+    if state_payload.get("mobile") is True:
+        mobile_redirect_uri = validar_mobile_redirect_uri(
+            str(state_payload.get("redirect_uri") or "wonder://auth")
+        )
+        return RedirectResponse(url=f"{mobile_redirect_uri}?token={token}")
 
     return {
         "access_token": token,
