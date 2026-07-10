@@ -1,5 +1,6 @@
 import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react';
 
+import { registerUnauthorizedHandler } from '../services/api';
 import {
   clearToken,
   getStoredToken,
@@ -53,6 +54,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     restoreToken();
+  }, []);
+
+  // Sempre que a API responder 401 (token expirado/inválido), encerra a
+  // sessão automaticamente — a troca de `token` para null já faz o
+  // AppNavigator voltar para a tela de Login sozinho.
+  useEffect(() => {
+    registerUnauthorizedHandler(() => {
+      setToken(null);
+    });
   }, []);
 
   const value = useMemo(

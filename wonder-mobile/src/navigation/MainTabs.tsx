@@ -7,8 +7,8 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { ProviderAgendaScreen } from '../screens/ProviderAgendaScreen';
 import { ProviderProfileScreen } from '../screens/ProviderProfileScreen';
-import { SearchScreen } from '../screens/SearchScreen';
 import { theme } from '../styles/theme';
+import { SearchStack } from './SearchStack';
 
 export type MainTabsParamList = {
   Home: undefined;
@@ -106,7 +106,7 @@ export function MainTabs() {
       />
       <ClientTab.Screen
         name="Search"
-        component={SearchScreen}
+        component={SearchStack}
         options={{
           title: 'Buscar',
           tabBarIcon: ({ color, size }) => (
