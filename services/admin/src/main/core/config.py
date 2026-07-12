@@ -2,6 +2,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    AUTH_SERVICE_URL: str = "http://auth:8001"
+    CATALOGO_SERVICE_URL: str = "http://catalogo:8002"
+
     AUTH_DB_HOST: str
     AUTH_DB_PORT: str
     AUTH_DB_NAME: str

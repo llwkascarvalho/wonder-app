@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, JSON, SmallInteger, Time
+from sqlalchemy import Column, DateTime, Integer, String, Float, ForeignKey, JSON, SmallInteger, Time
 from sqlalchemy.orm import relationship
 from src.main.core.database import Base
 
@@ -9,7 +9,11 @@ class Prestador(Base):
     usuario_id = Column(String, index=True, nullable=False)
     nome_estab = Column(String, nullable=False)
     documento = Column(String, nullable=False, unique=True)
-    status = Column(String, default="ativo")
+    status = Column(String, default="rascunho")
+    enviado_em = Column(DateTime, nullable=True)
+    aprovado_em = Column(DateTime, nullable=True)
+    aprovado_por = Column(String, nullable=True)
+    motivo_rejeicao = Column(String, nullable=True)
 
     servicos = relationship("Servico", back_populates="prestador")
     horarios = relationship("HorarioFuncionamento", back_populates="prestador")

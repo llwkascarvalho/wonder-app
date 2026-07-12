@@ -11,8 +11,13 @@ CREATE TABLE IF NOT EXISTS Prestador (
     usuario_id  INTEGER NOT NULL UNIQUE,
     nome_estab  VARCHAR(255) NOT NULL,
     documento   VARCHAR(20),
-    status      VARCHAR(20) NOT NULL DEFAULT 'ativo',
-    criado_em   TIMESTAMP NOT NULL DEFAULT NOW()
+    status      VARCHAR(20) NOT NULL DEFAULT 'rascunho',
+    enviado_em  TIMESTAMP,
+    aprovado_em TIMESTAMP,
+    aprovado_por VARCHAR(50),
+    motivo_rejeicao TEXT,
+    criado_em   TIMESTAMP NOT NULL DEFAULT NOW(),
+    CHECK (status IN ('rascunho', 'pendente', 'ativo', 'rejeitado', 'suspenso'))
 );
 
 CREATE TABLE IF NOT EXISTS Servico (
