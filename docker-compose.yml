@@ -84,7 +84,13 @@ services:
     container_name: wonder_admin
     ports:
       - "8006:8006"
-    env_file: .env
+    env_file:
+      - path: .env.monitor
+        required: false
+    volumes:
+      - ./.env.monitor:/app/.env.monitor:ro
+      - ./scripts:/app/scripts:ro
+      - ./docs/reports:/app/docs/reports
     depends_on:
       db_auth:
         condition: service_healthy
@@ -101,6 +107,7 @@ services:
   db_auth:
     image: postgres:16-alpine
     container_name: wonder_db_auth
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=all"]
     environment:
       POSTGRES_DB: db_autenticacao
       POSTGRES_USER: wonder_user
@@ -121,6 +128,7 @@ services:
   db_catalogo:
     image: postgres:16-alpine
     container_name: wonder_db_catalogo
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=all"]
     environment:
       POSTGRES_DB: db_catalogo
       POSTGRES_USER: wonder_user
@@ -141,6 +149,7 @@ services:
   db_agendamentos:
     image: postgres:16-alpine
     container_name: wonder_db_agendamentos
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=all"]
     environment:
       POSTGRES_DB: db_agendamentos
       POSTGRES_USER: wonder_user
@@ -161,6 +170,7 @@ services:
   db_notificacoes:
     image: postgres:16-alpine
     container_name: wonder_db_notificacoes
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=all"]
     environment:
       POSTGRES_DB: db_notificacoes
       POSTGRES_USER: wonder_user

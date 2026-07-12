@@ -220,6 +220,7 @@ __marimo__/
 
 # Ambiente
 .env
+.env.monitor
 *.env
 
 # Docker
@@ -239,3 +240,4 @@ __pycache__/
 .venv/
 venv/
 logs/
+docs/reports/monitor_*.md

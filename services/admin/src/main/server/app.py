@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from src.main.routes import auditoria_routes
+from src.main.routes import auditoria_routes, monitoramento_routes
 
 app = FastAPI(
     title="Wonder - Serviço Admin",
@@ -8,6 +8,7 @@ app = FastAPI(
 )
 
 app.include_router(auditoria_routes.router, prefix="/admin")
+app.include_router(monitoramento_routes.router, prefix="/admin")
 
 @app.get("/health", tags=["Infraestrutura"])
 def health_check():
