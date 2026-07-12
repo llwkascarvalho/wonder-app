@@ -1,4 +1,4 @@
-from datetime import time
+from datetime import datetime, time
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -39,15 +39,22 @@ class PrestadorCreate(PrestadorBase):
 class PrestadorUpdate(BaseModel):
     nome_estab: Optional[str] = None
     documento: Optional[str] = None
-    status: Optional[str] = None
 
 class PrestadorResponse(PrestadorBase):
     id: int
     usuario_id: int | str
     status: str
+    enviado_em: Optional[datetime] = None
+    aprovado_em: Optional[datetime] = None
+    aprovado_por: Optional[str] = None
+    motivo_rejeicao: Optional[str] = None
     
     class Config:
         from_attributes = True
+
+class PrestadorStatusUpdate(BaseModel):
+    status: str
+    motivo_rejeicao: Optional[str] = None
 
 # SCHEMAS DE HORARIO
 
@@ -59,6 +66,13 @@ class HorarioCreate(BaseModel):
 class HorarioResponse(HorarioCreate):
     id: int
     prestador_id: int
+
+    class Config:
+        from_attributes = True
+
+class PrestadorDetalheResponse(PrestadorResponse):
+    servicos: list[ServicoResponse] = Field(default_factory=list)
+    horarios: list[HorarioResponse] = Field(default_factory=list)
 
     class Config:
         from_attributes = True

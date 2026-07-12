@@ -67,6 +67,11 @@ def validar_admin(request: Request):
     if not is_admin(request):
         raise HTTPException(status_code=403, detail="Acesso restrito a administradores.")
 
+def validar_chamada_admin_interna(request: Request):
+    validar_admin(request)
+    if request.headers.get("X-Internal-Service") != "admin":
+        raise HTTPException(status_code=403, detail="Endpoint restrito ao servico Admin.")
+
 @router.get("/auth/google/login")
 def google_login(
     mobile: bool = False,
@@ -176,5 +181,14 @@ def atualizar_tipo(user_id: int, dados: TipoUpdate, request: Request, db: Sessio
 
     if dados.tipo_usuario not in ["cliente", "prestador", "admin"]:
         raise HTTPException(status_code=400, detail="Tipo inválido.")
+
+    return user_repo.atualizar_tipo(db, user_id, dados.tipo_usuario)
+
+@router.patch("/auth/internal/usuarios/{user_id}/tipo", response_model=UsuarioResponse)
+def atualizar_tipo_interno(user_id: int, dados: TipoUpdate, request: Request, db: Session = Depends(get_db)):
+    validar_chamada_admin_interna(request)
+
+    if dados.tipo_usuario != "prestador":
+        raise HTTPException(status_code=400, detail="Endpoint interno permite apenas promocao para prestador.")
 
     return user_repo.atualizar_tipo(db, user_id, dados.tipo_usuario)

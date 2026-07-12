@@ -74,8 +74,11 @@ async def proxy(full_path: str, request: Request):
         raise HTTPException(status_code=404, detail=f"Rota não encontrada: {path}")
 
     target_url = f"{service_url}{path}"
-    headers = dict(request.headers)
-    headers.pop("host", None)
+    headers = {
+        key: value
+        for key, value in request.headers.items()
+        if key.lower() not in {"host", "x-user-id", "x-user-role", "x-internal-service"}
+    }
     if user_id:
         headers["X-User-ID"]   = str(user_id)
     if user_role:
