@@ -1,6 +1,6 @@
 from datetime import time
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional
 
 # SCHEMAS DE SERVIÇO
 
