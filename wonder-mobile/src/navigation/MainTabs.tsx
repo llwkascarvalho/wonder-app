@@ -2,8 +2,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text } from 'react-native';
 
 import { useAuth } from '../contexts/AuthContext';
+import { NotificationsProvider, useNotifications } from '../contexts/NotificationsContext';
 import { AppointmentsScreen } from '../screens/AppointmentsScreen';
+import { ChatScreen } from '../screens/ChatScreen';
 import { HomeScreen } from '../screens/HomeScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { ProviderAgendaScreen } from '../screens/ProviderAgendaScreen';
 import { ProviderProfileScreen } from '../screens/ProviderProfileScreen';
@@ -14,11 +17,15 @@ export type MainTabsParamList = {
   Home: undefined;
   Search: undefined;
   Appointments: undefined;
+  Notifications: undefined;
+  Chat: undefined;
   Profile: undefined;
 };
 
 type ProviderTabsParamList = {
   ProviderAgenda: undefined;
+  Notifications: undefined;
+  Chat: undefined;
   ProviderProfile: undefined;
 };
 
@@ -29,11 +36,15 @@ const clientTabIcons: Record<keyof MainTabsParamList, string> = {
   Home: 'H',
   Search: 'B',
   Appointments: 'A',
+  Notifications: 'N',
+  Chat: 'C',
   Profile: 'P',
 };
 
 const providerTabIcons: Record<keyof ProviderTabsParamList, string> = {
   ProviderAgenda: 'A',
+  Notifications: 'N',
+  Chat: 'C',
   ProviderProfile: 'P',
 };
 
@@ -54,10 +65,13 @@ const sharedScreenOptions = {
   },
 } as const;
 
-export function MainTabs() {
+function MainTabsInner() {
   const { usuario } = useAuth();
+  const { unreadCount } = useNotifications();
   const tipoUsuario = usuario?.tipo_usuario?.toLowerCase();
   const useProviderFlow = tipoUsuario === 'prestador';
+
+  const notificationsBadge = unreadCount > 0 ? unreadCount : undefined;
 
   if (useProviderFlow) {
     return (
@@ -70,6 +84,31 @@ export function MainTabs() {
             tabBarIcon: ({ color, size }) => (
               <Text style={{ color, fontSize: size, fontWeight: theme.fontWeight.bold }}>
                 {providerTabIcons.ProviderAgenda}
+              </Text>
+            ),
+          }}
+        />
+        <ProviderTab.Screen
+          name="Notifications"
+          component={NotificationsScreen}
+          options={{
+            title: 'Avisos',
+            tabBarBadge: notificationsBadge,
+            tabBarIcon: ({ color, size }) => (
+              <Text style={{ color, fontSize: size, fontWeight: theme.fontWeight.bold }}>
+                {providerTabIcons.Notifications}
+              </Text>
+            ),
+          }}
+        />
+        <ProviderTab.Screen
+          name="Chat"
+          component={ChatScreen}
+          options={{
+            title: 'Assistente',
+            tabBarIcon: ({ color, size }) => (
+              <Text style={{ color, fontSize: size, fontWeight: theme.fontWeight.bold }}>
+                {providerTabIcons.Chat}
               </Text>
             ),
           }}
@@ -129,6 +168,31 @@ export function MainTabs() {
         }}
       />
       <ClientTab.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{
+          title: 'Avisos',
+          tabBarBadge: notificationsBadge,
+          tabBarIcon: ({ color, size }) => (
+            <Text style={{ color, fontSize: size, fontWeight: theme.fontWeight.bold }}>
+              {clientTabIcons.Notifications}
+            </Text>
+          ),
+        }}
+      />
+      <ClientTab.Screen
+        name="Chat"
+        component={ChatScreen}
+        options={{
+          title: 'Assistente',
+          tabBarIcon: ({ color, size }) => (
+            <Text style={{ color, fontSize: size, fontWeight: theme.fontWeight.bold }}>
+              {clientTabIcons.Chat}
+            </Text>
+          ),
+        }}
+      />
+      <ClientTab.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
@@ -141,5 +205,13 @@ export function MainTabs() {
         }}
       />
     </ClientTab.Navigator>
+  );
+}
+
+export function MainTabs() {
+  return (
+    <NotificationsProvider>
+      <MainTabsInner />
+    </NotificationsProvider>
   );
 }
