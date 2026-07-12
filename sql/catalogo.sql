@@ -3,8 +3,14 @@
 CREATE TABLE IF NOT EXISTS Categoria (
     id      SERIAL PRIMARY KEY,
     nome    VARCHAR(100) NOT NULL,
-    foto    VARCHAR(500)
+    descricao TEXT,
+    status  VARCHAR(20) NOT NULL DEFAULT 'ativa',
+    foto    VARCHAR(500),
+    CHECK (status IN ('ativa', 'inativa'))
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_categoria_nome_lower
+    ON Categoria (LOWER(nome));
 
 CREATE TABLE IF NOT EXISTS Prestador (
     id          SERIAL PRIMARY KEY,
@@ -27,6 +33,13 @@ CREATE TABLE IF NOT EXISTS Servico (
     nome          VARCHAR(150) NOT NULL,
     preco         DECIMAL(10,2) NOT NULL,
     duracao_min   INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS prestador_categoria (
+    id            SERIAL PRIMARY KEY,
+    prestador_id  INTEGER NOT NULL REFERENCES Prestador(id) ON DELETE CASCADE,
+    categoria_id  INTEGER NOT NULL REFERENCES Categoria(id),
+    UNIQUE (prestador_id, categoria_id)
 );
 
 CREATE TABLE IF NOT EXISTS HorarioFuncionamento (
@@ -112,6 +125,14 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE TRIGGER trg_auditoria_prestador
     AFTER INSERT OR UPDATE OR DELETE ON Prestador
+    FOR EACH ROW EXECUTE FUNCTION fn_auditoria();
+
+CREATE OR REPLACE TRIGGER trg_auditoria_categoria
+    AFTER INSERT OR UPDATE OR DELETE ON Categoria
+    FOR EACH ROW EXECUTE FUNCTION fn_auditoria();
+
+CREATE OR REPLACE TRIGGER trg_auditoria_prestador_categoria
+    AFTER INSERT OR UPDATE OR DELETE ON prestador_categoria
     FOR EACH ROW EXECUTE FUNCTION fn_auditoria();
 
 CREATE OR REPLACE TRIGGER trg_auditoria_servico

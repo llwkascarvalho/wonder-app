@@ -6,6 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from src.main.core.config import settings
 from src.main.dependencies.auth import exigir_admin
 from src.main.schemas.prestador_schema import (
+    CategoriaCreate,
+    CategoriaResponse,
+    CategoriaStatusUpdate,
+    CategoriaUpdate,
     PrestadorDetalheResponse,
     PrestadorResponse,
     PrestadorStatusUpdate,
@@ -101,3 +105,42 @@ async def atualizar_status(prestador_id: int, dados: PrestadorStatusUpdate, requ
         await promover_usuario_auth(detalhe["usuario_id"], headers)
 
     return await atualizar_status_catalogo(prestador_id, dados, headers)
+
+
+@router.get("/categorias", response_model=List[CategoriaResponse])
+async def listar_categorias(request: Request):
+    return await chamar_json(
+        "GET",
+        f"{settings.CATALOGO_SERVICE_URL}/catalogo/admin/categorias",
+        admin_headers(request),
+    )
+
+
+@router.post("/categorias", response_model=CategoriaResponse, status_code=201)
+async def criar_categoria(dados: CategoriaCreate, request: Request):
+    return await chamar_json(
+        "POST",
+        f"{settings.CATALOGO_SERVICE_URL}/catalogo/admin/categorias",
+        admin_headers(request),
+        json=dados.model_dump(),
+    )
+
+
+@router.put("/categorias/{categoria_id}", response_model=CategoriaResponse)
+async def atualizar_categoria(categoria_id: int, dados: CategoriaUpdate, request: Request):
+    return await chamar_json(
+        "PUT",
+        f"{settings.CATALOGO_SERVICE_URL}/catalogo/admin/categorias/{categoria_id}",
+        admin_headers(request),
+        json=dados.model_dump(),
+    )
+
+
+@router.patch("/categorias/{categoria_id}/status", response_model=CategoriaResponse)
+async def atualizar_status_categoria(categoria_id: int, dados: CategoriaStatusUpdate, request: Request):
+    return await chamar_json(
+        "PATCH",
+        f"{settings.CATALOGO_SERVICE_URL}/catalogo/admin/categorias/{categoria_id}/status",
+        admin_headers(request),
+        json=dados.model_dump(),
+    )

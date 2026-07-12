@@ -21,6 +21,18 @@ class HorarioResponse(BaseModel):
     hora_fim: time
 
 
+class CategoriaResponse(BaseModel):
+    id: int
+    nome: str
+    descricao: Optional[str] = None
+    status: str
+
+
+class PrestadorCategoriaResponse(BaseModel):
+    prestador_id: int
+    categoria: CategoriaResponse
+
+
 class PrestadorResponse(BaseModel):
     id: int
     usuario_id: int | str
@@ -36,8 +48,23 @@ class PrestadorResponse(BaseModel):
 class PrestadorDetalheResponse(PrestadorResponse):
     servicos: list[ServicoResponse] = Field(default_factory=list)
     horarios: list[HorarioResponse] = Field(default_factory=list)
+    categorias: list[PrestadorCategoriaResponse] = Field(default_factory=list)
 
 
 class PrestadorStatusUpdate(BaseModel):
     status: str
     motivo_rejeicao: Optional[str] = None
+
+
+class CategoriaCreate(BaseModel):
+    nome: str
+    descricao: Optional[str] = None
+
+
+class CategoriaUpdate(BaseModel):
+    nome: Optional[str] = None
+    descricao: Optional[str] = None
+
+
+class CategoriaStatusUpdate(BaseModel):
+    status: str

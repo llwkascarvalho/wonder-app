@@ -23,6 +23,29 @@ class ServicoResponse(ServicoBase):
 class CategoriaResponse(BaseModel):
     id: int
     nome: str
+    descricao: Optional[str] = None
+    status: str
+
+    class Config:
+        from_attributes = True
+
+class CategoriaCreate(BaseModel):
+    nome: str
+    descricao: Optional[str] = None
+
+class CategoriaUpdate(BaseModel):
+    nome: Optional[str] = None
+    descricao: Optional[str] = None
+
+class CategoriaStatusUpdate(BaseModel):
+    status: str
+
+class PrestadorCategoriaCreate(BaseModel):
+    categoria_ids: list[int]
+
+class PrestadorCategoriaResponse(BaseModel):
+    prestador_id: int
+    categoria: CategoriaResponse
 
     class Config:
         from_attributes = True
@@ -73,6 +96,7 @@ class HorarioResponse(HorarioCreate):
 class PrestadorDetalheResponse(PrestadorResponse):
     servicos: list[ServicoResponse] = Field(default_factory=list)
     horarios: list[HorarioResponse] = Field(default_factory=list)
+    categorias: list[PrestadorCategoriaResponse] = Field(default_factory=list)
 
     class Config:
         from_attributes = True

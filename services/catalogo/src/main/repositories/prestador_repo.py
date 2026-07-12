@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from src.main.models.prestador_model import (
@@ -9,11 +10,16 @@ from src.main.models.prestador_model import (
     HorarioFuncionamento,
     LogAuditoria,
     Prestador,
+    PrestadorCategoria,
     Servico,
 )
 from src.main.schemas.prestador_schema import (
     AvaliacaoCreate,
+    CategoriaCreate,
+    CategoriaStatusUpdate,
+    CategoriaUpdate,
     HorarioCreate,
+    PrestadorCategoriaCreate,
     PrestadorCreate,
     PrestadorStatusUpdate,
     PrestadorUpdate,
@@ -21,7 +27,7 @@ from src.main.schemas.prestador_schema import (
 )
 
 STATUS_VALIDOS = {"rascunho", "pendente", "ativo", "rejeitado", "suspenso"}
-STATUS_EDICAO_PERMITIDA = {"rascunho", "rejeitado"}
+STATUS_EDICAO_PERMITIDA = {"rascunho", "rejeitado", "ativo", "suspenso"}
 TRANSICOES_ADMIN = {
     "pendente": {"ativo", "rejeitado", "rascunho"},
     "ativo": {"suspenso"},
@@ -37,8 +43,34 @@ def listar_ativos(db: Session, nome: str = None, categoria_id: int = None):
     if nome:
         query = query.filter(Prestador.nome_estab.ilike(f"%{nome}%"))
     if categoria_id:
-        query = query.join(Servico).filter(Servico.categoria_id == categoria_id)
+        query = query.join(PrestadorCategoria).filter(PrestadorCategoria.categoria_id == categoria_id)
     return query.order_by(Prestador.nome_estab).all()
+
+
+def listar_categorias_ativas(db: Session):
+    return db.query(Categoria).filter(Categoria.status == "ativa").order_by(Categoria.nome).all()
+
+
+def listar_todas_categorias(db: Session):
+    return db.query(Categoria).order_by(Categoria.nome).all()
+
+
+def obter_categoria(db: Session, categoria_id: int):
+    return db.query(Categoria).filter(Categoria.id == categoria_id).first()
+
+
+def obter_categoria_por_nome(db: Session, nome: str):
+    return db.query(Categoria).filter(func.lower(Categoria.nome) == nome.lower()).first()
+
+
+def listar_categorias_prestador(db: Session, prestador_id: int):
+    return (
+        db.query(PrestadorCategoria)
+        .join(Categoria)
+        .filter(PrestadorCategoria.prestador_id == prestador_id)
+        .order_by(Categoria.nome)
+        .all()
+    )
 
 
 def listar_pendentes(db: Session):
@@ -86,12 +118,6 @@ def registrar_auditoria(db: Session, usuario_id: str, tabela: str, descricao: st
     db.commit()
 
 
-def validar_categoria_servico(db: Session, servico: Servico) -> bool:
-    if servico.categoria_id is None:
-        return False
-    return db.query(Categoria).filter(Categoria.id == servico.categoria_id).first() is not None
-
-
 def validar_requisitos_envio(db: Session, prestador: Prestador) -> list[str]:
     erros = []
 
@@ -101,9 +127,9 @@ def validar_requisitos_envio(db: Session, prestador: Prestador) -> list[str]:
     servicos = listar_servicos(db, prestador.id)
     if not servicos:
         erros.append("Cadastre ao menos um servico.")
-    elif not any(validar_categoria_servico(db, servico) for servico in servicos):
-        # Issue 40 deve substituir/complementar esta regra com PrestadorCategoria.
-        erros.append("Cadastre ao menos um servico com categoria valida.")
+
+    if not listar_categorias_prestador(db, prestador.id):
+        erros.append("Associe ao menos uma categoria ao estabelecimento.")
 
     if not listar_horarios(db, prestador.id):
         erros.append("Cadastre ao menos um horario.")
@@ -134,6 +160,115 @@ def criar_prestador(db: Session, dados: PrestadorCreate, usuario_id: str) -> Pre
     db.commit()
     db.refresh(prestador)
     return prestador
+
+
+def criar_categoria(db: Session, dados: CategoriaCreate) -> Categoria:
+    if obter_categoria_por_nome(db, dados.nome):
+        raise HTTPException(status_code=409, detail="Categoria ja cadastrada.")
+
+    categoria = Categoria(nome=dados.nome, descricao=dados.descricao, status="ativa")
+    db.add(categoria)
+    db.commit()
+    db.refresh(categoria)
+    return categoria
+
+
+def atualizar_categoria(db: Session, categoria_id: int, dados: CategoriaUpdate) -> Categoria:
+    categoria = obter_categoria(db, categoria_id)
+    if not categoria:
+        raise HTTPException(status_code=404, detail="Categoria nao encontrada.")
+
+    if dados.nome is not None:
+        existente = obter_categoria_por_nome(db, dados.nome)
+        if existente and existente.id != categoria.id:
+            raise HTTPException(status_code=409, detail="Categoria ja cadastrada.")
+        categoria.nome = dados.nome
+    if dados.descricao is not None:
+        categoria.descricao = dados.descricao
+
+    db.commit()
+    db.refresh(categoria)
+    return categoria
+
+
+def atualizar_status_categoria(db: Session, categoria_id: int, dados: CategoriaStatusUpdate) -> Categoria:
+    if dados.status not in {"ativa", "inativa"}:
+        raise HTTPException(status_code=400, detail="Status invalido.")
+
+    categoria = obter_categoria(db, categoria_id)
+    if not categoria:
+        raise HTTPException(status_code=404, detail="Categoria nao encontrada.")
+
+    categoria.status = dados.status
+    db.commit()
+    db.refresh(categoria)
+    return categoria
+
+
+def associar_categorias(
+    db: Session, prestador_id: int, dados: PrestadorCategoriaCreate, usuario_id: str
+) -> list[PrestadorCategoria]:
+    prestador = obter_por_id(db, prestador_id)
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
+    exigir_dono_editavel(prestador, usuario_id)
+
+    categoria_ids = list(dict.fromkeys(dados.categoria_ids))
+    if not categoria_ids:
+        raise HTTPException(status_code=400, detail="Informe ao menos uma categoria.")
+
+    categorias = (
+        db.query(Categoria)
+        .filter(Categoria.id.in_(categoria_ids), Categoria.status == "ativa")
+        .all()
+    )
+    categorias_encontradas = {categoria.id for categoria in categorias}
+    if categorias_encontradas != set(categoria_ids):
+        raise HTTPException(status_code=400, detail="Uma ou mais categorias sao invalidas ou inativas.")
+
+    existentes = {
+        vinculo.categoria_id
+        for vinculo in db.query(PrestadorCategoria)
+        .filter(
+            PrestadorCategoria.prestador_id == prestador_id,
+            PrestadorCategoria.categoria_id.in_(categoria_ids),
+        )
+        .all()
+    }
+    if existentes:
+        raise HTTPException(status_code=409, detail="Vinculo de categoria duplicado.")
+
+    vinculos = [
+        PrestadorCategoria(prestador_id=prestador_id, categoria_id=categoria_id)
+        for categoria_id in categoria_ids
+    ]
+    db.add_all(vinculos)
+    db.commit()
+    for vinculo in vinculos:
+        db.refresh(vinculo)
+    return vinculos
+
+
+def remover_categoria_prestador(db: Session, prestador_id: int, categoria_id: int, usuario_id: str) -> dict:
+    prestador = obter_por_id(db, prestador_id)
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
+    exigir_dono_editavel(prestador, usuario_id)
+
+    vinculo = (
+        db.query(PrestadorCategoria)
+        .filter(
+            PrestadorCategoria.prestador_id == prestador_id,
+            PrestadorCategoria.categoria_id == categoria_id,
+        )
+        .first()
+    )
+    if not vinculo:
+        raise HTTPException(status_code=404, detail="Vinculo de categoria nao encontrado.")
+
+    db.delete(vinculo)
+    db.commit()
+    return {"mensagem": "Categoria removida do prestador com sucesso."}
 
 
 def criar_servico(db: Session, prestador_id: int, dados: ServicoCreate, usuario_id: str) -> Servico:
