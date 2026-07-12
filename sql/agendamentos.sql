@@ -86,3 +86,4 @@ CREATE OR REPLACE TRIGGER trg_auditoria_agendamento
 CREATE OR REPLACE TRIGGER trg_auditoria_historico
     AFTER INSERT OR UPDATE OR DELETE ON Historico_agendamento
     FOR EACH ROW EXECUTE FUNCTION fn_auditoria();
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;

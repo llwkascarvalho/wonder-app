@@ -120,3 +120,4 @@ CREATE OR REPLACE TRIGGER trg_auditoria_horario
 CREATE OR REPLACE TRIGGER trg_auditoria_avaliacao
     AFTER INSERT OR UPDATE OR DELETE ON Avaliacao
     FOR EACH ROW EXECUTE FUNCTION fn_auditoria();
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;

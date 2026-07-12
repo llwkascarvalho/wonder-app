@@ -73,3 +73,4 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE TRIGGER trg_auditoria_customuser
     AFTER INSERT OR UPDATE OR DELETE ON CustomUser
     FOR EACH ROW EXECUTE FUNCTION fn_auditoria();
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;

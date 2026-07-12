@@ -70,3 +70,4 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE TRIGGER trg_auditoria_notificacao
     AFTER INSERT OR UPDATE ON Notificacao
     FOR EACH ROW EXECUTE FUNCTION fn_auditoria();
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
