@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest, urlopen
+from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
 from sqlalchemy import text
@@ -13,6 +14,7 @@ from src.main.core.config import settings
 from src.main.models.agendamento_model import Agendamento
 
 BLOQUEIA_AGENDA = {"pendente", "confirmado"}
+# Convencao do Catalogo: 1=segunda-feira, 2=terca-feira, ..., 7=domingo.
 
 
 @dataclass(frozen=True)
@@ -118,7 +120,7 @@ def gerar_slots_disponiveis(
     if duracao_min <= 0:
         raise HTTPException(status_code=422, detail="Duracao do servico invalida.")
 
-    agora = datetime.now()
+    agora = agora_local()
     duracao = timedelta(minutes=duracao_min)
     dia_semana = dia_semana_catalogo(data)
     slots: list[SlotDisponivel] = []
@@ -133,7 +135,7 @@ def gerar_slots_disponiveis(
 
         while inicio_slot + duracao <= fim_janela:
             fim_slot = inicio_slot + duracao
-            if inicio_slot >= agora and not possui_sobreposicao(
+            if inicio_slot > agora and not possui_sobreposicao(
                 inicio_slot,
                 fim_slot,
                 agendamentos,
@@ -257,4 +259,8 @@ def parse_mes(mes: str) -> tuple[int, int]:
 
 
 def dia_semana_catalogo(data: date) -> int:
-    return (data.weekday() + 1) % 7
+    return data.isoweekday()
+
+
+def agora_local() -> datetime:
+    return datetime.now(ZoneInfo(settings.APP_TIMEZONE)).replace(tzinfo=None)

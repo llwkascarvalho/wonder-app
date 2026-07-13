@@ -52,6 +52,8 @@ services:
     ports:
       - "8003:8003"
     env_file: .env
+    environment:
+      APP_TIMEZONE: ${APP_TIMEZONE:-America/Fortaleza}
     depends_on:
       db_agendamentos:
         condition: service_healthy

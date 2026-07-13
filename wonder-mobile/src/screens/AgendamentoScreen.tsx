@@ -1,17 +1,26 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import {
+  getCurrentMonthKey,
+  MonthlyAvailabilityCalendar,
+} from '../components/MonthlyAvailabilityCalendar';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
-import { Input } from '../components/Input';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { SearchStackParamList } from '../navigation/SearchStack';
-import { extrairMensagemErro, criarAgendamento } from '../services/agendamentos';
-import { listarHorariosPrestador, listarServicosPrestador } from '../services/catalogo';
+import {
+  criarAgendamento,
+  extrairMensagemErro,
+  listarDiasDisponiveis,
+  listarDisponibilidade,
+} from '../services/agendamentos';
+import { listarServicosPrestador, obterPrestador } from '../services/catalogo';
 import { theme } from '../styles/theme';
-import { DIAS_SEMANA, Horario, Servico } from '../types/catalogo';
+import { HorarioDisponivel } from '../types/agendamento';
+import { Prestador, Servico } from '../types/catalogo';
 
 type AgendamentoRouteProp = {
   key: string;
@@ -21,46 +30,68 @@ type AgendamentoRouteProp = {
 
 type AgendamentoNavigationProp = NativeStackNavigationProp<SearchStackParamList, 'Agendamento'>;
 
-const DATA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-const HORA_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
+function formatDateLabel(data: string) {
+  const [year, month, day] = data.split('-').map(Number);
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(year, month - 1, day));
+}
+
+function formatTimeLabel(isoDate: string) {
+  return new Intl.DateTimeFormat('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(isoDate));
+}
+
+function isConflictError(error: unknown) {
+  return (error as { response?: { status?: number } })?.response?.status === 409;
+}
 
 export function AgendamentoScreen() {
   const navigation = useNavigation<AgendamentoNavigationProp>();
   const route = useRoute<AgendamentoRouteProp>();
-  const { prestadorId, servicoId } = route.params;
+  const { prestadorId } = route.params;
 
-  const [servico, setServico] = useState<Servico | null>(null);
-  const [horarios, setHorarios] = useState<Horario[]>([]);
-  const [carregando, setCarregando] = useState(true);
-  const [erroCarregamento, setErroCarregamento] = useState<string | null>(null);
+  const [prestador, setPrestador] = useState<Prestador | null>(null);
+  const [servicos, setServicos] = useState<Servico[]>([]);
+  const [servicoSelecionado, setServicoSelecionado] = useState<Servico | null>(null);
+  const [mesSelecionado, setMesSelecionado] = useState(getCurrentMonthKey());
+  const [diasDisponiveis, setDiasDisponiveis] = useState<string[]>([]);
+  const [dataSelecionada, setDataSelecionada] = useState<string | null>(null);
+  const [horarios, setHorarios] = useState<HorarioDisponivel[]>([]);
+  const [horarioSelecionado, setHorarioSelecionado] = useState<HorarioDisponivel | null>(null);
 
-  const [data, setData] = useState('');
-  const [hora, setHora] = useState('');
-  const [erroFormulario, setErroFormulario] = useState<string | null>(null);
+  const [carregandoInicial, setCarregandoInicial] = useState(true);
+  const [carregandoDias, setCarregandoDias] = useState(false);
+  const [carregandoHorarios, setCarregandoHorarios] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [erroConfirmacao, setErroConfirmacao] = useState<string | null>(null);
 
   useEffect(() => {
     let ativo = true;
 
     async function carregar() {
-      setCarregando(true);
-      setErroCarregamento(null);
+      setCarregandoInicial(true);
+      setErro(null);
 
       try {
-        const [servicos, horariosData] = await Promise.all([
+        const [prestadorData, servicosData] = await Promise.all([
+          obterPrestador(prestadorId),
           listarServicosPrestador(prestadorId),
-          listarHorariosPrestador(prestadorId),
         ]);
 
         if (!ativo) return;
 
-        const encontrado = servicos.find((item) => item.id === servicoId) ?? null;
-        setServico(encontrado);
-        setHorarios(horariosData);
+        setPrestador(prestadorData);
+        setServicos(servicosData);
       } catch {
-        if (ativo) setErroCarregamento('Não foi possível carregar os dados do agendamento.');
+        if (ativo) setErro('Nao foi possivel carregar os dados para agendamento.');
       } finally {
-        if (ativo) setCarregando(false);
+        if (ativo) setCarregandoInicial(false);
       }
     }
 
@@ -68,49 +99,158 @@ export function AgendamentoScreen() {
     return () => {
       ativo = false;
     };
-  }, [prestadorId, servicoId]);
+  }, [prestadorId]);
+
+  useEffect(() => {
+    let ativo = true;
+
+    async function carregarDias() {
+      if (!servicoSelecionado) {
+        setDiasDisponiveis([]);
+        return;
+      }
+
+      setCarregandoDias(true);
+      setErroConfirmacao(null);
+
+      try {
+        const response = await listarDiasDisponiveis({
+          prestador_id: prestadorId,
+          servico_id: servicoSelecionado.id,
+          mes: mesSelecionado,
+        });
+
+        if (!ativo) return;
+
+        setDiasDisponiveis(
+          response.dias.filter((dia) => dia.disponivel).map((dia) => dia.data)
+        );
+      } catch {
+        if (ativo) {
+          setDiasDisponiveis([]);
+          setErroConfirmacao('Nao foi possivel carregar os dias disponiveis.');
+        }
+      } finally {
+        if (ativo) setCarregandoDias(false);
+      }
+    }
+
+    carregarDias();
+    return () => {
+      ativo = false;
+    };
+  }, [mesSelecionado, prestadorId, servicoSelecionado]);
+
+  const carregarHorarios = useCallback(
+    async (data: string) => {
+      if (!servicoSelecionado) return;
+
+      setCarregandoHorarios(true);
+      setErroConfirmacao(null);
+
+      try {
+        const response = await listarDisponibilidade({
+          prestador_id: prestadorId,
+          servico_id: servicoSelecionado.id,
+          data,
+        });
+
+        setHorarios(response.horarios);
+      } catch {
+        setHorarios([]);
+        setErroConfirmacao('Nao foi possivel carregar os horarios disponiveis.');
+      } finally {
+        setCarregandoHorarios(false);
+      }
+    },
+    [prestadorId, servicoSelecionado]
+  );
+
+  function selecionarServico(servico: Servico) {
+    setServicoSelecionado(servico);
+    setMesSelecionado(getCurrentMonthKey());
+    setDataSelecionada(null);
+    setDiasDisponiveis([]);
+    setHorarios([]);
+    setHorarioSelecionado(null);
+    setErroConfirmacao(null);
+  }
+
+  function trocarMes(mes: string) {
+    setMesSelecionado(mes);
+    setDataSelecionada(null);
+    setHorarios([]);
+    setHorarioSelecionado(null);
+    setErroConfirmacao(null);
+  }
+
+  function selecionarData(data: string) {
+    setDataSelecionada(data);
+    setHorarioSelecionado(null);
+    setHorarios([]);
+    carregarHorarios(data);
+  }
 
   async function confirmarAgendamento() {
-    setErroFormulario(null);
-
-    if (!DATA_REGEX.test(data)) {
-      setErroFormulario('Informe a data no formato AAAA-MM-DD (ex.: 2026-07-20).');
+    if (!servicoSelecionado || !dataSelecionada || !horarioSelecionado) {
+      setErroConfirmacao('Selecione servico, data e horario para confirmar.');
       return;
     }
-
-    if (!HORA_REGEX.test(hora)) {
-      setErroFormulario('Informe o horário no formato HH:MM (ex.: 14:30).');
-      return;
-    }
-
-    const inicio = `${data}T${hora}:00`;
 
     setEnviando(true);
+    setErroConfirmacao(null);
 
     try {
-      await criarAgendamento({ prestador_id: prestadorId, servico_id: servicoId, inicio });
+      await criarAgendamento({
+        prestador_id: prestadorId,
+        servico_id: servicoSelecionado.id,
+        inicio: horarioSelecionado.inicio,
+      });
 
-      Alert.alert('Agendamento confirmado!', 'Você pode acompanhá-lo na aba Agenda.', [
+      Alert.alert('Agendamento confirmado!', 'Voce pode acompanha-lo na aba Agenda.', [
         { text: 'OK', onPress: () => navigation.navigate('SearchHome') },
       ]);
     } catch (error) {
-      setErroFormulario(
-        extrairMensagemErro(error, 'Não foi possível confirmar o agendamento. Tente novamente.')
+      if (isConflictError(error)) {
+        setErroConfirmacao('Este horario foi ocupado. Escolha outro horario disponivel.');
+        setHorarioSelecionado(null);
+        await carregarHorarios(dataSelecionada);
+        return;
+      }
+
+      setErroConfirmacao(
+        extrairMensagemErro(error, 'Nao foi possivel confirmar o agendamento. Tente novamente.')
       );
     } finally {
       setEnviando(false);
     }
   }
 
-  if (carregando) {
-    return <LoadingIndicator text="Carregando serviço..." />;
+  const podeConfirmar = Boolean(servicoSelecionado && dataSelecionada && horarioSelecionado);
+  const resumo = useMemo(() => {
+    if (!prestador || !servicoSelecionado || !dataSelecionada || !horarioSelecionado) {
+      return null;
+    }
+
+    return {
+      prestador: prestador.nome_estab,
+      servico: servicoSelecionado.nome,
+      data: formatDateLabel(dataSelecionada),
+      horario: formatTimeLabel(horarioSelecionado.inicio),
+      preco: servicoSelecionado.preco,
+      duracao: servicoSelecionado.duracao_min,
+    };
+  }, [dataSelecionada, horarioSelecionado, prestador, servicoSelecionado]);
+
+  if (carregandoInicial) {
+    return <LoadingIndicator text="Carregando agendamento..." />;
   }
 
-  if (erroCarregamento || !servico) {
+  if (erro || !prestador) {
     return (
       <View style={styles.container}>
         <Card>
-          <Text style={styles.cardText}>{erroCarregamento || 'Serviço não encontrado.'}</Text>
+          <Text style={styles.cardText}>{erro || 'Prestador nao encontrado.'}</Text>
         </Card>
       </View>
     );
@@ -118,46 +258,117 @@ export function AgendamentoScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Card style={styles.servicoCard}>
-        <Text style={styles.cardTitle}>{servico.nome}</Text>
-        <Text style={styles.cardText}>
-          R$ {servico.preco.toFixed(2)} · {servico.duracao_min} min
-        </Text>
-      </Card>
+      <View style={styles.header}>
+        <Text style={styles.title}>Agendar servico</Text>
+        <Text style={styles.subtitle}>{prestador.nome_estab}</Text>
+      </View>
 
-      {horarios.length > 0 ? (
-        <Card style={styles.horariosCard}>
-          <Text style={styles.sectionTitle}>Horários de funcionamento</Text>
-          {horarios.map((horario) => (
-            <Text key={horario.id} style={styles.cardText}>
-              {DIAS_SEMANA[horario.dia_semana] ?? `Dia ${horario.dia_semana}`}:{' '}
-              {horario.hora_inicio.slice(0, 5)} às {horario.hora_fim.slice(0, 5)}
-            </Text>
-          ))}
+      <Text style={styles.sectionTitle}>1. Servico</Text>
+      {servicos.length === 0 ? (
+        <Card>
+          <Text style={styles.cardText}>Nenhum servico disponivel para este prestador.</Text>
         </Card>
+      ) : (
+        <View style={styles.list}>
+          {servicos.map((servico) => {
+            const selected = servicoSelecionado?.id === servico.id;
+
+            return (
+              <Card
+                key={servico.id}
+                onPress={() => selecionarServico(servico)}
+                style={[styles.selectableCard, selected && styles.selectedCard]}
+              >
+                <Text style={[styles.cardTitle, selected && styles.selectedText]}>
+                  {servico.nome}
+                </Text>
+                <Text style={[styles.cardText, selected && styles.selectedMutedText]}>
+                  R$ {servico.preco.toFixed(2)} - {servico.duracao_min} min
+                </Text>
+              </Card>
+            );
+          })}
+        </View>
+      )}
+
+      {servicoSelecionado ? (
+        <>
+          <Text style={styles.sectionTitle}>2. Data</Text>
+          <Card style={styles.calendarCard}>
+            {carregandoDias ? (
+              <LoadingIndicator text="Carregando dias disponiveis..." />
+            ) : null}
+            <MonthlyAvailabilityCalendar
+              mes={mesSelecionado}
+              diasDisponiveis={diasDisponiveis}
+              dataSelecionada={dataSelecionada}
+              onChangeMes={trocarMes}
+              onSelectDate={selecionarData}
+            />
+            <View style={styles.legend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, styles.legendAvailable]} />
+                <Text style={styles.legendText}>Disponivel</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, styles.legendUnavailable]} />
+                <Text style={styles.legendText}>Indisponivel</Text>
+              </View>
+            </View>
+          </Card>
+        </>
       ) : null}
 
-      <Text style={styles.sectionTitle}>Escolha data e horário</Text>
+      {dataSelecionada ? (
+        <>
+          <Text style={styles.sectionTitle}>3. Horario disponivel</Text>
+          {carregandoHorarios ? (
+            <LoadingIndicator text="Carregando horarios..." />
+          ) : horarios.length === 0 ? (
+            <Card>
+              <Text style={styles.cardText}>Nenhum horario disponivel para esta data.</Text>
+            </Card>
+          ) : (
+            <View style={styles.timeGrid}>
+              {horarios.map((horario) => {
+                const selected = horarioSelecionado?.inicio === horario.inicio;
 
-      <Input
-        label="Data (AAAA-MM-DD)"
-        placeholder="2026-07-20"
-        value={data}
-        onChangeText={setData}
-        keyboardType="numbers-and-punctuation"
-      />
+                return (
+                  <Card
+                    key={horario.inicio}
+                    onPress={() => setHorarioSelecionado(horario)}
+                    style={[styles.timeChip, selected && styles.selectedCard]}
+                  >
+                    <Text style={[styles.timeText, selected && styles.selectedText]}>
+                      {formatTimeLabel(horario.inicio)}
+                    </Text>
+                  </Card>
+                );
+              })}
+            </View>
+          )}
+        </>
+      ) : null}
 
-      <Input
-        label="Horário (HH:MM)"
-        placeholder="14:30"
-        value={hora}
-        onChangeText={setHora}
-        keyboardType="numbers-and-punctuation"
-      />
+      {resumo ? (
+        <>
+          <Text style={styles.sectionTitle}>4. Revisao</Text>
+          <Card style={styles.reviewCard}>
+            <Text style={styles.cardTitle}>{resumo.servico}</Text>
+            <Text style={styles.cardText}>{resumo.prestador}</Text>
+            <Text style={styles.cardText}>
+              {resumo.data} as {resumo.horario}
+            </Text>
+            <Text style={styles.cardText}>
+              R$ {resumo.preco.toFixed(2)} - {resumo.duracao} min
+            </Text>
+          </Card>
+        </>
+      ) : null}
 
-      {erroFormulario ? (
-        <Card style={styles.erroCard}>
-          <Text style={styles.erroText}>{erroFormulario}</Text>
+      {erroConfirmacao ? (
+        <Card style={styles.errorCard}>
+          <Text style={styles.errorText}>{erroConfirmacao}</Text>
         </Card>
       ) : null}
 
@@ -165,7 +376,7 @@ export function AgendamentoScreen() {
         title="Confirmar agendamento"
         onPress={confirmarAgendamento}
         loading={enviando}
-        disabled={enviando}
+        disabled={!podeConfirmar || enviando}
       />
     </ScrollView>
   );
@@ -178,31 +389,100 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     padding: theme.spacing.lg,
   },
-  servicoCard: {
+  header: {
     gap: theme.spacing.xs,
   },
-  horariosCard: {
-    gap: theme.spacing.xs,
+  title: {
+    color: theme.colors.text,
+    fontSize: theme.fontSize.xxl,
+    fontWeight: theme.fontWeight.bold,
+  },
+  subtitle: {
+    color: theme.colors.textSecondary,
+    fontSize: theme.fontSize.md,
   },
   sectionTitle: {
     color: theme.colors.text,
     fontSize: theme.fontSize.lg,
     fontWeight: theme.fontWeight.semibold,
+    marginTop: theme.spacing.sm,
+  },
+  list: {
+    gap: theme.spacing.sm,
+  },
+  selectableCard: {
+    gap: theme.spacing.xs,
+  },
+  selectedCard: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
   },
   cardTitle: {
     color: theme.colors.text,
-    fontSize: theme.fontSize.lg,
+    fontSize: theme.fontSize.md,
     fontWeight: theme.fontWeight.semibold,
   },
   cardText: {
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.md,
   },
-  erroCard: {
+  selectedText: {
+    color: theme.colors.white,
+  },
+  selectedMutedText: {
+    color: theme.colors.white,
+  },
+  calendarCard: {
+    gap: theme.spacing.md,
+  },
+  legend: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+  },
+  legendItem: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.spacing.xs,
+  },
+  legendDot: {
+    borderRadius: theme.borderRadius.pill,
+    height: 10,
+    width: 10,
+  },
+  legendAvailable: {
+    backgroundColor: theme.colors.primary,
+  },
+  legendUnavailable: {
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  legendText: {
+    color: theme.colors.textSecondary,
+    fontSize: theme.fontSize.sm,
+  },
+  timeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+  },
+  timeChip: {
+    minWidth: 92,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  timeText: {
+    color: theme.colors.primary,
+    fontSize: theme.fontSize.md,
+    fontWeight: theme.fontWeight.semibold,
+    textAlign: 'center',
+  },
+  reviewCard: {
+    gap: theme.spacing.xs,
+  },
+  errorCard: {
     backgroundColor: '#FEF2F2',
     borderColor: theme.colors.error,
   },
-  erroText: {
+  errorText: {
     color: theme.colors.error,
     fontSize: theme.fontSize.md,
   },

@@ -8,7 +8,7 @@ import { theme } from '../styles/theme';
 export type SearchStackParamList = {
   SearchHome: undefined;
   PrestadorProfile: { prestadorId: number };
-  Agendamento: { prestadorId: number; servicoId: number };
+  Agendamento: { prestadorId: number };
 };
 
 const Stack = createNativeStackNavigator<SearchStackParamList>();

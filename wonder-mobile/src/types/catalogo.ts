@@ -1,6 +1,9 @@
 export type Categoria = {
   id: number;
   nome: string;
+  descricao?: string | null;
+  status?: string;
+  foto_url?: string | null;
 };
 
 export type Prestador = {
@@ -9,6 +12,7 @@ export type Prestador = {
   nome_estab: string;
   documento: string;
   status: string;
+  foto_url?: string | null;
 };
 
 export type Servico = {
@@ -18,6 +22,7 @@ export type Servico = {
   preco: number;
   duracao_min: number;
   categoria_id?: number | null;
+  foto_url?: string | null;
 };
 
 export type Horario = {
