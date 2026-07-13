@@ -16,6 +16,7 @@ class ServicoCreate(ServicoBase):
 class ServicoResponse(ServicoBase):
     id: int
     prestador_id: int
+    foto_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -25,6 +26,7 @@ class CategoriaResponse(BaseModel):
     nome: str
     descricao: Optional[str] = None
     status: str
+    foto_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -67,6 +69,7 @@ class PrestadorResponse(PrestadorBase):
     id: int
     usuario_id: int | str
     status: str
+    foto_url: Optional[str] = None
     enviado_em: Optional[datetime] = None
     aprovado_em: Optional[datetime] = None
     aprovado_por: Optional[str] = None

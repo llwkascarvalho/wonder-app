@@ -38,6 +38,8 @@ services:
     ports:
       - "8002:8002"
     env_file: .env
+    volumes:
+      - catalogo_uploads:/app/uploads
     depends_on:
       db_catalogo:
         condition: service_healthy
@@ -238,6 +240,7 @@ volumes:
   db_notificacoes_data:
   backups_data:
   auth_uploads:
+  catalogo_uploads:
 
 # ─── REDE ────────────────────────────────────────────────────
 networks:

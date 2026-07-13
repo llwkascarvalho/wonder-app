@@ -63,6 +63,14 @@ def obter_categoria_por_nome(db: Session, nome: str):
     return db.query(Categoria).filter(func.lower(Categoria.nome) == nome.lower()).first()
 
 
+def obter_servico(db: Session, prestador_id: int, servico_id: int):
+    return (
+        db.query(Servico)
+        .filter(Servico.id == servico_id, Servico.prestador_id == prestador_id)
+        .first()
+    )
+
+
 def listar_categorias_prestador(db: Session, prestador_id: int):
     return (
         db.query(PrestadorCategoria)
@@ -205,6 +213,18 @@ def atualizar_status_categoria(db: Session, categoria_id: int, dados: CategoriaS
     return categoria
 
 
+def atualizar_foto_categoria(db: Session, categoria_id: int, foto_url: str) -> tuple[Categoria, str | None]:
+    categoria = obter_categoria(db, categoria_id)
+    if not categoria:
+        raise HTTPException(status_code=404, detail="Categoria nao encontrada.")
+
+    foto_antiga = categoria.foto
+    categoria.foto = foto_url
+    db.commit()
+    db.refresh(categoria)
+    return categoria, foto_antiga
+
+
 def associar_categorias(
     db: Session, prestador_id: int, dados: PrestadorCategoriaCreate, usuario_id: str
 ) -> list[PrestadorCategoria]:
@@ -293,6 +313,42 @@ def criar_servico(db: Session, prestador_id: int, dados: ServicoCreate, usuario_
     db.commit()
     db.refresh(servico)
     return servico
+
+
+def atualizar_foto_prestador(db: Session, prestador_id: int, foto_url: str, usuario_id: str) -> tuple[Prestador, str | None]:
+    prestador = obter_por_id(db, prestador_id)
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
+    exigir_dono_editavel(prestador, usuario_id)
+
+    foto_antiga = prestador.foto
+    prestador.foto = foto_url
+    db.commit()
+    db.refresh(prestador)
+    return prestador, foto_antiga
+
+
+def atualizar_foto_servico(
+    db: Session,
+    prestador_id: int,
+    servico_id: int,
+    foto_url: str,
+    usuario_id: str,
+) -> tuple[Servico, str | None]:
+    prestador = obter_por_id(db, prestador_id)
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
+    exigir_dono_editavel(prestador, usuario_id)
+
+    servico = obter_servico(db, prestador_id, servico_id)
+    if not servico:
+        raise HTTPException(status_code=404, detail="Servico nao encontrado.")
+
+    foto_antiga = servico.foto
+    servico.foto = foto_url
+    db.commit()
+    db.refresh(servico)
+    return servico, foto_antiga
 
 
 def criar_horario(db: Session, prestador_id: int, dados: HorarioCreate, usuario_id: str) -> HorarioFuncionamento:

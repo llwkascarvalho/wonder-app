@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS Prestador (
     aprovado_em TIMESTAMP,
     aprovado_por VARCHAR(50),
     motivo_rejeicao TEXT,
+    foto        VARCHAR(500),
     criado_em   TIMESTAMP NOT NULL DEFAULT NOW(),
     CHECK (status IN ('rascunho', 'pendente', 'ativo', 'rejeitado', 'suspenso'))
 );
@@ -32,7 +33,8 @@ CREATE TABLE IF NOT EXISTS Servico (
     categoria_id  INTEGER REFERENCES Categoria(id),
     nome          VARCHAR(150) NOT NULL,
     preco         DECIMAL(10,2) NOT NULL,
-    duracao_min   INTEGER NOT NULL
+    duracao_min   INTEGER NOT NULL,
+    foto          VARCHAR(500)
 );
 
 CREATE TABLE IF NOT EXISTS prestador_categoria (
@@ -48,12 +50,6 @@ CREATE TABLE IF NOT EXISTS HorarioFuncionamento (
     dia_semana    INTEGER NOT NULL,
     hora_inicio   TIME NOT NULL,
     hora_fim      TIME NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS FotoEstabelecimento (
-    id            SERIAL PRIMARY KEY,
-    prestador_id  INTEGER NOT NULL REFERENCES Prestador(id) ON DELETE CASCADE,
-    url_foto      VARCHAR(500) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS Avaliacao (

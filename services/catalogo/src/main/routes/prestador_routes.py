@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from src.main.dependencies.db import get_db
@@ -24,6 +24,7 @@ from src.main.schemas.prestador_schema import (
     ServicoCreate,
     ServicoResponse,
 )
+from src.main.storage.catalog_image_storage import delete_catalog_image, save_catalog_image
 
 router = APIRouter(tags=["Catalogo"])
 STATUS_LEITURA_DONO = {"rascunho", "rejeitado", "ativo", "suspenso"}
@@ -208,9 +209,57 @@ def enviar_para_aprovacao(prestador_id: int, request: Request, db: Session = Dep
     return prestador_repo.enviar_para_aprovacao(db, prestador_id, get_user_id(request))
 
 
+@router.post("/prestadores/{prestador_id}/foto", response_model=PrestadorResponse)
+async def atualizar_foto_prestador(
+    prestador_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    foto_url = await save_catalog_image(file, "prestadores", prestador_id)
+    try:
+        prestador, foto_antiga = prestador_repo.atualizar_foto_prestador(
+            db,
+            prestador_id,
+            foto_url,
+            get_user_id(request),
+        )
+    except Exception:
+        delete_catalog_image(foto_url)
+        raise
+
+    delete_catalog_image(foto_antiga)
+    return prestador
+
+
 @router.post("/prestadores/{prestador_id}/servicos", response_model=ServicoResponse, status_code=201)
 def criar_servico(prestador_id: int, dados: ServicoCreate, request: Request, db: Session = Depends(get_db)):
     return prestador_repo.criar_servico(db, prestador_id, dados, get_user_id(request))
+
+
+@router.post("/prestadores/{prestador_id}/servicos/{servico_id}/foto", response_model=ServicoResponse)
+async def atualizar_foto_servico(
+    prestador_id: int,
+    servico_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    foto_url = await save_catalog_image(file, "servicos", servico_id)
+    try:
+        servico, foto_antiga = prestador_repo.atualizar_foto_servico(
+            db,
+            prestador_id,
+            servico_id,
+            foto_url,
+            get_user_id(request),
+        )
+    except Exception:
+        delete_catalog_image(foto_url)
+        raise
+
+    delete_catalog_image(foto_antiga)
+    return servico
 
 
 @router.post("/prestadores/{prestador_id}/horarios", response_model=HorarioResponse, status_code=201)
@@ -282,6 +331,25 @@ def admin_listar_categorias(request: Request, db: Session = Depends(get_db)):
 def admin_criar_categoria(dados: CategoriaCreate, request: Request, db: Session = Depends(get_db)):
     exigir_admin(request)
     return prestador_repo.criar_categoria(db, dados)
+
+
+@router.post("/admin/categorias/{categoria_id}/foto", response_model=CategoriaResponse)
+async def admin_atualizar_foto_categoria(
+    categoria_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    exigir_admin(request)
+    foto_url = await save_catalog_image(file, "categorias", categoria_id)
+    try:
+        categoria, foto_antiga = prestador_repo.atualizar_foto_categoria(db, categoria_id, foto_url)
+    except Exception:
+        delete_catalog_image(foto_url)
+        raise
+
+    delete_catalog_image(foto_antiga)
+    return categoria
 
 
 @router.put("/admin/categorias/{categoria_id}", response_model=CategoriaResponse)

@@ -14,11 +14,16 @@ class Prestador(Base):
     aprovado_em = Column(DateTime, nullable=True)
     aprovado_por = Column(String, nullable=True)
     motivo_rejeicao = Column(String, nullable=True)
+    foto = Column(String(500), nullable=True)
 
     servicos = relationship("Servico", back_populates="prestador")
     horarios = relationship("HorarioFuncionamento", back_populates="prestador")
     avaliacoes = relationship("Avaliacao", back_populates="prestador")
     categorias = relationship("PrestadorCategoria", back_populates="prestador")
+
+    @property
+    def foto_url(self):
+        return self.foto
 
 class Categoria(Base):
     __tablename__ = "categoria"
@@ -27,8 +32,13 @@ class Categoria(Base):
     nome = Column(String, nullable=False)
     descricao = Column(String, nullable=True)
     status = Column(String, default="ativa", nullable=False)
+    foto = Column(String(500), nullable=True)
 
     prestadores = relationship("PrestadorCategoria", back_populates="categoria")
+
+    @property
+    def foto_url(self):
+        return self.foto
 
 class PrestadorCategoria(Base):
     __tablename__ = "prestador_categoria"
@@ -52,9 +62,14 @@ class Servico(Base):
     nome = Column(String, nullable=False)
     preco = Column(Float, nullable=False)
     duracao_min = Column(Integer, nullable=False)
+    foto = Column(String(500), nullable=True)
 
     prestador = relationship("Prestador", back_populates="servicos")
     categoria = relationship("Categoria")
+
+    @property
+    def foto_url(self):
+        return self.foto
 
 class HorarioFuncionamento(Base):
     __tablename__ = "horariofuncionamento"
