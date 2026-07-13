@@ -1,4 +1,5 @@
 export type AdminPrestadorStatus = 'rascunho' | 'pendente' | 'ativo' | 'rejeitado' | 'suspenso';
+export type AdminCategoriaStatus = 'ativa' | 'inativa';
 
 export type AdminPrestador = {
   id: number;
@@ -32,11 +33,26 @@ export type AdminHorario = {
 export type AdminPrestadorDetalhe = AdminPrestador & {
   servicos: AdminServico[];
   horarios: AdminHorario[];
+  categorias?: Array<{
+    prestador_id: number;
+    categoria: AdminCategoria;
+  }>;
 };
 
 export type AdminCategoria = {
   id: number;
   nome: string;
+  descricao?: string | null;
+  status: AdminCategoriaStatus;
+};
+
+export type AdminCategoriaPayload = {
+  nome: string;
+  descricao?: string | null;
+};
+
+export type AdminCategoriaStatusPayload = {
+  status: AdminCategoriaStatus;
 };
 
 export type AdminStatusPayload = {

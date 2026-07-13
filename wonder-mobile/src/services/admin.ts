@@ -1,7 +1,8 @@
 import { api } from './api';
-import { listarCategorias } from './catalogo';
 import {
   AdminCategoria,
+  AdminCategoriaPayload,
+  AdminCategoriaStatusPayload,
   AdminLogAuditoria,
   AdminMonitoramentoBanco,
   AdminPrestador,
@@ -29,7 +30,29 @@ export async function atualizarStatusPrestadorAdmin(
 }
 
 export async function listarCategoriasAdmin(): Promise<AdminCategoria[]> {
-  return listarCategorias();
+  const response = await api.get<AdminCategoria[]>('/admin/categorias');
+  return response.data;
+}
+
+export async function criarCategoriaAdmin(payload: AdminCategoriaPayload): Promise<AdminCategoria> {
+  const response = await api.post<AdminCategoria>('/admin/categorias', payload);
+  return response.data;
+}
+
+export async function atualizarCategoriaAdmin(
+  categoriaId: number,
+  payload: AdminCategoriaPayload
+): Promise<AdminCategoria> {
+  const response = await api.put<AdminCategoria>(`/admin/categorias/${categoriaId}`, payload);
+  return response.data;
+}
+
+export async function atualizarStatusCategoriaAdmin(
+  categoriaId: number,
+  payload: AdminCategoriaStatusPayload
+): Promise<AdminCategoria> {
+  const response = await api.patch<AdminCategoria>(`/admin/categorias/${categoriaId}/status`, payload);
+  return response.data;
 }
 
 export async function obterMonitoramentoAdmin(limit = 10): Promise<AdminMonitoramentoBanco[]> {
