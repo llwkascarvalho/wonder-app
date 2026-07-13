@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.xxl,
   },
   header: {
-    gap: theme.spacing.xs,
+    gap: theme.spacing.sm,
   },
   title: {
     color: theme.colors.primary,

@@ -56,6 +56,7 @@ export function SearchScreen() {
 
   return (
     <View style={styles.container}>
+      <Text style={styles.title}>Buscar Prestadores</Text>
       <Text style={styles.subtitle}>Encontre profissionais de beleza perto de voce</Text>
 
       <Input
@@ -136,6 +137,12 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: theme.spacing.md,
     padding: theme.spacing.lg,
+    paddingTop: theme.spacing.xxl,
+  },
+  title: {
+    color: theme.colors.text,
+    fontSize: theme.fontSize.xxl,
+    fontWeight: theme.fontWeight.bold,
   },
   subtitle: {
     color: theme.colors.textSecondary,

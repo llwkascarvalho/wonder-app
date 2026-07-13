@@ -6,7 +6,6 @@ import { Card } from '../components/Card';
 import { CategoryCard } from '../components/catalog/CategoryCard';
 import { ProviderCard } from '../components/catalog/ProviderCard';
 import { LoadingIndicator } from '../components/LoadingIndicator';
-import { Logo } from '../components/Logo';
 import { listarCategorias, listarPrestadores } from '../services/catalogo';
 import { theme } from '../styles/theme';
 import { Categoria } from '../types/catalogo';
@@ -74,10 +73,6 @@ export function HomeScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.header}>
-        <Logo size={20} />
-      </View>
-
       <Text style={styles.sectionTitle}>Categorias</Text>
       {carregandoCategorias ? (
         <LoadingIndicator text="Carregando categorias..." />
@@ -138,9 +133,6 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     padding: theme.spacing.lg,
     paddingTop: theme.spacing.xxl,
-  },
-  header: {
-    alignItems: 'flex-start',
   },
   sectionTitle: {
     color: theme.colors.text,

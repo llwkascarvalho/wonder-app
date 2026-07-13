@@ -148,6 +148,7 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: theme.spacing.sm,
     padding: theme.spacing.lg,
+    paddingTop: theme.spacing.xxl,
   },
   title: {
     color: theme.colors.text,

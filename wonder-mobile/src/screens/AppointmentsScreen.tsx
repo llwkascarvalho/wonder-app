@@ -196,6 +196,8 @@ export function AppointmentsScreen() {
 
   return (
     <View style={styles.container}>
+      <Text style={styles.title}>Agendamentos</Text>
+
       <View style={styles.segment}>
         {tabs.map((tab) => {
           const selected = activeTab === tab.key;
@@ -323,6 +325,12 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: theme.spacing.md,
     padding: theme.spacing.lg,
+    paddingTop: theme.spacing.xxl,
+  },
+  title: {
+    color: theme.colors.text,
+    fontSize: theme.fontSize.xxl,
+    fontWeight: theme.fontWeight.bold,
   },
   segment: {
     borderColor: theme.colors.border,
@@ -409,9 +417,9 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.error,
     borderRadius: theme.borderRadius.pill,
     borderWidth: 1,
+    justifyContent: 'center',
     minHeight: 30,
     minWidth: 84,
-    justifyContent: 'center',
     paddingHorizontal: theme.spacing.sm,
   },
   cancelButtonText: {
