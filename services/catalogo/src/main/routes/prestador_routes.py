@@ -4,14 +4,18 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from src.main.dependencies.db import get_db
-from src.main.models.prestador_model import Categoria
 from src.main.repositories import prestador_repo
 from src.main.schemas.prestador_schema import (
     AvaliacaoCreate,
     AvaliacaoResponse,
+    CategoriaCreate,
     CategoriaResponse,
+    CategoriaStatusUpdate,
+    CategoriaUpdate,
     HorarioCreate,
     HorarioResponse,
+    PrestadorCategoriaCreate,
+    PrestadorCategoriaResponse,
     PrestadorCreate,
     PrestadorDetalheResponse,
     PrestadorResponse,
@@ -58,7 +62,7 @@ def listar_prestadores(
 
 @router.get("/categorias", response_model=List[CategoriaResponse])
 def listar_categorias(db: Session = Depends(get_db)):
-    return db.query(Categoria).all()
+    return prestador_repo.listar_categorias_ativas(db)
 
 
 @router.get("/prestadores/me", response_model=PrestadorResponse)
@@ -67,6 +71,34 @@ def obter_meu_prestador(request: Request, db: Session = Depends(get_db)):
     if not prestador:
         raise HTTPException(status_code=404, detail="Cadastro de prestador nao encontrado.")
     return prestador
+
+
+@router.get("/prestadores/me/categorias", response_model=List[PrestadorCategoriaResponse])
+def listar_minhas_categorias(request: Request, db: Session = Depends(get_db)):
+    prestador = prestador_repo.obter_por_usuario(db, get_user_id(request))
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Cadastro de prestador nao encontrado.")
+    return prestador_repo.listar_categorias_prestador(db, prestador.id)
+
+
+@router.post("/prestadores/me/categorias", response_model=List[PrestadorCategoriaResponse], status_code=201)
+def associar_minhas_categorias(
+    dados: PrestadorCategoriaCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    prestador = prestador_repo.obter_por_usuario(db, get_user_id(request))
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Cadastro de prestador nao encontrado.")
+    return prestador_repo.associar_categorias(db, prestador.id, dados, get_user_id(request))
+
+
+@router.delete("/prestadores/me/categorias/{categoria_id}")
+def remover_minha_categoria(categoria_id: int, request: Request, db: Session = Depends(get_db)):
+    prestador = prestador_repo.obter_por_usuario(db, get_user_id(request))
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Cadastro de prestador nao encontrado.")
+    return prestador_repo.remover_categoria_prestador(db, prestador.id, categoria_id, get_user_id(request))
 
 
 @router.get("/prestadores/{prestador_id}", response_model=PrestadorResponse)
@@ -97,6 +129,35 @@ def listar_servicos_prestador(prestador_id: int, request: Request, db: Session =
         )
 
     return servicos
+
+
+@router.get("/prestadores/{prestador_id}/categorias", response_model=List[PrestadorCategoriaResponse])
+def listar_categorias_prestador(prestador_id: int, request: Request, db: Session = Depends(get_db)):
+    prestador = prestador_repo.obter_por_id(db, prestador_id)
+    is_owner = prestador and str(prestador.usuario_id) == str(get_user_id(request))
+    if not prestador or (not is_admin(request) and not is_owner and prestador.status != "ativo"):
+        raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
+    return prestador_repo.listar_categorias_prestador(db, prestador_id)
+
+
+@router.post("/prestadores/{prestador_id}/categorias", response_model=List[PrestadorCategoriaResponse], status_code=201)
+def associar_categorias_prestador(
+    prestador_id: int,
+    dados: PrestadorCategoriaCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    return prestador_repo.associar_categorias(db, prestador_id, dados, get_user_id(request))
+
+
+@router.delete("/prestadores/{prestador_id}/categorias/{categoria_id}")
+def remover_categoria_prestador(
+    prestador_id: int,
+    categoria_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    return prestador_repo.remover_categoria_prestador(db, prestador_id, categoria_id, get_user_id(request))
 
 
 @router.get("/prestadores/{prestador_id}/horarios", response_model=List[HorarioResponse])
@@ -190,3 +251,41 @@ def admin_atualizar_status(
 ):
     exigir_admin(request)
     return prestador_repo.atualizar_status_admin(db, prestador_id, dados, get_user_id(request))
+
+
+@router.get("/admin/categorias", response_model=List[CategoriaResponse])
+def admin_listar_categorias(request: Request, db: Session = Depends(get_db)):
+    exigir_admin(request)
+    categorias = prestador_repo.listar_todas_categorias(db)
+    prestador_repo.registrar_auditoria(
+        db, get_user_id(request), "categoria", f"Admin listou {len(categorias)} categorias"
+    )
+    return categorias
+
+
+@router.post("/admin/categorias", response_model=CategoriaResponse, status_code=201)
+def admin_criar_categoria(dados: CategoriaCreate, request: Request, db: Session = Depends(get_db)):
+    exigir_admin(request)
+    return prestador_repo.criar_categoria(db, dados)
+
+
+@router.put("/admin/categorias/{categoria_id}", response_model=CategoriaResponse)
+def admin_atualizar_categoria(
+    categoria_id: int,
+    dados: CategoriaUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    exigir_admin(request)
+    return prestador_repo.atualizar_categoria(db, categoria_id, dados)
+
+
+@router.patch("/admin/categorias/{categoria_id}/status", response_model=CategoriaResponse)
+def admin_atualizar_status_categoria(
+    categoria_id: int,
+    dados: CategoriaStatusUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    exigir_admin(request)
+    return prestador_repo.atualizar_status_categoria(db, categoria_id, dados)

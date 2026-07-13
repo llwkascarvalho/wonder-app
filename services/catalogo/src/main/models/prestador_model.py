@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Integer, String, Float, ForeignKey, JSON, SmallInteger, Time
+from sqlalchemy import Column, DateTime, Integer, String, Float, ForeignKey, JSON, SmallInteger, Time, UniqueConstraint
 from sqlalchemy.orm import relationship
 from src.main.core.database import Base
 
@@ -18,12 +18,30 @@ class Prestador(Base):
     servicos = relationship("Servico", back_populates="prestador")
     horarios = relationship("HorarioFuncionamento", back_populates="prestador")
     avaliacoes = relationship("Avaliacao", back_populates="prestador")
+    categorias = relationship("PrestadorCategoria", back_populates="prestador")
 
 class Categoria(Base):
     __tablename__ = "categoria"
 
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String, nullable=False)
+    descricao = Column(String, nullable=True)
+    status = Column(String, default="ativa", nullable=False)
+
+    prestadores = relationship("PrestadorCategoria", back_populates="categoria")
+
+class PrestadorCategoria(Base):
+    __tablename__ = "prestador_categoria"
+    __table_args__ = (
+        UniqueConstraint("prestador_id", "categoria_id", name="uq_prestador_categoria"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    prestador_id = Column(Integer, ForeignKey("prestador.id"), nullable=False)
+    categoria_id = Column(Integer, ForeignKey("categoria.id"), nullable=False)
+
+    prestador = relationship("Prestador", back_populates="categorias")
+    categoria = relationship("Categoria", back_populates="prestadores")
 
 class Servico(Base):
     __tablename__ = "servico"
