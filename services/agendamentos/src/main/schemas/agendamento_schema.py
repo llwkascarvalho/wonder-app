@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 class AgendamentoCreate(BaseModel):
@@ -21,6 +21,27 @@ class AgendamentoResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class HorarioDisponivelResponse(BaseModel):
+    inicio: datetime
+    fim: datetime
+
+class DisponibilidadeResponse(BaseModel):
+    prestador_id: int
+    servico_id: int
+    data: date
+    duracao_min: int
+    horarios: list[HorarioDisponivelResponse]
+
+class DiaDisponivelResponse(BaseModel):
+    data: date
+    disponivel: bool
+
+class DiasDisponiveisResponse(BaseModel):
+    prestador_id: int
+    servico_id: int
+    mes: str
+    dias: list[DiaDisponivelResponse]
 
 class HistoricoResponse(BaseModel):
     id: int

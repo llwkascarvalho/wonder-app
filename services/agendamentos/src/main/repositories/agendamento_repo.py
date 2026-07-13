@@ -3,6 +3,10 @@ from src.main.models.agendamento_model import Agendamento, HistoricoAgendamento
 from sqlalchemy import select
 from fastapi import HTTPException
 from src.main.schemas.agendamento_schema import AgendamentoCreate, AgendamentoStatusUpdate
+from src.main.services.disponibilidade_service import (
+    adquirir_lock_prestador,
+    validar_intervalo_para_criacao,
+)
 import pika
 import json
 from src.main.core.config import settings
@@ -110,18 +114,39 @@ def obter_agendamento(db: Session, agendamento_id: int, cliente_id: int) -> Agen
     return agendamento
 
 
-def criar_agendamento(db: Session, dados: AgendamentoCreate, cliente_id: int) -> Agendamento:
+def criar_agendamento(
+    db: Session,
+    dados: AgendamentoCreate,
+    cliente_id: int,
+    catalogo_headers: dict[str, str],
+) -> Agendamento:
     """
     Cria agendamento com controle de concorrência via SELECT FOR UPDATE.
     Impede double booking: mesmo prestador, mesmo horário.
     """
+    validar_intervalo_para_criacao(
+        db,
+        dados.prestador_id,
+        dados.servico_id,
+        dados.inicio,
+        catalogo_headers,
+    )
+    adquirir_lock_prestador(db, dados.prestador_id)
+    validar_intervalo_para_criacao(
+        db,
+        dados.prestador_id,
+        dados.servico_id,
+        dados.inicio,
+        catalogo_headers,
+    )
+
     conflito = (
         db.execute(
             select(Agendamento)
             .where(
                 Agendamento.prestador_id == dados.prestador_id,
                 Agendamento.inicio == dados.inicio,
-                Agendamento.status.notin_(["cancelado"])
+                Agendamento.status.in_(["pendente", "confirmado"])
             )
             .with_for_update()
         )
