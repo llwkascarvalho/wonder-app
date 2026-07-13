@@ -7,11 +7,11 @@ import { AppointmentsScreen } from '../screens/AppointmentsScreen';
 import { ChatScreen } from '../screens/ChatScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
-import { ProfileScreen } from '../screens/ProfileScreen';
 import { ProviderAgendaScreen } from '../screens/ProviderAgendaScreen';
 import { ProviderProfileScreen } from '../screens/ProviderProfileScreen';
 import { theme } from '../styles/theme';
 import { AdminTabs } from './AdminTabs';
+import { ProfileStack } from './ProfileStack';
 import { SearchStack } from './SearchStack';
 
 export type MainTabsParamList = {
@@ -200,7 +200,7 @@ function MainTabsInner() {
       />
       <ClientTab.Screen
         name="Profile"
-        component={ProfileScreen}
+        component={ProfileStack}
         options={{
           title: 'Perfil',
           tabBarIcon: ({ color, size }) => (

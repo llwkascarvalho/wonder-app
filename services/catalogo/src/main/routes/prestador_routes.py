@@ -26,6 +26,7 @@ from src.main.schemas.prestador_schema import (
 )
 
 router = APIRouter(tags=["Catalogo"])
+STATUS_LEITURA_DONO = {"rascunho", "rejeitado", "ativo", "suspenso"}
 
 
 def get_user_id(request: Request) -> str:
@@ -39,6 +40,20 @@ def is_admin(request: Request) -> bool:
 def exigir_admin(request: Request):
     if not is_admin(request):
         raise HTTPException(status_code=403, detail="Acesso restrito a administradores.")
+
+
+def pode_ler_dados_prestador(prestador, request: Request) -> bool:
+    if not prestador:
+        return False
+
+    if is_admin(request):
+        return True
+
+    if prestador.status == "ativo":
+        return True
+
+    is_owner = str(prestador.usuario_id) == str(get_user_id(request))
+    return is_owner and prestador.status in STATUS_LEITURA_DONO
 
 
 # LEITURA PUBLICA/AUTENTICADA
@@ -118,7 +133,7 @@ def obter_prestador(prestador_id: int, request: Request, db: Session = Depends(g
 @router.get("/prestadores/{prestador_id}/servicos", response_model=List[ServicoResponse])
 def listar_servicos_prestador(prestador_id: int, request: Request, db: Session = Depends(get_db)):
     prestador = prestador_repo.obter_por_id(db, prestador_id)
-    if not prestador or (not is_admin(request) and prestador.status != "ativo"):
+    if not pode_ler_dados_prestador(prestador, request):
         raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
 
     servicos = prestador_repo.listar_servicos(db, prestador_id)
@@ -163,7 +178,7 @@ def remover_categoria_prestador(
 @router.get("/prestadores/{prestador_id}/horarios", response_model=List[HorarioResponse])
 def listar_horarios(prestador_id: int, request: Request, db: Session = Depends(get_db)):
     prestador = prestador_repo.obter_por_id(db, prestador_id)
-    if not prestador or (not is_admin(request) and prestador.status != "ativo"):
+    if not pode_ler_dados_prestador(prestador, request):
         raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
     return prestador_repo.listar_horarios(db, prestador_id)
 
