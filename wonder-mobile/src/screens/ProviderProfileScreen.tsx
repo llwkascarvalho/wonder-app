@@ -8,6 +8,7 @@ import { CatalogImage } from '../components/catalog/CatalogImage';
 import { Input } from '../components/Input';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { ProfileScreenContent } from '../components/profile/ProfileScreenContent';
+import { ProviderIcon, ProviderIconName } from '../components/provider/ProviderIcon';
 import { ProviderScheduleModal } from '../components/ProviderScheduleModal';
 import { ProviderServiceModal } from '../components/ProviderServiceModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -261,9 +262,14 @@ export function ProviderProfileScreen() {
         </Card>
       ) : (
         <>
+          <View style={styles.avatar}>
+            <ProviderIcon name="store" size={64} />
+          </View>
+
           <Card style={styles.metricsCard}>
-            <Text style={styles.metricText}>Avaliacao: -</Text>
-            <Text style={styles.metricText}>Servicos: {servicos.length}</Text>
+            <MetricItem icon="star" label="Avaliacao" value="-" />
+            <MetricItem icon="content-cut" label="Servicos" value={String(servicos.length)} />
+            <MetricItem icon="schedule" label="Horarios" value={String(horarios.length)} />
           </Card>
 
           <Card style={styles.detailsCard}>
@@ -306,7 +312,9 @@ export function ProviderProfileScreen() {
                 </View>
                 <InfoRow label="Nome do estabelecimento" value={prestador.nome_estab} />
                 <InfoRow label="CPF/CNPJ" value={prestador.documento} />
+                <InfoRow label="Email" value={usuario?.email || '-'} />
                 <InfoRow label="Horario de funcionamento" value={horariosResumo} />
+                <InfoRow label="Status do cadastro" value={prestador.status} />
               </>
             )}
           </Card>
@@ -368,6 +376,16 @@ export function ProviderProfileScreen() {
   );
 }
 
+function MetricItem({ icon, label, value }: { icon: ProviderIconName; label: string; value: string }) {
+  return (
+    <View style={styles.metricItem}>
+      <ProviderIcon name={icon} size={24} />
+      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={styles.metricLabel}>{label}</Text>
+    </View>
+  );
+}
+
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.infoRow}>
@@ -386,13 +404,34 @@ const styles = StyleSheet.create({
   formCard: {
     gap: theme.spacing.md,
   },
+  avatar: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: theme.colors.surfaceMuted,
+    borderColor: theme.colors.primary,
+    borderRadius: 74,
+    borderWidth: 2,
+    height: 148,
+    justifyContent: 'center',
+    width: 148,
+  },
   metricsCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  metricText: {
+  metricItem: {
+    alignItems: 'center',
+    flex: 1,
+    gap: theme.spacing.xs,
+  },
+  metricValue: {
     color: theme.colors.text,
-    fontSize: theme.fontSize.md,
+    fontSize: theme.fontSize.lg,
+    fontWeight: theme.fontWeight.bold,
+  },
+  metricLabel: {
+    color: theme.colors.textSecondary,
+    fontSize: theme.fontSize.xs,
     fontWeight: theme.fontWeight.semibold,
   },
   detailsCard: {

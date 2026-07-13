@@ -1,5 +1,6 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { ComponentProps } from 'react';
 
 import { useAuth } from '../contexts/AuthContext';
 import { NotificationsProvider, useNotifications } from '../contexts/NotificationsContext';
@@ -33,20 +34,22 @@ type ProviderTabsParamList = {
 const ClientTab = createBottomTabNavigator<MainTabsParamList>();
 const ProviderTab = createBottomTabNavigator<ProviderTabsParamList>();
 
-const clientTabIcons: Record<keyof MainTabsParamList, string> = {
-  Home: 'H',
-  Search: 'B',
-  Appointments: 'A',
-  Notifications: 'N',
-  Chat: 'C',
-  Profile: 'P',
+type TabIconName = ComponentProps<typeof MaterialIcons>['name'];
+
+const clientTabIcons: Record<keyof MainTabsParamList, TabIconName> = {
+  Home: 'home',
+  Search: 'search',
+  Appointments: 'event',
+  Notifications: 'notifications',
+  Chat: 'chat',
+  Profile: 'person',
 };
 
-const providerTabIcons: Record<keyof ProviderTabsParamList, string> = {
-  ProviderAgenda: 'A',
-  Notifications: 'N',
-  Chat: 'C',
-  ProviderProfile: 'P',
+const providerTabIcons: Record<keyof ProviderTabsParamList, TabIconName> = {
+  ProviderAgenda: 'event',
+  Notifications: 'notifications',
+  Chat: 'chat',
+  ProviderProfile: 'store',
 };
 
 const sharedScreenOptions = {
@@ -65,6 +68,10 @@ const sharedScreenOptions = {
     paddingTop: theme.spacing.xs,
   },
 } as const;
+
+function TabIcon({ name, color, size }: { name: TabIconName; color: string; size: number }) {
+  return <MaterialIcons name={name} color={color} size={size} />;
+}
 
 function MainTabsInner() {
   const { usuario } = useAuth();
@@ -87,11 +94,7 @@ function MainTabsInner() {
           component={ProviderAgendaScreen}
           options={{
             title: 'Agendamentos',
-            tabBarIcon: ({ color, size }) => (
-              <Text style={{ color, fontSize: size, fontWeight: theme.fontWeight.bold }}>
-                {providerTabIcons.ProviderAgenda}
-              </Text>
-            ),
+            tabBarIcon: ({ color, size }) => <TabIcon name={providerTabIcons.ProviderAgenda} color={color} size={size} />,
           }}
         />
         <ProviderTab.Screen
@@ -100,11 +103,7 @@ function MainTabsInner() {
           options={{
             title: 'Avisos',
             tabBarBadge: notificationsBadge,
-            tabBarIcon: ({ color, size }) => (
-              <Text style={{ color, fontSize: size, fontWeight: theme.fontWeight.bold }}>
-                {providerTabIcons.Notifications}
-              </Text>
-            ),
+            tabBarIcon: ({ color, size }) => <TabIcon name={providerTabIcons.Notifications} color={color} size={size} />,
           }}
         />
         <ProviderTab.Screen
@@ -112,11 +111,7 @@ function MainTabsInner() {
           component={ChatScreen}
           options={{
             title: 'Assistente',
-            tabBarIcon: ({ color, size }) => (
-              <Text style={{ color, fontSize: size, fontWeight: theme.fontWeight.bold }}>
-                {providerTabIcons.Chat}
-              </Text>
-            ),
+            tabBarIcon: ({ color, size }) => <TabIcon name={providerTabIcons.Chat} color={color} size={size} />,
           }}
         />
         <ProviderTab.Screen
@@ -124,11 +119,7 @@ function MainTabsInner() {
           component={ProviderProfileScreen}
           options={{
             title: 'Perfil',
-            tabBarIcon: ({ color, size }) => (
-              <Text style={{ color, fontSize: size, fontWeight: theme.fontWeight.bold }}>
-                {providerTabIcons.ProviderProfile}
-              </Text>
-            ),
+            tabBarIcon: ({ color, size }) => <TabIcon name={providerTabIcons.ProviderProfile} color={color} size={size} />,
           }}
         />
       </ProviderTab.Navigator>
@@ -142,11 +133,7 @@ function MainTabsInner() {
         component={HomeScreen}
         options={{
           title: 'Inicio',
-          tabBarIcon: ({ color, size }) => (
-            <Text style={{ color, fontSize: size, fontWeight: theme.fontWeight.bold }}>
-              {clientTabIcons.Home}
-            </Text>
-          ),
+          tabBarIcon: ({ color, size }) => <TabIcon name={clientTabIcons.Home} color={color} size={size} />,
         }}
       />
       <ClientTab.Screen
@@ -154,11 +141,7 @@ function MainTabsInner() {
         component={SearchStack}
         options={{
           title: 'Buscar',
-          tabBarIcon: ({ color, size }) => (
-            <Text style={{ color, fontSize: size, fontWeight: theme.fontWeight.bold }}>
-              {clientTabIcons.Search}
-            </Text>
-          ),
+          tabBarIcon: ({ color, size }) => <TabIcon name={clientTabIcons.Search} color={color} size={size} />,
         }}
       />
       <ClientTab.Screen
@@ -166,11 +149,7 @@ function MainTabsInner() {
         component={AppointmentsScreen}
         options={{
           title: 'Agenda',
-          tabBarIcon: ({ color, size }) => (
-            <Text style={{ color, fontSize: size, fontWeight: theme.fontWeight.bold }}>
-              {clientTabIcons.Appointments}
-            </Text>
-          ),
+          tabBarIcon: ({ color, size }) => <TabIcon name={clientTabIcons.Appointments} color={color} size={size} />,
         }}
       />
       <ClientTab.Screen
@@ -179,11 +158,7 @@ function MainTabsInner() {
         options={{
           title: 'Avisos',
           tabBarBadge: notificationsBadge,
-          tabBarIcon: ({ color, size }) => (
-            <Text style={{ color, fontSize: size, fontWeight: theme.fontWeight.bold }}>
-              {clientTabIcons.Notifications}
-            </Text>
-          ),
+          tabBarIcon: ({ color, size }) => <TabIcon name={clientTabIcons.Notifications} color={color} size={size} />,
         }}
       />
       <ClientTab.Screen
@@ -191,11 +166,7 @@ function MainTabsInner() {
         component={ChatScreen}
         options={{
           title: 'Assistente',
-          tabBarIcon: ({ color, size }) => (
-            <Text style={{ color, fontSize: size, fontWeight: theme.fontWeight.bold }}>
-              {clientTabIcons.Chat}
-            </Text>
-          ),
+          tabBarIcon: ({ color, size }) => <TabIcon name={clientTabIcons.Chat} color={color} size={size} />,
         }}
       />
       <ClientTab.Screen
@@ -203,11 +174,7 @@ function MainTabsInner() {
         component={ProfileStack}
         options={{
           title: 'Perfil',
-          tabBarIcon: ({ color, size }) => (
-            <Text style={{ color, fontSize: size, fontWeight: theme.fontWeight.bold }}>
-              {clientTabIcons.Profile}
-            </Text>
-          ),
+          tabBarIcon: ({ color, size }) => <TabIcon name={clientTabIcons.Profile} color={color} size={size} />,
         }}
       />
     </ClientTab.Navigator>
