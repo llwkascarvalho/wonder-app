@@ -2,7 +2,7 @@ import httpx
 import base64
 import json
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from urllib.parse import urlencode, urlparse
 from sqlalchemy.orm import Session
@@ -11,7 +11,8 @@ from src.main.core.config import settings
 from src.main.dependencies.db import get_db
 from src.main.repositories import user_repo
 from src.main.core.security import gerar_jwt
-from src.main.schemas.auth_schema import TipoUpdate, TokenResponse, UsuarioResponse
+from src.main.schemas.auth_schema import TipoUpdate, TokenResponse, UsuarioResponse, UsuarioUpdate
+from src.main.storage.profile_storage import delete_profile_photo, save_profile_photo
 
 router = APIRouter(tags=["Autenticação"])
 
@@ -71,6 +72,17 @@ def validar_chamada_admin_interna(request: Request):
     validar_admin(request)
     if request.headers.get("X-Internal-Service") != "admin":
         raise HTTPException(status_code=403, detail="Endpoint restrito ao servico Admin.")
+
+def get_user_id(request: Request) -> int:
+    user_id = request.headers.get("X-User-ID")
+
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Usuario autenticado nao identificado.")
+
+    try:
+        return int(user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Identificador de usuario invalido.")
 
 @router.get("/auth/google/login")
 def google_login(
@@ -158,12 +170,32 @@ async def google_callback(code: str, state: str | None = None, db: Session = Dep
     return {
         "access_token": token,
         "token_type": "bearer",
-        "usuario": {
-            "id": usuario.id,
-            "email": usuario.email,
-            "tipo_usuario": usuario.tipo_usuario
-        }
+        "usuario": usuario
     }
+
+@router.get("/auth/me", response_model=UsuarioResponse)
+def obter_meu_perfil(request: Request, db: Session = Depends(get_db)):
+    return user_repo.obter_usuario(db, get_user_id(request))
+
+@router.patch("/auth/me", response_model=UsuarioResponse)
+def atualizar_meu_perfil(dados: UsuarioUpdate, request: Request, db: Session = Depends(get_db)):
+    return user_repo.atualizar_perfil(
+        db,
+        get_user_id(request),
+        nome=dados.nome,
+        telefone=dados.telefone,
+    )
+
+@router.post("/auth/me/photo", response_model=UsuarioResponse)
+async def atualizar_minha_foto(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    usuario = user_repo.obter_usuario(db, get_user_id(request))
+    foto_url = await save_profile_photo(file, usuario.id)
+    delete_profile_photo(usuario.foto_perfil)
+    return user_repo.atualizar_foto_perfil(db, usuario.id, foto_url)
 
 @router.get("/auth/usuarios", response_model=List[UsuarioResponse])
 def listar_usuarios(request: Request, db: Session = Depends(get_db)):
