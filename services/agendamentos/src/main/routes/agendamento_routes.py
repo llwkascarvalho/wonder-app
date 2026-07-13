@@ -2,7 +2,9 @@ import json
 from urllib.error import URLError
 from urllib.request import Request as UrlRequest, urlopen
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from datetime import date
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from src.main.core.config import settings
@@ -17,9 +19,24 @@ from src.main.schemas.agendamento_schema import (
     AgendamentoCreate,
     AgendamentoResponse,
     AgendamentoStatusUpdate,
+    DiasDisponiveisResponse,
+    DiaDisponivelResponse,
+    DisponibilidadeResponse,
+    HorarioDisponivelResponse,
+)
+from src.main.services.disponibilidade_service import (
+    calcular_dias_disponiveis,
+    calcular_disponibilidade,
 )
 
 router = APIRouter(tags=["Agendamentos"])
+
+
+def catalogo_headers(usuario_id: int, tipo_usuario: str) -> dict[str, str]:
+    return {
+        "X-User-ID": str(usuario_id),
+        "X-User-Role": tipo_usuario,
+    }
 
 
 def listar_prestadores_usuario(usuario_id: int, tipo_usuario: str) -> list[int]:
@@ -50,6 +67,55 @@ def listar_prestadores_usuario(usuario_id: int, tipo_usuario: str) -> list[int]:
     ]
 
 
+@router.get("/agendamentos/dias-disponiveis", response_model=DiasDisponiveisResponse)
+def route_dias_disponiveis(
+    prestador_id: int,
+    servico_id: int,
+    mes: str = Query(..., description="Mes no formato YYYY-MM"),
+    x_user_id: int = Header(..., alias="X-User-ID"),
+    x_user_role: str = Header("cliente", alias="X-User-Role"),
+    db: Session = Depends(get_db),
+):
+    servico, dias = calcular_dias_disponiveis(
+        db,
+        prestador_id,
+        servico_id,
+        mes,
+        catalogo_headers(x_user_id, x_user_role.lower()),
+    )
+    return DiasDisponiveisResponse(
+        prestador_id=prestador_id,
+        servico_id=servico.id,
+        mes=mes,
+        dias=[DiaDisponivelResponse(data=dia, disponivel=True) for dia in dias],
+    )
+
+
+@router.get("/agendamentos/disponibilidade", response_model=DisponibilidadeResponse)
+def route_disponibilidade(
+    prestador_id: int,
+    servico_id: int,
+    data: date,
+    x_user_id: int = Header(..., alias="X-User-ID"),
+    x_user_role: str = Header("cliente", alias="X-User-Role"),
+    db: Session = Depends(get_db),
+):
+    servico, slots = calcular_disponibilidade(
+        db,
+        prestador_id,
+        servico_id,
+        data,
+        catalogo_headers(x_user_id, x_user_role.lower()),
+    )
+    return DisponibilidadeResponse(
+        prestador_id=prestador_id,
+        servico_id=servico.id,
+        data=data,
+        duracao_min=servico.duracao_min,
+        horarios=[HorarioDisponivelResponse(inicio=slot.inicio, fim=slot.fim) for slot in slots],
+    )
+
+
 @router.get("/agendamentos", response_model=list[AgendamentoResponse])
 def route_listar(
     x_user_id: int = Header(..., alias="X-User-ID"),
@@ -76,9 +142,10 @@ def route_obter(
 def route_criar(
     dados: AgendamentoCreate,
     x_user_id: int = Header(..., alias="X-User-ID"),
+    x_user_role: str = Header("cliente", alias="X-User-Role"),
     db: Session = Depends(get_db),
 ):
-    return criar_agendamento(db, dados, x_user_id)
+    return criar_agendamento(db, dados, x_user_id, catalogo_headers(x_user_id, x_user_role.lower()))
 
 
 @router.patch("/agendamentos/{agendamento_id}/status", response_model=AgendamentoResponse)

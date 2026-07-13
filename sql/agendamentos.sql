@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS Historico_agendamento (
 
 -- ─── AUDITORIA ─────────────────────────────────────────────────────────────
 
+CREATE INDEX IF NOT EXISTS idx_agendamento_prestador_inicio_status
+    ON Agendamento (prestador_id, inicio, status);
+
 CREATE TABLE IF NOT EXISTS logs_auditoria (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     usuario_id     INTEGER,
