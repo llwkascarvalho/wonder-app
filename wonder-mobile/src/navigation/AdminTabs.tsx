@@ -1,7 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Text } from 'react-native';
 
+import { AdminIcon, AdminIconName } from '../components/admin/AdminIcon';
 import { AdminAuditScreen } from '../screens/admin/AdminAuditScreen';
 import { AdminCategoriesScreen } from '../screens/admin/AdminCategoriesScreen';
 import { AdminHomeScreen } from '../screens/admin/AdminHomeScreen';
@@ -26,12 +26,12 @@ export type AdminTabsParamList = {
 const Tab = createBottomTabNavigator<AdminTabsParamList>();
 const HomeStack = createNativeStackNavigator<AdminHomeStackParamList>();
 
-const tabIcons: Record<keyof AdminTabsParamList, string> = {
-  AdminHome: 'H',
-  AdminProviders: 'P',
-  AdminCategories: 'C',
-  AdminMonitoring: 'M',
-  AdminProfile: 'U',
+const tabIcons: Record<keyof AdminTabsParamList, AdminIconName> = {
+  AdminHome: 'home',
+  AdminProviders: 'groups',
+  AdminCategories: 'category',
+  AdminMonitoring: 'monitor',
+  AdminProfile: 'person',
 };
 
 const screenOptions = {
@@ -61,11 +61,7 @@ function AdminHomeStack() {
 }
 
 function TabIcon({ name, color, size }: { name: keyof AdminTabsParamList; color: string; size: number }) {
-  return (
-    <Text style={{ color, fontSize: size, fontWeight: theme.fontWeight.bold }}>
-      {tabIcons[name]}
-    </Text>
-  );
+  return <AdminIcon name={tabIcons[name]} color={color} size={size} />;
 }
 
 export function AdminTabs() {

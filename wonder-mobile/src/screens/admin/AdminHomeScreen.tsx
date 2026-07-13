@@ -4,6 +4,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { AdminIcon, AdminIconName } from '../../components/admin/AdminIcon';
 import { Card } from '../../components/Card';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { AdminHomeStackParamList, AdminTabsParamList } from '../../navigation/AdminTabs';
@@ -68,8 +69,9 @@ export function AdminHomeScreen() {
         <View>
           <Text style={styles.cardTitle}>Prestadores pendentes</Text>
           <Text style={styles.cardText}>Solicitacoes aguardando analise.</Text>
+          {pendentes !== null ? <Text style={styles.cardText}>Pendentes: {pendentes}</Text> : null}
         </View>
-        <Text style={styles.metric}>{pendentes ?? '-'}</Text>
+        <IconCircle name="groups" />
       </Card>
 
       <Card style={styles.hubCard} onPress={() => navigation.navigate('AdminCategories')}>
@@ -77,7 +79,7 @@ export function AdminHomeScreen() {
           <Text style={styles.cardTitle}>Categorias</Text>
           <Text style={styles.cardText}>Consulte as categorias cadastradas.</Text>
         </View>
-        <Text style={styles.arrow}>C</Text>
+        <IconCircle name="category" />
       </Card>
 
       <Card style={styles.hubCard} onPress={() => navigation.navigate('AdminMonitoring')}>
@@ -85,7 +87,7 @@ export function AdminHomeScreen() {
           <Text style={styles.cardTitle}>Monitoramento</Text>
           <Text style={styles.cardText}>Queries lentas, conexoes ativas e dead tuples.</Text>
         </View>
-        <Text style={styles.arrow}>M</Text>
+        <IconCircle name="monitor" />
       </Card>
 
       <Card style={styles.hubCard} onPress={() => navigation.navigate('AdminAudit')}>
@@ -93,9 +95,17 @@ export function AdminHomeScreen() {
           <Text style={styles.cardTitle}>Auditoria</Text>
           <Text style={styles.cardText}>Logs recentes e resumo por operacao.</Text>
         </View>
-        <Text style={styles.arrow}>A</Text>
+        <IconCircle name="fact-check" />
       </Card>
     </ScrollView>
+  );
+}
+
+function IconCircle({ name }: { name: AdminIconName }) {
+  return (
+    <View style={styles.iconCircle}>
+      <AdminIcon name={name} color={theme.colors.white} size={22} />
+    </View>
   );
 }
 
@@ -136,20 +146,13 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.sm,
     marginTop: theme.spacing.xs,
   },
-  metric: {
-    color: theme.colors.primary,
-    fontSize: theme.fontSize.xxl,
-    fontWeight: theme.fontWeight.bold,
-  },
-  arrow: {
+  iconCircle: {
+    alignItems: 'center',
     backgroundColor: theme.colors.primary,
     borderRadius: theme.borderRadius.pill,
-    color: theme.colors.white,
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.bold,
-    overflow: 'hidden',
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
   },
   error: {
     color: theme.colors.error,
