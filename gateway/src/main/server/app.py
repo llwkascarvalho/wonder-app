@@ -4,7 +4,7 @@ from fastapi.responses import Response
 from jose import jwt, JWTError, ExpiredSignatureError
 from src.main.core.config import settings
 
-PUBLIC_PREFIXES = ["/auth/google/", "/health"]
+PUBLIC_PREFIXES = ["/auth/google/", "/auth/uploads/profile/", "/health"]
 
 SERVICE_PREFIX_ALIASES = {
     "notificacoes": "notificacao",

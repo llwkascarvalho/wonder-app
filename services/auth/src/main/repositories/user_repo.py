@@ -14,7 +14,6 @@ def upsert_usuario(db: Session, email: str, username: str) -> CustomUser:
     stmt = stmt.on_conflict_do_update(
         index_elements=['email'],
         set_={
-            'username': stmt.excluded.username,
             'atualizado_em': func.now()
         }
     ).returning(CustomUser)
@@ -38,6 +37,30 @@ def obter_usuario(db: Session, user_id: int):
 def atualizar_tipo(db: Session, user_id: int, novo_tipo: str):
     user = obter_usuario(db, user_id)
     user.tipo_usuario = novo_tipo
+    db.commit()
+    db.refresh(user)
+    return user
+
+def atualizar_perfil(db: Session, user_id: int, nome: str | None = None, telefone: str | None = None):
+    user = obter_usuario(db, user_id)
+
+    if nome is not None:
+        nome_limpo = nome.strip()
+        if not nome_limpo:
+            raise HTTPException(status_code=400, detail="Nome nao pode ficar vazio.")
+        user.username = nome_limpo
+
+    if telefone is not None:
+        telefone_limpo = telefone.strip()
+        user.telefone = telefone_limpo or None
+
+    db.commit()
+    db.refresh(user)
+    return user
+
+def atualizar_foto_perfil(db: Session, user_id: int, foto_url: str | None):
+    user = obter_usuario(db, user_id)
+    user.foto_perfil = foto_url
     db.commit()
     db.refresh(user)
     return user

@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS CustomUser (
     id            SERIAL PRIMARY KEY,
     username      VARCHAR(150) NOT NULL,
     email         VARCHAR(254) NOT NULL UNIQUE,
+    telefone      VARCHAR(30),
     tipo_usuario  VARCHAR(20) NOT NULL DEFAULT 'cliente',
     foto_perfil   VARCHAR(500),
     endereco      VARCHAR(255),

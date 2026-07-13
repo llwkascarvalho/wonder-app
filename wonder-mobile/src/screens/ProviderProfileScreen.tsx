@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Input } from '../components/Input';
 import { LoadingIndicator } from '../components/LoadingIndicator';
+import { ProfileScreenContent } from '../components/profile/ProfileScreenContent';
 import { ProviderScheduleModal } from '../components/ProviderScheduleModal';
 import { ProviderServiceModal } from '../components/ProviderServiceModal';
 import { useAuth } from '../contexts/AuthContext';
 import {
+  atualizarPrestador,
   criarHorario,
   criarPrestador,
   criarServico,
@@ -32,6 +34,7 @@ export function ProviderProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [editingEstablishment, setEditingEstablishment] = useState(false);
   const [serviceModalVisible, setServiceModalVisible] = useState(false);
   const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
 
@@ -45,7 +48,7 @@ export function ProviderProfileScreen() {
       .join(', ');
   }, [horarios]);
 
-  const loadProfile = useCallback(async () => {
+  const loadProviderProfile = useCallback(async () => {
     if (!usuario?.id) {
       return;
     }
@@ -77,8 +80,8 @@ export function ProviderProfileScreen() {
   }, [usuario?.id]);
 
   useEffect(() => {
-    loadProfile();
-  }, [loadProfile]);
+    loadProviderProfile();
+  }, [loadProviderProfile]);
 
   async function handleCreatePrestador() {
     if (!nomeEstab.trim() || !documento.trim()) {
@@ -94,12 +97,47 @@ export function ProviderProfileScreen() {
         documento: documento.trim(),
       });
       setPrestador(created);
-      await loadProfile();
+      await loadProviderProfile();
     } catch {
       setError('Nao foi possivel criar o perfil do prestador.');
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleUpdatePrestador() {
+    if (!prestador) {
+      return;
+    }
+
+    if (!nomeEstab.trim() || !documento.trim()) {
+      setError('Informe nome do estabelecimento e documento.');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    try {
+      const updated = await atualizarPrestador(prestador.id, {
+        nome_estab: nomeEstab.trim(),
+        documento: documento.trim(),
+      });
+      setPrestador(updated);
+      setNomeEstab(updated.nome_estab);
+      setDocumento(updated.documento);
+      setEditingEstablishment(false);
+    } catch {
+      setError('Nao foi possivel atualizar o estabelecimento.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleCancelEditEstablishment() {
+    setNomeEstab(prestador?.nome_estab || '');
+    setDocumento(prestador?.documento || '');
+    setEditingEstablishment(false);
+    setError('');
   }
 
   async function handleCreateService(payload: { nome: string; preco: number; duracao_min: number }) {
@@ -155,21 +193,15 @@ export function ProviderProfileScreen() {
     }
   }
 
-  if (loading) {
-    return <LoadingIndicator text="Carregando perfil..." />;
-  }
-
   return (
-    <ScrollView
-      contentContainerStyle={styles.container}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={loadProfile} />}
+    <ProfileScreenContent
+      title="Perfil"
+      subtitle="Gerencie seu perfil e estabelecimento."
+      onSignOut={signOut}
     >
-      <View style={styles.header}>
-        <Text style={styles.greeting}>Ola, {prestador?.nome_estab || usuario?.email || 'prestador'}</Text>
-        <Button title="Sair" size="sm" variant="secondary" onPress={signOut} />
-      </View>
-
-      {!prestador ? (
+      {loading ? (
+        <LoadingIndicator text="Carregando dados do estabelecimento..." />
+      ) : !prestador ? (
         <Card style={styles.formCard}>
           <Text style={styles.title}>Criar perfil de prestador</Text>
           <Input
@@ -184,20 +216,40 @@ export function ProviderProfileScreen() {
         </Card>
       ) : (
         <>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{prestador.nome_estab.slice(0, 1).toUpperCase()}</Text>
-          </View>
-
           <Card style={styles.metricsCard}>
             <Text style={styles.metricText}>Avaliacao: -</Text>
             <Text style={styles.metricText}>Servicos: {servicos.length}</Text>
           </Card>
 
           <Card style={styles.detailsCard}>
-            <InfoRow label="Nome do estabelecimento" value={prestador.nome_estab} />
-            <InfoRow label="CPF/CNPJ" value={prestador.documento} />
-            <InfoRow label="Email" value={usuario?.email || '-'} />
-            <InfoRow label="Horario de funcionamento" value={horariosResumo} />
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardSectionTitle}>Estabelecimento</Text>
+              {!editingEstablishment ? (
+                <Button title="Editar" size="sm" variant="secondary" onPress={() => setEditingEstablishment(true)} />
+              ) : null}
+            </View>
+
+            {editingEstablishment ? (
+              <>
+                <Input
+                  label="Nome do estabelecimento"
+                  placeholder="Diego BarberShop"
+                  value={nomeEstab}
+                  onChangeText={setNomeEstab}
+                />
+                <Input label="CPF/CNPJ" placeholder="00.000.000/0000-00" value={documento} onChangeText={setDocumento} />
+                <View style={styles.editActions}>
+                  <Button title="Cancelar" size="sm" variant="secondary" onPress={handleCancelEditEstablishment} disabled={saving} />
+                  <Button title="Salvar" size="sm" onPress={handleUpdatePrestador} loading={saving} />
+                </View>
+              </>
+            ) : (
+              <>
+                <InfoRow label="Nome do estabelecimento" value={prestador.nome_estab} />
+                <InfoRow label="CPF/CNPJ" value={prestador.documento} />
+                <InfoRow label="Horario de funcionamento" value={horariosResumo} />
+              </>
+            )}
           </Card>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -253,7 +305,7 @@ export function ProviderProfileScreen() {
         onClose={() => setScheduleModalVisible(false)}
         onSave={handleCreateSchedule}
       />
-    </ScrollView>
+    </ProfileScreenContent>
   );
 }
 
@@ -267,24 +319,6 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: theme.colors.background,
-    gap: theme.spacing.md,
-    padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xxl,
-    paddingTop: theme.spacing.xxl,
-  },
-  header: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  greeting: {
-    color: theme.colors.primary,
-    flex: 1,
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.bold,
-  },
   title: {
     color: theme.colors.text,
     fontSize: theme.fontSize.xl,
@@ -292,22 +326,6 @@ const styles = StyleSheet.create({
   },
   formCard: {
     gap: theme.spacing.md,
-  },
-  avatar: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: theme.colors.surfaceMuted,
-    borderColor: theme.colors.primary,
-    borderRadius: 74,
-    borderWidth: 2,
-    height: 148,
-    justifyContent: 'center',
-    width: 148,
-  },
-  avatarText: {
-    color: theme.colors.primary,
-    fontSize: 56,
-    fontWeight: theme.fontWeight.bold,
   },
   metricsCard: {
     flexDirection: 'row',
@@ -320,6 +338,23 @@ const styles = StyleSheet.create({
   },
   detailsCard: {
     gap: theme.spacing.sm,
+  },
+  cardHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    justifyContent: 'space-between',
+  },
+  cardSectionTitle: {
+    color: theme.colors.text,
+    flex: 1,
+    fontSize: theme.fontSize.md,
+    fontWeight: theme.fontWeight.bold,
+  },
+  editActions: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    justifyContent: 'flex-end',
   },
   infoRow: {
     backgroundColor: theme.colors.surfaceMuted,

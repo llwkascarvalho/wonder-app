@@ -24,6 +24,8 @@ services:
     ports:
       - "8001:8001"
     env_file: .env
+    volumes:
+      - auth_uploads:/app/uploads
     depends_on:
       db_auth:
         condition: service_healthy
@@ -235,6 +237,7 @@ volumes:
   db_agendamentos_data:
   db_notificacoes_data:
   backups_data:
+  auth_uploads:
 
 # ─── REDE ────────────────────────────────────────────────────
 networks:
