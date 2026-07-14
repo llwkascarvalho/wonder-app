@@ -1,7 +1,7 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -105,6 +105,18 @@ export function PrestadorProfileScreen() {
     avaliacoes.length > 0
       ? avaliacoes.reduce((soma, item) => soma + item.nota, 0) / avaliacoes.length
       : null;
+  const enderecoFormatado = formatAddress(prestador);
+  const temEndereco = hasAddress(prestador);
+
+  function openMaps() {
+    if (!temEndereco) {
+      return;
+    }
+
+    const query = encodeURIComponent(enderecoFormatado.replace(/\n/g, ', '));
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.header}>
@@ -144,6 +156,14 @@ export function PrestadorProfileScreen() {
         onPress={() => navigation.navigate('Agendamento', { prestadorId: prestador.id })}
       />
 
+      <Text style={styles.sectionTitle}>Localizacao</Text>
+      <Card style={styles.locationCard}>
+        <Text style={styles.cardText}>{temEndereco ? enderecoFormatado : 'Endereco nao informado.'}</Text>
+        {temEndereco ? (
+          <Button title="Ver no Google Maps" variant="secondary" onPress={openMaps} />
+        ) : null}
+      </Card>
+
       <Text style={styles.sectionTitle}>Horarios de funcionamento</Text>
       {horarios.length === 0 ? (
         <Card>
@@ -174,6 +194,22 @@ export function PrestadorProfileScreen() {
       )}
     </ScrollView>
   );
+}
+
+function hasAddress(prestador: Prestador) {
+  return Boolean(
+    prestador.endereco?.trim() ||
+      prestador.numero?.trim() ||
+      prestador.bairro?.trim() ||
+      prestador.cidade?.trim() ||
+      prestador.estado?.trim()
+  );
+}
+
+function formatAddress(prestador: Prestador) {
+  const linhaEndereco = [prestador.endereco, prestador.numero].filter(Boolean).join(', ');
+  const linhaCidade = [prestador.cidade, prestador.estado].filter(Boolean).join(' - ');
+  return [linhaEndereco, prestador.bairro, linhaCidade].filter(Boolean).join('\n');
 }
 
 const styles = StyleSheet.create({
@@ -235,6 +271,9 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.sm,
   },
   list: {
+    gap: theme.spacing.sm,
+  },
+  locationCard: {
     gap: theme.spacing.sm,
   },
   cardTitle: {

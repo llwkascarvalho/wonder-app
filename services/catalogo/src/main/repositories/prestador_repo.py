@@ -162,6 +162,12 @@ def criar_prestador(db: Session, dados: PrestadorCreate, usuario_id: str) -> Pre
         usuario_id=str(usuario_id),
         nome_estab=dados.nome_estab,
         documento=dados.documento,
+        endereco=dados.endereco,
+        numero=dados.numero,
+        bairro=dados.bairro,
+        cidade=dados.cidade,
+        estado=dados.estado,
+        complemento=dados.complemento,
         status="rascunho",
     )
     db.add(prestador)
@@ -419,6 +425,20 @@ def atualizar_prestador(db: Session, prestador_id: int, dados: PrestadorUpdate, 
         prestador.nome_estab = dados.nome_estab
     if dados.documento is not None:
         prestador.documento = dados.documento
+    campos_informados = dados.model_fields_set
+
+    if "endereco" in campos_informados:
+        prestador.endereco = dados.endereco
+    if "numero" in campos_informados:
+        prestador.numero = dados.numero
+    if "bairro" in campos_informados:
+        prestador.bairro = dados.bairro
+    if "cidade" in campos_informados:
+        prestador.cidade = dados.cidade
+    if "estado" in campos_informados:
+        prestador.estado = dados.estado
+    if "complemento" in campos_informados:
+        prestador.complemento = dados.complemento
 
     db.commit()
     db.refresh(prestador)
