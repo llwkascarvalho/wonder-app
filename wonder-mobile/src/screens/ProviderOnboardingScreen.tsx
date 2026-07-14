@@ -1,3 +1,4 @@
+import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -28,6 +29,7 @@ import {
   obterMeuPrestador,
   removerHorarioPrestadorOnboarding,
   removerMinhaCategoriaPrestador,
+  uploadFotoPrestadorOnboarding,
 } from '../services/providerOnboarding';
 import { theme } from '../styles/theme';
 import {
@@ -58,6 +60,7 @@ export function ProviderOnboardingScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [savingCategoryId, setSavingCategoryId] = useState<number | null>(null);
   const [serviceModalVisible, setServiceModalVisible] = useState(false);
   const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
@@ -146,6 +149,47 @@ export function ProviderOnboardingScreen() {
       setError(getBackendMessage(saveError, 'Nao foi possivel salvar os dados do estabelecimento.'));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleChangeProviderPhoto() {
+    if (!profile?.id) {
+      return;
+    }
+
+    setUploadingPhoto(true);
+    setError('');
+
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        setError('Permita o acesso a galeria para adicionar a foto do estabelecimento.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        mediaTypes: ['images'],
+        quality: 0.85,
+      });
+
+      if (result.canceled || !result.assets.length) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      setProfile(
+        await uploadFotoPrestadorOnboarding(profile.id, {
+          uri: asset.uri,
+          fileName: asset.fileName,
+          mimeType: asset.mimeType,
+        })
+      );
+    } catch (photoError) {
+      setError(getBackendMessage(photoError, 'Nao foi possivel enviar a foto do estabelecimento.'));
+    } finally {
+      setUploadingPhoto(false);
     }
   }
 
@@ -298,7 +342,15 @@ export function ProviderOnboardingScreen() {
         <>
           <StepSelector activeStep={step} onSelect={setStep} hasProfileId={hasProfileId} />
 
-          {step === 'dados' ? <ProviderDataStep profile={profile} saving={saving} onAdvance={handleSaveProfile} /> : null}
+          {step === 'dados' ? (
+            <ProviderDataStep
+              profile={profile}
+              saving={saving}
+              uploadingPhoto={uploadingPhoto}
+              onChangePhoto={profile?.id && canEdit ? handleChangeProviderPhoto : undefined}
+              onAdvance={handleSaveProfile}
+            />
+          ) : null}
 
           {step === 'categorias' ? (
             <ProviderCategoriesStep
@@ -449,7 +501,7 @@ function NavigationButtons({
 }) {
   const currentIndex = steps.findIndex((item) => item.key === step);
   const previousStep = steps[currentIndex - 1]?.key;
-  const nextStep = steps[currentIndex + 1]?.key;
+  const nextStep = step === 'dados' ? undefined : steps[currentIndex + 1]?.key;
 
   return (
     <View style={styles.navButtons}>
@@ -474,7 +526,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     padding: theme.spacing.lg,
     paddingBottom: theme.spacing.xxl,
-    paddingTop: theme.spacing.lg,
+    paddingTop: theme.spacing.xxl,
   },
   header: {
     gap: theme.spacing.xs,

@@ -18,6 +18,8 @@ class AgendamentoResponse(BaseModel):
     servico_id: int
     inicio: datetime
     status: str
+    cliente_nome: Optional[str] = None
+    cliente_foto_url: Optional[str] = None
 
     class Config:
         from_attributes = True

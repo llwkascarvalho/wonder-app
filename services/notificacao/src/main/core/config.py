@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     RABBITMQ_PORT: str
     RABBITMQ_USER: str
     RABBITMQ_PASSWORD: str
+    RABBITMQ_QUEUE: str = "wonder.eventos"
+    RABBITMQ_EXCHANGE: str = ""
+    RABBITMQ_ROUTING_KEY: str = "wonder.eventos"
+    RABBITMQ_MAX_RETRIES: int = 3
+    CATALOGO_URL: str = "http://catalogo:8002"
 
     @property
     def database_url(self) -> str:

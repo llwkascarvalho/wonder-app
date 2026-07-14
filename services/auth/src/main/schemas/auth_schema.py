@@ -12,6 +12,13 @@ class UsuarioResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class UsuarioPublicoResponse(BaseModel):
+    id: int
+    nome: str
+    foto_url: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
 class UsuarioUpdate(BaseModel):
     nome: Optional[str] = None
     telefone: Optional[str] = None

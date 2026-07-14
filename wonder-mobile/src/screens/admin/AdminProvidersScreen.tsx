@@ -1,6 +1,6 @@
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../../components/Button';
@@ -49,10 +49,12 @@ export function AdminProvidersScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    setLoading(true);
-    load().finally(() => setLoading(false));
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      load().finally(() => setLoading(false));
+    }, [load])
+  );
 
   async function handleRefresh() {
     setRefreshing(true);
@@ -89,7 +91,11 @@ export function AdminProvidersScreen() {
         }
         renderItem={({ item }) => (
           <Card style={styles.providerCard}>
-            <CatalogImage fotoUrl={item.foto_url} kind="provider" style={styles.providerAvatar} />
+            <CatalogImage
+              fotoUrl={item.foto_url || item.solicitante_foto_url}
+              kind="provider"
+              style={styles.providerAvatar}
+            />
             <View style={styles.providerInfo}>
               <Text style={styles.cardTitle}>{item.nome_estab}</Text>
               <Text style={styles.cardText}>Documento: {item.documento}</Text>

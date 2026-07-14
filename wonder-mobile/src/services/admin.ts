@@ -1,4 +1,5 @@
 import { api } from './api';
+import { ProfilePhotoAsset } from '../types/profile';
 import {
   AdminCategoria,
   AdminCategoriaPayload,
@@ -52,6 +53,33 @@ export async function atualizarStatusCategoriaAdmin(
   payload: AdminCategoriaStatusPayload
 ): Promise<AdminCategoria> {
   const response = await api.patch<AdminCategoria>(`/admin/categorias/${categoriaId}/status`, payload);
+  return response.data;
+}
+
+export async function uploadFotoCategoriaAdmin(
+  categoriaId: number,
+  asset: ProfilePhotoAsset
+): Promise<AdminCategoria> {
+  const formData = new FormData();
+  const fileName = asset.fileName || `categoria-${Date.now()}.jpg`;
+  const mimeType = asset.mimeType || 'image/jpeg';
+
+  formData.append('file', {
+    uri: asset.uri,
+    name: fileName,
+    type: mimeType,
+  } as unknown as Blob);
+
+  const response = await api.post<AdminCategoria>(
+    `/catalogo/admin/categorias/${categoriaId}/foto`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  );
+
   return response.data;
 }
 

@@ -8,6 +8,8 @@ export type AdminPrestador = {
   documento: string;
   status: AdminPrestadorStatus | string;
   foto_url?: string | null;
+  solicitante_nome?: string | null;
+  solicitante_foto_url?: string | null;
   enviado_em?: string | null;
   aprovado_em?: string | null;
   aprovado_por?: string | null;

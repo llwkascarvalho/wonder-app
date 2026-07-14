@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   name: {
-    color: theme.colors.text,
+    color: theme.colors.textSecondary,
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.semibold,
     textAlign: 'center',

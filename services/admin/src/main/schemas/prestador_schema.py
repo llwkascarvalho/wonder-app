@@ -42,6 +42,8 @@ class PrestadorResponse(BaseModel):
     documento: str
     status: str
     foto_url: Optional[str] = None
+    solicitante_nome: Optional[str] = None
+    solicitante_foto_url: Optional[str] = None
     enviado_em: Optional[datetime] = None
     aprovado_em: Optional[datetime] = None
     aprovado_por: Optional[str] = None

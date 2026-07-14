@@ -1,6 +1,7 @@
 import { AxiosError } from 'axios';
 
 import { api } from './api';
+import { ProfilePhotoAsset } from '../types/profile';
 import {
   ProviderCategoryLink,
   ProviderOnboardingCategory,
@@ -68,6 +69,33 @@ export async function atualizarPerfilPrestador(
   payload: Partial<ProviderOnboardingProfilePayload>
 ): Promise<ProviderOnboardingProfile> {
   const response = await api.put<ProviderOnboardingProfile>(`/catalogo/prestadores/${prestadorId}`, payload);
+  return response.data;
+}
+
+export async function uploadFotoPrestadorOnboarding(
+  prestadorId: number,
+  asset: ProfilePhotoAsset
+): Promise<ProviderOnboardingProfile> {
+  const formData = new FormData();
+  const fileName = asset.fileName || `prestador-${Date.now()}.jpg`;
+  const mimeType = asset.mimeType || 'image/jpeg';
+
+  formData.append('file', {
+    uri: asset.uri,
+    name: fileName,
+    type: mimeType,
+  } as unknown as Blob);
+
+  const response = await api.post<ProviderOnboardingProfile>(
+    `/catalogo/prestadores/${prestadorId}/foto`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  );
+
   return response.data;
 }
 

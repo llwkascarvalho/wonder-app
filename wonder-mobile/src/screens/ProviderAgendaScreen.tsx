@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { LoadingIndicator } from '../components/LoadingIndicator';
+import {
+  getCurrentMonthKey,
+  MonthlyAvailabilityCalendar,
+} from '../components/MonthlyAvailabilityCalendar';
 import { ProviderIcon } from '../components/provider/ProviderIcon';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -12,13 +16,31 @@ import {
   listarServicos,
   obterPrestadorLogado,
 } from '../services/provider';
+import { resolveProfilePhotoUrl } from '../services/profileService';
 import { theme } from '../styles/theme';
 import { Agendamento, Prestador, Servico } from '../types/provider';
 
-type AgendaTab = 'abertos' | 'finalizados';
+type AgendaTab = 'abertos' | 'finalizados' | 'cancelados';
+
+const tabs: Array<{ key: AgendaTab; label: string }> = [
+  { key: 'abertos', label: 'Em aberto' },
+  { key: 'finalizados', label: 'Finalizados' },
+  { key: 'cancelados', label: 'Cancelados' },
+];
 
 const openStatuses = ['pendente', 'confirmado'];
 const doneStatuses = ['concluido', 'finalizado'];
+
+function formatDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate()
+  ).padStart(2, '0')}`;
+}
+
+function formatDateLabel(dateKey: string) {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
+}
 
 export function ProviderAgendaScreen() {
   const { usuario, signOut } = useAuth();
@@ -26,7 +48,9 @@ export function ProviderAgendaScreen() {
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [activeTab, setActiveTab] = useState<AgendaTab>('abertos');
-  const [showCanceled, setShowCanceled] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(formatDateKey(new Date()));
+  const [calendarMonth, setCalendarMonth] = useState(getCurrentMonthKey());
+  const [calendarVisible, setCalendarVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<number | null>(null);
   const [error, setError] = useState('');
@@ -43,18 +67,22 @@ export function ProviderAgendaScreen() {
       return agendamentos.filter((agendamento) => openStatuses.includes(agendamento.status));
     }
 
-    if (showCanceled) {
+    if (activeTab === 'cancelados') {
       return agendamentos.filter((agendamento) => agendamento.status === 'cancelado');
     }
 
     return agendamentos.filter((agendamento) => doneStatuses.includes(agendamento.status));
-  }, [activeTab, agendamentos, showCanceled]);
+  }, [activeTab, agendamentos]);
+
+  const sectionTitle = selectedDate === formatDateKey(new Date())
+    ? 'Agendados hoje'
+    : `Agendados em ${formatDateLabel(selectedDate)}`;
 
   const loadAgenda = useCallback(async () => {
     setError('');
     setLoading(true);
     try {
-      const nextAgendamentos = await listarAgendamentos();
+      const nextAgendamentos = await listarAgendamentos(selectedDate);
       setAgendamentos(nextAgendamentos);
 
       if (usuario?.id) {
@@ -69,7 +97,7 @@ export function ProviderAgendaScreen() {
     } finally {
       setLoading(false);
     }
-  }, [usuario?.id]);
+  }, [selectedDate, usuario?.id]);
 
   useEffect(() => {
     loadAgenda();
@@ -80,12 +108,17 @@ export function ProviderAgendaScreen() {
     setError('');
     try {
       await atualizarStatusAgendamento(agendamentoId, status);
-      setAgendamentos(await listarAgendamentos());
+      setAgendamentos(await listarAgendamentos(selectedDate));
     } catch {
       setError('Nao foi possivel atualizar o agendamento.');
     } finally {
       setSavingId(null);
     }
+  }
+
+  function handleSelectDate(dateKey: string) {
+    setSelectedDate(dateKey);
+    setCalendarVisible(false);
   }
 
   if (loading) {
@@ -103,41 +136,54 @@ export function ProviderAgendaScreen() {
       </View>
 
       <View style={styles.segment}>
-        <Button
-          title="Em aberto"
-          variant={activeTab === 'abertos' ? 'primary' : 'outline'}
-          onPress={() => setActiveTab('abertos')}
-          style={styles.segmentButton}
-        />
-        <Button
-          title="Finalizados"
-          variant={activeTab === 'finalizados' ? 'primary' : 'outline'}
-          onPress={() => setActiveTab('finalizados')}
-          style={styles.segmentButton}
-        />
+        {tabs.map((tab) => {
+          const selected = activeTab === tab.key;
+
+          return (
+            <Pressable
+              key={tab.key}
+              accessibilityRole="button"
+              onPress={() => setActiveTab(tab.key)}
+              style={({ pressed }) => [
+                styles.segmentButton,
+                selected && styles.segmentButtonActive,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={[styles.segmentText, selected && styles.segmentTextActive]} numberOfLines={1}>
+                {tab.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
-      {activeTab === 'finalizados' ? (
-        <View style={styles.filterRow}>
-          <View style={styles.dateBadge}>
-            <ProviderIcon name="calendar-today" color={theme.colors.white} size={18} />
-            <Text style={styles.dateBadgeText}>{new Date().toLocaleDateString('pt-BR')}</Text>
-          </View>
-          <Button
-            title={showCanceled ? 'Ver concluidos' : 'Ver cancelados'}
-            size="sm"
-            variant={showCanceled ? 'primary' : 'outline'}
-            onPress={() => setShowCanceled((current) => !current)}
+      <View style={styles.sectionRow}>
+        <View>
+          <Text style={styles.sectionTitle}>{sectionTitle}</Text>
+          <Text style={styles.selectedDateText}>{formatDateLabel(selectedDate)}</Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setCalendarVisible((current) => !current)}
+          style={styles.calendarButton}
+        >
+          <ProviderIcon name="calendar-today" color={theme.colors.white} size={22} />
+        </Pressable>
+      </View>
+
+      {calendarVisible ? (
+        <Card>
+          <MonthlyAvailabilityCalendar
+            mes={calendarMonth}
+            diasDisponiveis={[]}
+            dataSelecionada={selectedDate}
+            allowUnavailableSelection
+            onChangeMes={setCalendarMonth}
+            onSelectDate={handleSelectDate}
           />
-        </View>
-      ) : (
-        <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>Agendado hoje</Text>
-          <View style={styles.calendarButton}>
-            <ProviderIcon name="calendar-today" color={theme.colors.white} size={22} />
-          </View>
-        </View>
-      )}
+        </Card>
+      ) : null}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -188,11 +234,11 @@ function AppointmentCard({
   return (
     <Card style={styles.appointmentCard}>
       <View style={styles.appointmentAvatar}>
-        <Text style={styles.appointmentAvatarText}>#{agendamento.cliente_id}</Text>
+        <ClientAvatar nome={agendamento.cliente_nome} fotoUrl={agendamento.cliente_foto_url} />
       </View>
       <View style={styles.appointmentInfo}>
         <Text style={styles.cardTitle}>{servico?.nome || `Servico ${agendamento.servico_id}`}</Text>
-        <Text style={styles.cardText}>Cliente {agendamento.cliente_id}</Text>
+        <Text style={styles.cardText}>{agendamento.cliente_nome || `Cliente ${agendamento.cliente_id}`}</Text>
         <Text style={styles.cardText}>{dateLabel}</Text>
       </View>
       {showActions ? (
@@ -207,6 +253,17 @@ function AppointmentCard({
       )}
     </Card>
   );
+}
+
+function ClientAvatar({ nome, fotoUrl }: { nome?: string | null; fotoUrl?: string | null }) {
+  const source = resolveProfilePhotoUrl(fotoUrl);
+  const initial = nome?.trim().slice(0, 1).toUpperCase();
+
+  if (source) {
+    return <Image source={{ uri: source }} style={styles.clientImage} />;
+  }
+
+  return <Text style={styles.appointmentAvatarText}>{initial || 'Cliente'}</Text>;
 }
 
 const styles = StyleSheet.create({
@@ -229,30 +286,33 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeight.bold,
   },
   segment: {
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
     flexDirection: 'row',
-    gap: theme.spacing.sm,
+    overflow: 'hidden',
   },
   segmentButton: {
+    alignItems: 'center',
     flex: 1,
+    height: 44,
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.xs,
   },
-  filterRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  dateBadge: {
-    alignItems: 'center',
+  segmentButtonActive: {
     backgroundColor: theme.colors.primary,
-    borderRadius: theme.borderRadius.pill,
-    flexDirection: 'row',
-    gap: theme.spacing.xs,
-    minHeight: 40,
-    paddingHorizontal: theme.spacing.md,
   },
-  dateBadgeText: {
-    color: theme.colors.white,
-    fontSize: theme.fontSize.sm,
+  segmentText: {
+    color: theme.colors.primary,
+    fontSize: theme.fontSize.xs,
     fontWeight: theme.fontWeight.bold,
+    textTransform: 'uppercase',
+  },
+  segmentTextActive: {
+    color: theme.colors.white,
+  },
+  pressed: {
+    opacity: 0.86,
   },
   sectionRow: {
     alignItems: 'center',
@@ -264,6 +324,11 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.md,
     fontWeight: theme.fontWeight.bold,
     textTransform: 'uppercase',
+  },
+  selectedDateText: {
+    color: theme.colors.textSecondary,
+    fontSize: theme.fontSize.sm,
+    marginTop: theme.spacing.xs,
   },
   calendarButton: {
     alignItems: 'center',
@@ -284,6 +349,11 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
     height: 56,
     justifyContent: 'center',
+    width: 56,
+  },
+  clientImage: {
+    borderRadius: theme.borderRadius.md,
+    height: 56,
     width: 56,
   },
   appointmentAvatarText: {

@@ -1,5 +1,7 @@
+import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Image,
   Modal,
   RefreshControl,
   ScrollView,
@@ -10,6 +12,7 @@ import {
 
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
+import { CatalogImage } from '../../components/catalog/CatalogImage';
 import { Input } from '../../components/Input';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import {
@@ -17,6 +20,7 @@ import {
   atualizarStatusCategoriaAdmin,
   criarCategoriaAdmin,
   listarCategoriasAdmin,
+  uploadFotoCategoriaAdmin,
 } from '../../services/admin';
 import { theme } from '../../styles/theme';
 import { AdminCategoria, AdminCategoriaStatus } from '../../types/admin';
@@ -60,10 +64,12 @@ export function AdminCategoriesScreen() {
   const [saving, setSaving] = useState(false);
   const [savingStatusId, setSavingStatusId] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCategoria, setEditingCategoria] = useState<AdminCategoria | null>(null);
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
+  const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
   const categoriasAtivas = useMemo(
     () => categorias.filter((categoria) => categoria.status === 'ativa'),
@@ -99,6 +105,8 @@ export function AdminCategoriesScreen() {
     setNome('');
     setDescricao('');
     setError('');
+    setSuccess('');
+    setSelectedImage(null);
     setModalVisible(true);
   }
 
@@ -107,6 +115,8 @@ export function AdminCategoriesScreen() {
     setNome(categoria.nome);
     setDescricao(categoria.descricao || '');
     setError('');
+    setSuccess('');
+    setSelectedImage(null);
     setModalVisible(true);
   }
 
@@ -119,6 +129,35 @@ export function AdminCategoriesScreen() {
     setEditingCategoria(null);
     setNome('');
     setDescricao('');
+    setSelectedImage(null);
+  }
+
+  async function handlePickImage() {
+    setError('');
+    setSuccess('');
+
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        setError('Permita o acesso a galeria para selecionar a imagem da categoria.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        mediaTypes: ['images'],
+        quality: 0.85,
+      });
+
+      if (result.canceled || !result.assets.length) {
+        return;
+      }
+
+      setSelectedImage(result.assets[0]);
+    } catch (pickError) {
+      setError(extractBackendMessage(pickError, 'Nao foi possivel selecionar a imagem.'));
+    }
   }
 
   async function handleSave() {
@@ -129,6 +168,7 @@ export function AdminCategoriesScreen() {
 
     setSaving(true);
     setError('');
+    setSuccess('');
 
     try {
       const payload = {
@@ -136,16 +176,24 @@ export function AdminCategoriesScreen() {
         descricao: descricao.trim() || null,
       };
 
-      if (editingCategoria) {
-        await atualizarCategoriaAdmin(editingCategoria.id, payload);
-      } else {
-        await criarCategoriaAdmin(payload);
+      const savedCategoria = editingCategoria
+        ? await atualizarCategoriaAdmin(editingCategoria.id, payload)
+        : await criarCategoriaAdmin(payload);
+
+      if (selectedImage) {
+        await uploadFotoCategoriaAdmin(savedCategoria.id, {
+          uri: selectedImage.uri,
+          fileName: selectedImage.fileName,
+          mimeType: selectedImage.mimeType,
+        });
       }
 
       setModalVisible(false);
       setEditingCategoria(null);
       setNome('');
       setDescricao('');
+      setSelectedImage(null);
+      setSuccess(selectedImage ? 'Categoria e imagem salvas com sucesso.' : 'Categoria salva com sucesso.');
       await load();
     } catch (saveError) {
       setError(extractBackendMessage(saveError, 'Nao foi possivel salvar a categoria.'));
@@ -157,9 +205,11 @@ export function AdminCategoriesScreen() {
   async function handleStatus(categoria: AdminCategoria, status: AdminCategoriaStatus) {
     setSavingStatusId(categoria.id);
     setError('');
+    setSuccess('');
 
     try {
       await atualizarStatusCategoriaAdmin(categoria.id, { status });
+      setSuccess(status === 'ativa' ? 'Categoria ativada com sucesso.' : 'Categoria inativada com sucesso.');
       await load();
     } catch (statusError) {
       setError(extractBackendMessage(statusError, 'Nao foi possivel alterar o status da categoria.'));
@@ -189,6 +239,12 @@ export function AdminCategoriesScreen() {
         {error ? (
           <Card>
             <Text style={styles.error}>{error}</Text>
+          </Card>
+        ) : null}
+
+        {success ? (
+          <Card>
+            <Text style={styles.success}>{success}</Text>
           </Card>
         ) : null}
 
@@ -233,9 +289,22 @@ export function AdminCategoriesScreen() {
               multiline
             />
 
-            <View style={styles.imagePlaceholder}>
-              <Text style={styles.imageIcon}>I</Text>
-              <Text style={styles.imagePlaceholderText}>Imagem fora do escopo desta issue</Text>
+            <View style={styles.imagePreviewRow}>
+              {selectedImage ? (
+                <Image source={{ uri: selectedImage.uri }} style={styles.imagePreview} />
+              ) : (
+                <CatalogImage fotoUrl={editingCategoria?.foto_url} kind="category" style={styles.imagePreview} />
+              )}
+              <View style={styles.imagePreviewContent}>
+                <Text style={styles.imagePreviewTitle}>Imagem da categoria</Text>
+                <Button
+                  title={selectedImage || editingCategoria?.foto_url ? 'Trocar imagem' : 'Selecionar imagem'}
+                  size="sm"
+                  variant="secondary"
+                  disabled={saving}
+                  onPress={handlePickImage}
+                />
+              </View>
             </View>
 
             <View style={styles.modalActions}>
@@ -301,9 +370,7 @@ function CategoryCard({
 
   return (
     <Card style={styles.categoryCard}>
-      <View style={styles.categoryImage}>
-        <Text style={styles.categoryImageText}>{categoria.nome.slice(0, 1).toUpperCase()}</Text>
-      </View>
+      <CatalogImage fotoUrl={categoria.foto_url} kind="category" style={styles.categoryImage} />
 
       <View style={styles.categoryInfo}>
         <Text style={styles.cardTitle}>{categoria.nome}</Text>
@@ -370,17 +437,10 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
   },
   categoryImage: {
-    alignItems: 'center',
     backgroundColor: theme.colors.surfaceMuted,
     borderRadius: theme.borderRadius.md,
     height: 56,
-    justifyContent: 'center',
     width: 56,
-  },
-  categoryImageText: {
-    color: theme.colors.primary,
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.bold,
   },
   categoryInfo: {
     flex: 1,
@@ -419,6 +479,10 @@ const styles = StyleSheet.create({
     color: theme.colors.error,
     fontSize: theme.fontSize.sm,
   },
+  success: {
+    color: theme.colors.success,
+    fontSize: theme.fontSize.sm,
+  },
   modalBackdrop: {
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.32)',
@@ -439,26 +503,27 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeight.bold,
     textTransform: 'uppercase',
   },
-  imagePlaceholder: {
+  imagePreviewRow: {
     alignItems: 'center',
-    borderColor: theme.colors.textMuted,
+    backgroundColor: theme.colors.surfaceMuted,
     borderRadius: theme.borderRadius.sm,
-    borderStyle: 'dashed',
-    borderWidth: 1,
+    flexDirection: 'row',
     gap: theme.spacing.xs,
-    justifyContent: 'center',
-    minHeight: 96,
-    padding: theme.spacing.md,
+    padding: theme.spacing.sm,
   },
-  imageIcon: {
-    color: theme.colors.textMuted,
-    fontSize: theme.fontSize.xl,
-    fontWeight: theme.fontWeight.bold,
+  imagePreview: {
+    borderRadius: theme.borderRadius.md,
+    height: 76,
+    width: 76,
   },
-  imagePlaceholderText: {
-    color: theme.colors.textMuted,
+  imagePreviewContent: {
+    flex: 1,
+    gap: theme.spacing.xs,
+  },
+  imagePreviewTitle: {
+    color: theme.colors.text,
     fontSize: theme.fontSize.sm,
-    textAlign: 'center',
+    fontWeight: theme.fontWeight.bold,
   },
   modalActions: {
     flexDirection: 'row',

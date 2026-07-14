@@ -48,6 +48,48 @@ async def chamar_json(method: str, url: str, headers: dict[str, str], json: dict
     return response.json()
 
 
+async def obter_usuario_publico_auth(usuario_id: int | str, headers: dict[str, str]) -> dict | None:
+    try:
+        return await chamar_json(
+            "GET",
+            f"{settings.AUTH_SERVICE_URL}/auth/internal/usuarios/{usuario_id}/publico",
+            headers,
+        )
+    except HTTPException:
+        return None
+
+
+async def enriquecer_foto_solicitante(prestador: dict, headers: dict[str, str]) -> dict:
+    if prestador.get("foto_url"):
+        return prestador
+
+    usuario = await obter_usuario_publico_auth(prestador.get("usuario_id"), headers)
+    if usuario:
+        prestador["solicitante_nome"] = usuario.get("nome")
+        prestador["solicitante_foto_url"] = usuario.get("foto_url")
+
+    return prestador
+
+
+async def enriquecer_lista_foto_solicitante(prestadores: list[dict], headers: dict[str, str]) -> list[dict]:
+    cache: dict[str, dict | None] = {}
+
+    for prestador in prestadores:
+        if prestador.get("foto_url"):
+            continue
+
+        usuario_id = str(prestador.get("usuario_id"))
+        if usuario_id not in cache:
+            cache[usuario_id] = await obter_usuario_publico_auth(usuario_id, headers)
+
+        usuario = cache[usuario_id]
+        if usuario:
+            prestador["solicitante_nome"] = usuario.get("nome")
+            prestador["solicitante_foto_url"] = usuario.get("foto_url")
+
+    return prestadores
+
+
 async def obter_detalhe_catalogo(prestador_id: int, headers: dict[str, str]) -> dict:
     return await chamar_json(
         "GET",
@@ -78,16 +120,20 @@ async def promover_usuario_auth(usuario_id: int | str, headers: dict[str, str]) 
 
 @router.get("/prestadores/pendentes", response_model=List[PrestadorResponse])
 async def listar_pendentes(request: Request):
-    return await chamar_json(
+    headers = admin_headers(request)
+    prestadores = await chamar_json(
         "GET",
         f"{settings.CATALOGO_SERVICE_URL}/catalogo/admin/prestadores/pendentes",
-        admin_headers(request),
+        headers,
     )
+    return await enriquecer_lista_foto_solicitante(prestadores, headers)
 
 
 @router.get("/prestadores/{prestador_id}", response_model=PrestadorDetalheResponse)
 async def obter_detalhe(prestador_id: int, request: Request):
-    return await obter_detalhe_catalogo(prestador_id, admin_headers(request))
+    headers = admin_headers(request)
+    detalhe = await obter_detalhe_catalogo(prestador_id, headers)
+    return await enriquecer_foto_solicitante(detalhe, headers)
 
 
 @router.patch("/prestadores/{prestador_id}/status", response_model=PrestadorResponse)

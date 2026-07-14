@@ -7,6 +7,8 @@ export type Agendamento = {
   servico_id: number;
   inicio: string;
   status: AgendamentoStatus;
+  cliente_nome?: string | null;
+  cliente_foto_url?: string | null;
 };
 
 export type AgendamentoCreate = {

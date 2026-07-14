@@ -66,6 +66,47 @@ def listar_prestadores_usuario(usuario_id: int, tipo_usuario: str) -> list[int]:
         if str(prestador.get("usuario_id")) == str(usuario_id)
     ]
 
+def obter_cliente_publico(cliente_id: int, cache: dict[int, dict | None]) -> dict | None:
+    if cliente_id in cache:
+        return cache[cliente_id]
+
+    request = UrlRequest(
+        f"{settings.AUTH_URL}/auth/internal/usuarios/{cliente_id}/publico",
+        headers={"X-Internal-Service": "agendamentos"},
+    )
+
+    try:
+        with urlopen(request, timeout=5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (URLError, TimeoutError, json.JSONDecodeError):
+        cache[cliente_id] = None
+        return None
+
+    cache[cliente_id] = payload
+    return payload
+
+
+def enriquecer_agendamentos_cliente(agendamentos: list) -> list[AgendamentoResponse]:
+    cache: dict[int, dict | None] = {}
+    respostas: list[AgendamentoResponse] = []
+
+    for agendamento in agendamentos:
+        cliente = obter_cliente_publico(agendamento.cliente_id, cache)
+        respostas.append(
+            AgendamentoResponse(
+                id=agendamento.id,
+                cliente_id=agendamento.cliente_id,
+                prestador_id=agendamento.prestador_id,
+                servico_id=agendamento.servico_id,
+                inicio=agendamento.inicio,
+                status=agendamento.status,
+                cliente_nome=cliente.get("nome") if cliente else None,
+                cliente_foto_url=cliente.get("foto_url") if cliente else None,
+            )
+        )
+
+    return respostas
+
 
 @router.get("/agendamentos/dias-disponiveis", response_model=DiasDisponiveisResponse)
 def route_dias_disponiveis(
@@ -118,6 +159,7 @@ def route_disponibilidade(
 
 @router.get("/agendamentos", response_model=list[AgendamentoResponse])
 def route_listar(
+    data: date | None = None,
     x_user_id: int = Header(..., alias="X-User-ID"),
     x_user_role: str = Header("cliente", alias="X-User-Role"),
     db: Session = Depends(get_db),
@@ -125,7 +167,12 @@ def route_listar(
     """Lista agendamentos conforme o papel do usuario logado."""
     tipo_usuario = x_user_role.lower()
     prestador_ids = listar_prestadores_usuario(x_user_id, tipo_usuario)
-    return listar_agendamentos(db, x_user_id, tipo_usuario, prestador_ids)
+    agendamentos = listar_agendamentos(db, x_user_id, tipo_usuario, prestador_ids, data)
+
+    if tipo_usuario == "prestador":
+        return enriquecer_agendamentos_cliente(agendamentos)
+
+    return agendamentos
 
 
 @router.get("/agendamentos/{agendamento_id}", response_model=AgendamentoResponse)
