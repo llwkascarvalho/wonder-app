@@ -17,6 +17,7 @@ export function SearchStack() {
   return (
     <Stack.Navigator
       screenOptions={{
+        headerShown: false,
         headerStyle: { backgroundColor: theme.colors.surface },
         headerShadowVisible: false,
         headerTintColor: theme.colors.text,

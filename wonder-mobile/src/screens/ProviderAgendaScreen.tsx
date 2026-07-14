@@ -4,6 +4,7 @@ import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { LoadingIndicator } from '../components/LoadingIndicator';
+import { ProviderIcon } from '../components/provider/ProviderIcon';
 import { useAuth } from '../contexts/AuthContext';
 import {
   atualizarStatusAgendamento,
@@ -118,7 +119,10 @@ export function ProviderAgendaScreen() {
 
       {activeTab === 'finalizados' ? (
         <View style={styles.filterRow}>
-          <Text style={styles.dateBadge}>{new Date().toLocaleDateString('pt-BR')}</Text>
+          <View style={styles.dateBadge}>
+            <ProviderIcon name="calendar-today" color={theme.colors.white} size={18} />
+            <Text style={styles.dateBadgeText}>{new Date().toLocaleDateString('pt-BR')}</Text>
+          </View>
           <Button
             title={showCanceled ? 'Ver concluidos' : 'Ver cancelados'}
             size="sm"
@@ -127,7 +131,12 @@ export function ProviderAgendaScreen() {
           />
         </View>
       ) : (
-        <Text style={styles.sectionTitle}>Agendado hoje</Text>
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionTitle}>Agendado hoje</Text>
+          <View style={styles.calendarButton}>
+            <ProviderIcon name="calendar-today" color={theme.colors.white} size={22} />
+          </View>
+        </View>
       )}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -232,19 +241,37 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   dateBadge: {
+    alignItems: 'center',
     backgroundColor: theme.colors.primary,
-    borderRadius: theme.borderRadius.sm,
+    borderRadius: theme.borderRadius.pill,
+    flexDirection: 'row',
+    gap: theme.spacing.xs,
+    minHeight: 40,
+    paddingHorizontal: theme.spacing.md,
+  },
+  dateBadgeText: {
     color: theme.colors.white,
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.bold,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
+  },
+  sectionRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   sectionTitle: {
     color: theme.colors.primary,
     fontSize: theme.fontSize.md,
     fontWeight: theme.fontWeight.bold,
     textTransform: 'uppercase',
+  },
+  calendarButton: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.pill,
+    height: 40,
+    justifyContent: 'center',
+    width: 48,
   },
   appointmentCard: {
     alignItems: 'center',
