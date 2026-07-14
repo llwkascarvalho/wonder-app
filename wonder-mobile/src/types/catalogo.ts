@@ -41,11 +41,12 @@ export type Avaliacao = {
 };
 
 export const DIAS_SEMANA = [
-  'Domingo',
+  'Dia invalido',
   'Segunda-feira',
-  'Terça-feira',
+  'Terca-feira',
   'Quarta-feira',
   'Quinta-feira',
   'Sexta-feira',
-  'Sábado',
+  'Sabado',
+  'Domingo',
 ] as const;

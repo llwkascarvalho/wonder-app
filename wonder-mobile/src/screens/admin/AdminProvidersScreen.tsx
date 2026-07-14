@@ -5,6 +5,7 @@ import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
+import { CatalogImage } from '../../components/catalog/CatalogImage';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { AdminProvidersStackParamList } from '../../navigation/AdminProvidersStack';
 import { listarPrestadoresPendentes } from '../../services/admin';
@@ -88,9 +89,7 @@ export function AdminProvidersScreen() {
         }
         renderItem={({ item }) => (
           <Card style={styles.providerCard}>
-            <View style={styles.providerAvatar}>
-              <Text style={styles.providerAvatarText}>{item.nome_estab.slice(0, 1).toUpperCase()}</Text>
-            </View>
+            <CatalogImage fotoUrl={item.foto_url} kind="provider" style={styles.providerAvatar} />
             <View style={styles.providerInfo}>
               <Text style={styles.cardTitle}>{item.nome_estab}</Text>
               <Text style={styles.cardText}>Documento: {item.documento}</Text>
@@ -139,17 +138,9 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
   },
   providerAvatar: {
-    alignItems: 'center',
-    backgroundColor: theme.colors.surfaceMuted,
     borderRadius: theme.borderRadius.md,
     height: 56,
-    justifyContent: 'center',
     width: 56,
-  },
-  providerAvatarText: {
-    color: theme.colors.primary,
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.bold,
   },
   providerInfo: {
     flex: 1,

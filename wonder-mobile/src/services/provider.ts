@@ -1,4 +1,5 @@
 import api from './api';
+import { ProfilePhotoAsset } from '../types/profile';
 import {
   Agendamento,
   Horario,
@@ -26,6 +27,29 @@ export async function criarPrestador(payload: PrestadorPayload) {
 
 export async function atualizarPrestador(prestadorId: number, payload: Partial<PrestadorPayload>) {
   const response = await api.put<Prestador>(`/catalogo/prestadores/${prestadorId}`, payload);
+  return response.data;
+}
+
+export async function uploadFotoPrestador(
+  prestadorId: number,
+  asset: ProfilePhotoAsset
+): Promise<Prestador> {
+  const formData = new FormData();
+  const fileName = asset.fileName || `prestador-${Date.now()}.jpg`;
+  const mimeType = asset.mimeType || 'image/jpeg';
+
+  formData.append('file', {
+    uri: asset.uri,
+    name: fileName,
+    type: mimeType,
+  } as unknown as Blob);
+
+  const response = await api.post<Prestador>(`/catalogo/prestadores/${prestadorId}/foto`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
   return response.data;
 }
 

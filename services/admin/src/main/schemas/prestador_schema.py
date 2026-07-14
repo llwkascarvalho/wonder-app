@@ -11,6 +11,7 @@ class ServicoResponse(BaseModel):
     preco: float
     duracao_min: int
     categoria_id: Optional[int] = None
+    foto_url: Optional[str] = None
 
 
 class HorarioResponse(BaseModel):
@@ -26,6 +27,7 @@ class CategoriaResponse(BaseModel):
     nome: str
     descricao: Optional[str] = None
     status: str
+    foto_url: Optional[str] = None
 
 
 class PrestadorCategoriaResponse(BaseModel):
@@ -39,6 +41,7 @@ class PrestadorResponse(BaseModel):
     nome_estab: str
     documento: str
     status: str
+    foto_url: Optional[str] = None
     enviado_em: Optional[datetime] = None
     aprovado_em: Optional[datetime] = None
     aprovado_por: Optional[str] = None

@@ -1,15 +1,17 @@
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '../components/Card';
+import { ProviderCard } from '../components/catalog/ProviderCard';
 import { Input } from '../components/Input';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { SearchStackParamList } from '../navigation/SearchStack';
 import { listarCategorias, listarPrestadores } from '../services/catalogo';
 import { theme } from '../styles/theme';
-import { Categoria, Prestador } from '../types/catalogo';
+import { Categoria } from '../types/catalogo';
+import { carregarCardsPrestadores, ProviderCardModel } from '../utils/catalogPresentation';
 
 type SearchScreenNavigationProp = NativeStackNavigationProp<SearchStackParamList, 'SearchHome'>;
 
@@ -19,7 +21,7 @@ export function SearchScreen() {
   const [nome, setNome] = useState('');
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [categoriaSelecionada, setCategoriaSelecionada] = useState<number | null>(null);
-  const [prestadores, setPrestadores] = useState<Prestador[]>([]);
+  const [prestadores, setPrestadores] = useState<ProviderCardModel[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -32,9 +34,10 @@ export function SearchScreen() {
         nome: nome.trim() || undefined,
         categoria_id: categoriaSelecionada ?? undefined,
       });
-      setPrestadores(resultado);
+      const cards = await carregarCardsPrestadores(resultado);
+      setPrestadores(cards);
     } catch {
-      setErro('Não foi possível carregar os prestadores. Tente novamente.');
+      setErro('Nao foi possivel carregar os prestadores. Tente novamente.');
     } finally {
       setCarregando(false);
     }
@@ -53,7 +56,7 @@ export function SearchScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.subtitle}>Encontre profissionais de beleza perto de você</Text>
+      <Text style={styles.subtitle}>Encontre profissionais de beleza perto de voce</Text>
 
       <Input
         label="Buscar por nome"
@@ -68,6 +71,7 @@ export function SearchScreen() {
           showsHorizontalScrollIndicator={false}
           data={[{ id: -1, nome: 'Todas' }, ...categorias]}
           keyExtractor={(item) => String(item.id)}
+          style={styles.categoriasScroller}
           contentContainerStyle={styles.categoriasList}
           renderItem={({ item }) => {
             const selecionada =
@@ -75,16 +79,22 @@ export function SearchScreen() {
               item.id === categoriaSelecionada;
 
             return (
-              <Card
+              <Pressable
+                accessibilityRole="button"
                 onPress={() => setCategoriaSelecionada(item.id === -1 ? null : item.id)}
-                style={[styles.categoriaChip, selecionada && styles.categoriaChipAtiva]}
+                style={({ pressed }) => [
+                  styles.categoriaChip,
+                  selecionada && styles.categoriaChipAtiva,
+                  pressed && styles.pressed,
+                ]}
               >
                 <Text
                   style={[styles.categoriaChipText, selecionada && styles.categoriaChipTextAtiva]}
+                  numberOfLines={1}
                 >
                   {item.nome}
                 </Text>
-              </Card>
+              </Pressable>
             );
           }}
         />
@@ -99,7 +109,7 @@ export function SearchScreen() {
       ) : (
         <FlatList
           data={prestadores}
-          keyExtractor={(item) => String(item.id)}
+          keyExtractor={(item) => String(item.prestador.id)}
           contentContainerStyle={styles.resultadosList}
           ListEmptyComponent={
             <Card>
@@ -107,15 +117,12 @@ export function SearchScreen() {
             </Card>
           }
           renderItem={({ item }) => (
-            <Card
-              onPress={() => navigation.navigate('PrestadorProfile', { prestadorId: item.id })}
-              style={styles.resultCard}
-            >
-              <Text style={styles.cardTitle}>{item.nome_estab}</Text>
-              <Text style={styles.cardText}>
-                {item.status === 'ativo' ? 'Disponível' : item.status}
-              </Text>
-            </Card>
+            <ProviderCard
+              provider={item}
+              onPress={() =>
+                navigation.navigate('PrestadorProfile', { prestadorId: item.prestador.id })
+              }
+            />
           )}
         />
       )}
@@ -136,10 +143,23 @@ const styles = StyleSheet.create({
   },
   categoriasList: {
     gap: theme.spacing.sm,
+    paddingRight: theme.spacing.lg,
+  },
+  categoriasScroller: {
+    flexGrow: 0,
+    maxHeight: 42,
   },
   categoriaChip: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.pill,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: 'center',
+    maxWidth: 150,
+    minWidth: 72,
     paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
   },
   categoriaChipAtiva: {
     backgroundColor: theme.colors.primary,
@@ -153,16 +173,11 @@ const styles = StyleSheet.create({
   categoriaChipTextAtiva: {
     color: theme.colors.white,
   },
+  pressed: {
+    opacity: 0.86,
+  },
   resultadosList: {
     gap: theme.spacing.sm,
-  },
-  resultCard: {
-    gap: theme.spacing.xs,
-  },
-  cardTitle: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.semibold,
   },
   cardText: {
     color: theme.colors.textSecondary,

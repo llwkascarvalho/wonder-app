@@ -1,8 +1,10 @@
+import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
+import { CatalogImage } from '../components/catalog/CatalogImage';
 import { Input } from '../components/Input';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { ProfileScreenContent } from '../components/profile/ProfileScreenContent';
@@ -18,6 +20,7 @@ import {
   listarServicos,
   obterPrestadorLogado,
   removerHorario,
+  uploadFotoPrestador,
 } from '../services/provider';
 import { theme } from '../styles/theme';
 import { Horario, Prestador, Servico } from '../types/provider';
@@ -33,6 +36,7 @@ export function ProviderProfileScreen() {
   const [documento, setDocumento] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingProviderPhoto, setUploadingProviderPhoto] = useState(false);
   const [error, setError] = useState('');
   const [editingEstablishment, setEditingEstablishment] = useState(false);
   const [serviceModalVisible, setServiceModalVisible] = useState(false);
@@ -130,6 +134,47 @@ export function ProviderProfileScreen() {
       setError('Nao foi possivel atualizar o estabelecimento.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleChangeProviderPhoto() {
+    if (!prestador) {
+      return;
+    }
+
+    setUploadingProviderPhoto(true);
+    setError('');
+
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        setError('Permita o acesso a galeria para alterar a foto do estabelecimento.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        mediaTypes: ['images'],
+        quality: 0.85,
+      });
+
+      if (result.canceled || !result.assets.length) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const updated = await uploadFotoPrestador(prestador.id, {
+        uri: asset.uri,
+        fileName: asset.fileName,
+        mimeType: asset.mimeType,
+      });
+
+      setPrestador(updated);
+    } catch {
+      setError('Nao foi possivel enviar a foto do estabelecimento.');
+    } finally {
+      setUploadingProviderPhoto(false);
     }
   }
 
@@ -245,6 +290,20 @@ export function ProviderProfileScreen() {
               </>
             ) : (
               <>
+                <View style={styles.providerPhotoRow}>
+                  <CatalogImage fotoUrl={prestador.foto_url} kind="provider" style={styles.providerPhoto} />
+                  <View style={styles.providerPhotoContent}>
+                    <Text style={styles.providerPhotoTitle}>Foto do estabelecimento</Text>
+                    <Button
+                      title="Alterar foto"
+                      size="sm"
+                      variant="secondary"
+                      onPress={handleChangeProviderPhoto}
+                      loading={uploadingProviderPhoto}
+                      disabled={saving}
+                    />
+                  </View>
+                </View>
                 <InfoRow label="Nome do estabelecimento" value={prestador.nome_estab} />
                 <InfoRow label="CPF/CNPJ" value={prestador.documento} />
                 <InfoRow label="Horario de funcionamento" value={horariosResumo} />
@@ -355,6 +414,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.spacing.sm,
     justifyContent: 'flex-end',
+  },
+  providerPhotoRow: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceMuted,
+    borderRadius: theme.borderRadius.sm,
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+    padding: theme.spacing.sm,
+  },
+  providerPhoto: {
+    borderRadius: theme.borderRadius.md,
+    height: 88,
+    width: 88,
+  },
+  providerPhotoContent: {
+    flex: 1,
+    gap: theme.spacing.xs,
+  },
+  providerPhotoTitle: {
+    color: theme.colors.text,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.bold,
   },
   infoRow: {
     backgroundColor: theme.colors.surfaceMuted,
