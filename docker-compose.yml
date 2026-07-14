@@ -68,6 +68,12 @@ services:
     ports:
       - "8004:8004"
     env_file: .env
+    environment:
+      RABBITMQ_QUEUE: ${RABBITMQ_QUEUE:-wonder.eventos}
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-}
+      RABBITMQ_ROUTING_KEY: ${RABBITMQ_ROUTING_KEY:-wonder.eventos}
+      RABBITMQ_MAX_RETRIES: ${RABBITMQ_MAX_RETRIES:-3}
+      CATALOGO_URL: ${CATALOGO_URL:-http://catalogo:8002}
     depends_on:
       db_notificacoes:
         condition: service_healthy
