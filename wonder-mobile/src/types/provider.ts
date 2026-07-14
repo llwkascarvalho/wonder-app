@@ -32,6 +32,8 @@ export type Agendamento = {
   servico_id: number;
   inicio: string;
   status: string;
+  cliente_nome?: string | null;
+  cliente_foto_url?: string | null;
 };
 
 export type PrestadorPayload = {

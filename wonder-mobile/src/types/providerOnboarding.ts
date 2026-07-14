@@ -6,6 +6,7 @@ export type ProviderOnboardingProfile = {
   nome_estab: string;
   documento: string;
   status: ProviderOnboardingStatus | string;
+  foto_url?: string | null;
   enviado_em?: string | null;
   aprovado_em?: string | null;
   aprovado_por?: string | null;

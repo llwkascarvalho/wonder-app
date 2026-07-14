@@ -383,6 +383,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     gap: theme.spacing.md,
     padding: theme.spacing.lg,
+    paddingTop: theme.spacing.xxl,
   },
   header: {
     gap: theme.spacing.xs,

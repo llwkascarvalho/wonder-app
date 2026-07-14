@@ -23,7 +23,14 @@ import {
   removerHorario,
   uploadFotoPrestador,
 } from '../services/provider';
+import {
+  associarMinhasCategoriasPrestador,
+  listarCategoriasAtivas,
+  listarMinhasCategoriasPrestadorSeguro,
+  removerMinhaCategoriaPrestador,
+} from '../services/providerOnboarding';
 import { theme } from '../styles/theme';
+import { Categoria } from '../types/catalogo';
 import { Horario, Prestador, Servico } from '../types/provider';
 
 const dayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
@@ -31,12 +38,15 @@ const dayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 export function ProviderProfileScreen() {
   const { usuario, signOut } = useAuth();
   const [prestador, setPrestador] = useState<Prestador | null>(null);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [categoriasAtivas, setCategoriasAtivas] = useState<Categoria[]>([]);
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [horarios, setHorarios] = useState<Horario[]>([]);
   const [nomeEstab, setNomeEstab] = useState('');
   const [documento, setDocumento] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingCategoryId, setSavingCategoryId] = useState<number | null>(null);
   const [uploadingProviderPhoto, setUploadingProviderPhoto] = useState(false);
   const [error, setError] = useState('');
   const [editingEstablishment, setEditingEstablishment] = useState(false);
@@ -65,15 +75,19 @@ export function ProviderProfileScreen() {
       setPrestador(foundPrestador);
       setNomeEstab(foundPrestador?.nome_estab || '');
       setDocumento(foundPrestador?.documento || '');
+      setCategoriasAtivas(await listarCategoriasAtivas());
 
       if (foundPrestador) {
-        const [nextServicos, nextHorarios] = await Promise.all([
+        const [nextCategorias, nextServicos, nextHorarios] = await Promise.all([
+          listarMinhasCategoriasPrestadorSeguro(),
           listarServicos(foundPrestador.id),
           listarHorarios(foundPrestador.id),
         ]);
+        setCategorias(nextCategorias.map((item) => item.categoria));
         setServicos(nextServicos);
         setHorarios(nextHorarios);
       } else {
+        setCategorias([]);
         setServicos([]);
         setHorarios([]);
       }
@@ -186,7 +200,7 @@ export function ProviderProfileScreen() {
     setError('');
   }
 
-  async function handleCreateService(payload: { nome: string; preco: number; duracao_min: number }) {
+  async function handleCreateService(payload: { nome: string; preco: number; duracao_min: number; categoria_id?: number }) {
     if (!prestador) {
       return;
     }
@@ -239,14 +253,41 @@ export function ProviderProfileScreen() {
     }
   }
 
+  async function handleAddCategory(categoriaId: number) {
+    setSavingCategoryId(categoriaId);
+    setError('');
+    try {
+      const updated = await associarMinhasCategoriasPrestador([categoriaId]);
+      setCategorias(updated.map((item) => item.categoria));
+    } catch {
+      setError('Nao foi possivel associar a categoria.');
+    } finally {
+      setSavingCategoryId(null);
+    }
+  }
+
+  async function handleRemoveCategory(categoriaId: number) {
+    setSavingCategoryId(categoriaId);
+    setError('');
+    try {
+      await removerMinhaCategoriaPrestador(categoriaId);
+      const updated = await listarMinhasCategoriasPrestadorSeguro();
+      setCategorias(updated.map((item) => item.categoria));
+    } catch {
+      setError('Nao foi possivel remover a categoria.');
+    } finally {
+      setSavingCategoryId(null);
+    }
+  }
+
   return (
     <ProfileScreenContent
-      title="Perfil"
-      subtitle="Gerencie seu perfil e estabelecimento."
+      title="Perfil pessoal"
+      subtitle="Gerencie seus dados pessoais e profissionais."
       onSignOut={signOut}
     >
       {loading ? (
-        <LoadingIndicator text="Carregando dados do estabelecimento..." />
+      <LoadingIndicator text="Carregando dados do estabelecimento..." />
       ) : !prestador ? (
         <Card style={styles.formCard}>
           <Text style={styles.title}>Criar perfil de prestador</Text>
@@ -262,19 +303,10 @@ export function ProviderProfileScreen() {
         </Card>
       ) : (
         <>
-          <View style={styles.avatar}>
-            <ProviderIcon name="store" size={64} />
-          </View>
-
-          <Card style={styles.metricsCard}>
-            <MetricItem icon="star" label="Avaliacao" value="-" />
-            <MetricItem icon="content-cut" label="Servicos" value={String(servicos.length)} />
-            <MetricItem icon="schedule" label="Horarios" value={String(horarios.length)} />
-          </Card>
-
+          <Text style={styles.sectionTitle}>Estabelecimento</Text>
           <Card style={styles.detailsCard}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardSectionTitle}>Estabelecimento</Text>
+              <Text style={styles.cardSectionTitle}>Dados do estabelecimento</Text>
               {!editingEstablishment ? (
                 <Button title="Editar" size="sm" variant="secondary" onPress={() => setEditingEstablishment(true)} />
               ) : null}
@@ -312,7 +344,6 @@ export function ProviderProfileScreen() {
                 </View>
                 <InfoRow label="Nome do estabelecimento" value={prestador.nome_estab} />
                 <InfoRow label="CPF/CNPJ" value={prestador.documento} />
-                <InfoRow label="Email" value={usuario?.email || '-'} />
                 <InfoRow label="Horario de funcionamento" value={horariosResumo} />
                 <InfoRow label="Status do cadastro" value={prestador.status} />
               </>
@@ -320,6 +351,62 @@ export function ProviderProfileScreen() {
           </Card>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
+
+          <Text style={styles.sectionTitle}>Gestao</Text>
+          <Card style={styles.metricsCard}>
+            <MetricItem icon="star" label="Avaliacao" value="-" />
+            <MetricItem icon="category" label="Categorias" value={String(categorias.length)} />
+            <MetricItem icon="content-cut" label="Servicos" value={String(servicos.length)} />
+            <MetricItem icon="schedule" label="Horarios" value={String(horarios.length)} />
+          </Card>
+
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Categorias</Text>
+          </View>
+
+          {categorias.length ? (
+            <View style={styles.chips}>
+              {categorias.map((categoria) => (
+                <View key={categoria.id} style={styles.chip}>
+                  <Text style={styles.chipText}>{categoria.nome}</Text>
+                  <Button
+                    title="Remover"
+                    size="sm"
+                    variant="outline"
+                    loading={savingCategoryId === categoria.id}
+                    disabled={savingCategoryId !== null}
+                    onPress={() => handleRemoveCategory(categoria.id)}
+                  />
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Card>
+              <Text style={styles.cardText}>Nenhuma categoria associada.</Text>
+            </Card>
+          )}
+
+          <Card style={styles.detailsCard}>
+            <Text style={styles.cardSectionTitle}>Associar categoria ativa</Text>
+            <View style={styles.chips}>
+              {categoriasAtivas
+                .filter((categoria) => !categorias.some((item) => item.id === categoria.id))
+                .map((categoria) => (
+                  <Button
+                    key={categoria.id}
+                    title={categoria.nome}
+                    size="sm"
+                    variant="secondary"
+                    loading={savingCategoryId === categoria.id}
+                    disabled={savingCategoryId !== null}
+                    onPress={() => handleAddCategory(categoria.id)}
+                  />
+                ))}
+              {categoriasAtivas.every((categoria) => categorias.some((item) => item.id === categoria.id)) ? (
+                <Text style={styles.cardText}>Todas as categorias ativas ja estao associadas.</Text>
+              ) : null}
+            </View>
+          </Card>
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Horarios cadastrados</Text>
@@ -363,6 +450,7 @@ export function ProviderProfileScreen() {
       <ProviderServiceModal
         visible={serviceModalVisible}
         loading={saving}
+        categories={categorias}
         onClose={() => setServiceModalVisible(false)}
         onSave={handleCreateService}
       />
@@ -403,17 +491,6 @@ const styles = StyleSheet.create({
   },
   formCard: {
     gap: theme.spacing.md,
-  },
-  avatar: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: theme.colors.surfaceMuted,
-    borderColor: theme.colors.primary,
-    borderRadius: 74,
-    borderWidth: 2,
-    height: 148,
-    justifyContent: 'center',
-    width: 148,
   },
   metricsCard: {
     flexDirection: 'row',
@@ -501,6 +578,25 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: theme.fontSize.md,
     fontWeight: theme.fontWeight.bold,
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+  },
+  chip: {
+    alignItems: 'center',
+    backgroundColor: '#F3E8FF',
+    borderRadius: theme.borderRadius.pill,
+    flexDirection: 'row',
+    gap: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  chipText: {
+    color: theme.colors.primary,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.semibold,
   },
   listCard: {
     gap: theme.spacing.xs,

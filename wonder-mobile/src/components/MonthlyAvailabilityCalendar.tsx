@@ -6,6 +6,7 @@ type MonthlyAvailabilityCalendarProps = {
   mes: string;
   diasDisponiveis: string[];
   dataSelecionada: string | null;
+  allowUnavailableSelection?: boolean;
   onChangeMes: (mes: string) => void;
   onSelectDate: (data: string) => void;
 };
@@ -52,6 +53,7 @@ export function MonthlyAvailabilityCalendar({
   mes,
   diasDisponiveis,
   dataSelecionada,
+  allowUnavailableSelection = false,
   onChangeMes,
   onSelectDate,
 }: MonthlyAvailabilityCalendarProps) {
@@ -103,9 +105,9 @@ export function MonthlyAvailabilityCalendar({
 
           const dateKey = formatDate(year, month, day);
           const isPast = dateKey < today;
-          const isAvailable = availableSet.has(dateKey) && !isPast;
+          const isAvailable = allowUnavailableSelection || (availableSet.has(dateKey) && !isPast);
           const isSelected = dataSelecionada === dateKey;
-          const disabled = !isAvailable;
+          const disabled = !allowUnavailableSelection && !isAvailable;
 
           return (
             <Pressable

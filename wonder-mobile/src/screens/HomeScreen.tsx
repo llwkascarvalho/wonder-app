@@ -100,7 +100,7 @@ export function HomeScreen() {
         />
       )}
 
-      <Text style={styles.sectionTitle}>Para voce</Text>
+      <Text style={styles.subtitle}>Para voce</Text>
       {carregandoPrestadores ? (
         <LoadingIndicator text="Carregando prestadores..." />
       ) : erroPrestadores ? (
@@ -135,6 +135,11 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.xxl,
   },
   sectionTitle: {
+    color: theme.colors.text,
+    fontSize: theme.fontSize.xxl,
+    fontWeight: theme.fontWeight.bold,
+  },
+  subtitle: {
     color: theme.colors.text,
     fontSize: theme.fontSize.lg,
     fontWeight: theme.fontWeight.bold,

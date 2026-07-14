@@ -77,8 +77,10 @@ export async function removerHorario(prestadorId: number, horarioId: number) {
   await api.delete(`/catalogo/prestadores/${prestadorId}/horarios/${horarioId}`);
 }
 
-export async function listarAgendamentos() {
-  const response = await api.get<Agendamento[]>('/agendamentos');
+export async function listarAgendamentos(data?: string) {
+  const response = await api.get<Agendamento[]>('/agendamentos', {
+    params: data ? { data } : undefined,
+  });
   return response.data;
 }
 

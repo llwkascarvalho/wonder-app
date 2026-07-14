@@ -2,6 +2,7 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Modal,
   RefreshControl,
   ScrollView,
@@ -37,6 +38,54 @@ function formatDate(value?: string | null): string {
   }
 
   return date.toLocaleString('pt-BR');
+}
+
+function extractBackendMessage(error: unknown, fallback: string): string {
+  const responseData = (error as { response?: { data?: unknown } })?.response?.data;
+
+  function parseDetail(value: unknown): string | null {
+    if (!value) {
+      return null;
+    }
+
+    if (typeof value === 'string') {
+      return value;
+    }
+
+    if (Array.isArray(value)) {
+      return value.map(parseDetail).filter(Boolean).join('\n') || null;
+    }
+
+    if (typeof value === 'object') {
+      const objectValue = value as Record<string, unknown>;
+      return (
+        parseDetail(objectValue.detail) ||
+        parseDetail(objectValue.message) ||
+        parseDetail(objectValue.erros) ||
+        null
+      );
+    }
+
+    return null;
+  }
+
+  return parseDetail(responseData) || fallback;
+}
+
+function successMessage(status: AdminPrestadorStatus): string {
+  if (status === 'ativo') {
+    return 'Prestador aprovado com sucesso.';
+  }
+
+  if (status === 'rejeitado') {
+    return 'Cadastro rejeitado com sucesso.';
+  }
+
+  if (status === 'rascunho') {
+    return 'Solicitacao de correcao enviada com sucesso.';
+  }
+
+  return 'Status atualizado com sucesso.';
 }
 
 export function AdminProviderDetailsScreen() {
@@ -95,8 +144,14 @@ export function AdminProviderDetailsScreen() {
       setNoteModalAction(null);
       setNote('');
       await load();
-    } catch {
-      setError('Nao foi possivel atualizar o status do prestador.');
+      Alert.alert('Status atualizado', successMessage(status), [
+        {
+          text: 'OK',
+          onPress: () => navigation.goBack(),
+        },
+      ]);
+    } catch (statusError) {
+      setError(extractBackendMessage(statusError, 'Nao foi possivel atualizar o status do prestador.'));
     } finally {
       setSavingStatus(null);
     }
@@ -142,7 +197,7 @@ export function AdminProviderDetailsScreen() {
           <Text style={styles.statusBadge}>{prestador.status}</Text>
         </View>
 
-        <CatalogImage fotoUrl={prestador.foto_url} kind="provider" style={styles.avatar} />
+        <CatalogImage fotoUrl={prestador.foto_url || prestador.solicitante_foto_url} kind="provider" style={styles.avatar} />
 
         <Text style={styles.title}>{prestador.nome_estab}</Text>
 
@@ -212,7 +267,12 @@ export function AdminProviderDetailsScreen() {
               multiline
             />
             <View style={styles.modalActions}>
-              <Button title="Cancelar" variant="secondary" onPress={() => setNoteModalAction(null)} />
+              <Button
+                title="Cancelar"
+                variant="secondary"
+                disabled={savingStatus !== null}
+                onPress={() => setNoteModalAction(null)}
+              />
               <Button title="Confirmar" loading={savingStatus !== null} onPress={confirmNoteAction} />
             </View>
           </View>
