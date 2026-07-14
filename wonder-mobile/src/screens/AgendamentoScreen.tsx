@@ -9,6 +9,7 @@ import {
 } from '../components/MonthlyAvailabilityCalendar';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
+import { ServiceCard } from '../components/catalog/ServiceCard';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { SearchStackParamList } from '../navigation/SearchStack';
 import {
@@ -274,18 +275,12 @@ export function AgendamentoScreen() {
             const selected = servicoSelecionado?.id === servico.id;
 
             return (
-              <Card
+              <ServiceCard
                 key={servico.id}
+                servico={servico}
                 onPress={() => selecionarServico(servico)}
-                style={[styles.selectableCard, selected && styles.selectedCard]}
-              >
-                <Text style={[styles.cardTitle, selected && styles.selectedText]}>
-                  {servico.nome}
-                </Text>
-                <Text style={[styles.cardText, selected && styles.selectedMutedText]}>
-                  R$ {servico.preco.toFixed(2)} - {servico.duracao_min} min
-                </Text>
-              </Card>
+                selected={selected}
+              />
             );
           })}
         </View>
@@ -410,9 +405,6 @@ const styles = StyleSheet.create({
   list: {
     gap: theme.spacing.sm,
   },
-  selectableCard: {
-    gap: theme.spacing.xs,
-  },
   selectedCard: {
     backgroundColor: theme.colors.primary,
     borderColor: theme.colors.primary,
@@ -427,9 +419,6 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.md,
   },
   selectedText: {
-    color: theme.colors.white,
-  },
-  selectedMutedText: {
     color: theme.colors.white,
   },
   calendarCard: {

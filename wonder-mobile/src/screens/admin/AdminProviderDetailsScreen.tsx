@@ -12,6 +12,7 @@ import {
 
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
+import { CatalogImage } from '../../components/catalog/CatalogImage';
 import { Input } from '../../components/Input';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { AdminProvidersStackParamList } from '../../navigation/AdminProvidersStack';
@@ -141,9 +142,7 @@ export function AdminProviderDetailsScreen() {
           <Text style={styles.statusBadge}>{prestador.status}</Text>
         </View>
 
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{prestador.nome_estab.slice(0, 1).toUpperCase()}</Text>
-        </View>
+        <CatalogImage fotoUrl={prestador.foto_url} kind="provider" style={styles.avatar} />
 
         <Text style={styles.title}>{prestador.nome_estab}</Text>
 
@@ -255,20 +254,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   avatar: {
-    alignItems: 'center',
     alignSelf: 'center',
-    backgroundColor: theme.colors.surfaceMuted,
     borderColor: theme.colors.primary,
     borderRadius: 72,
     borderWidth: 2,
     height: 144,
-    justifyContent: 'center',
     width: 144,
-  },
-  avatarText: {
-    color: theme.colors.primary,
-    fontSize: 56,
-    fontWeight: theme.fontWeight.bold,
   },
   title: {
     color: theme.colors.text,

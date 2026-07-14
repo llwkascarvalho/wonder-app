@@ -7,6 +7,7 @@ export type AdminPrestador = {
   nome_estab: string;
   documento: string;
   status: AdminPrestadorStatus | string;
+  foto_url?: string | null;
   enviado_em?: string | null;
   aprovado_em?: string | null;
   aprovado_por?: string | null;
@@ -20,6 +21,7 @@ export type AdminServico = {
   preco: number;
   duracao_min: number;
   categoria_id?: number | null;
+  foto_url?: string | null;
 };
 
 export type AdminHorario = {
@@ -44,6 +46,7 @@ export type AdminCategoria = {
   nome: string;
   descricao?: string | null;
   status: AdminCategoriaStatus;
+  foto_url?: string | null;
 };
 
 export type AdminCategoriaPayload = {

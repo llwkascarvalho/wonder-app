@@ -1,10 +1,12 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
+import { CatalogImage } from '../components/catalog/CatalogImage';
+import { ServiceCard } from '../components/catalog/ServiceCard';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { SearchStackParamList } from '../navigation/SearchStack';
 import {
@@ -14,7 +16,6 @@ import {
   listarServicosPrestador,
   obterPrestador,
 } from '../services/catalogo';
-import { resolveProfilePhotoUrl } from '../services/profileService';
 import { theme } from '../styles/theme';
 import {
   Avaliacao,
@@ -104,19 +105,10 @@ export function PrestadorProfileScreen() {
     avaliacoes.length > 0
       ? avaliacoes.reduce((soma, item) => soma + item.nota, 0) / avaliacoes.length
       : null;
-  const fotoUrl = resolveProfilePhotoUrl(prestador.foto_url);
-  const initial = prestador.nome_estab.trim().slice(0, 1).toUpperCase() || 'W';
-
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.header}>
-        <View style={styles.photo}>
-          {fotoUrl ? (
-            <Image source={{ uri: fotoUrl }} style={styles.photoImage} />
-          ) : (
-            <Text style={styles.photoInitial}>{initial}</Text>
-          )}
-        </View>
+        <CatalogImage fotoUrl={prestador.foto_url} kind="provider" style={styles.photo} />
 
         <View style={styles.headerContent}>
           <Text style={styles.title}>{prestador.nome_estab}</Text>
@@ -176,12 +168,7 @@ export function PrestadorProfileScreen() {
       ) : (
         <View style={styles.list}>
           {servicos.map((item) => (
-            <Card key={item.id} style={styles.servicoCard}>
-              <Text style={styles.cardTitle}>{item.nome}</Text>
-              <Text style={styles.cardText}>
-                R$ {item.preco.toFixed(2)} - {item.duracao_min} min
-              </Text>
-            </Card>
+            <ServiceCard key={item.id} servico={item} />
           ))}
         </View>
       )}
@@ -206,22 +193,9 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   photo: {
-    alignItems: 'center',
-    backgroundColor: theme.colors.primary,
     borderRadius: theme.borderRadius.lg,
     height: 96,
-    justifyContent: 'center',
-    overflow: 'hidden',
     width: 96,
-  },
-  photoImage: {
-    height: '100%',
-    width: '100%',
-  },
-  photoInitial: {
-    color: theme.colors.white,
-    fontSize: 36,
-    fontWeight: theme.fontWeight.bold,
   },
   title: {
     color: theme.colors.text,
@@ -261,9 +235,6 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: theme.spacing.sm,
-  },
-  servicoCard: {
-    gap: theme.spacing.xs,
   },
   cardTitle: {
     color: theme.colors.text,
