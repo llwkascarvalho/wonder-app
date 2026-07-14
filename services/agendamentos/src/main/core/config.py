@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     RABBITMQ_PASSWORD: str = ""
     RABBITMQ_QUEUE: str = "wonder.eventos"
     CATALOGO_URL: str = "http://catalogo:8002"
+    AUTH_URL: str = "http://auth:8001"
     APP_TIMEZONE: str = "America/Fortaleza"
 
     @property

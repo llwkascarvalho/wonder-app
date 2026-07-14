@@ -1,5 +1,7 @@
 from sqlalchemy.orm import Session
 from src.main.models.agendamento_model import Agendamento, HistoricoAgendamento
+from datetime import date, datetime, time
+
 from sqlalchemy import select
 from fastapi import HTTPException
 from src.main.schemas.agendamento_schema import AgendamentoCreate, AgendamentoStatusUpdate
@@ -46,8 +48,14 @@ def publicar_evento(agendamento: Agendamento):
         print(f"⚠️  Falha ao publicar no RabbitMQ: {e}")
 
 
-def publicar_evento_cancelamento(agendamento: Agendamento, motivo: str = None):
-    """Publica o evento de cancelamento sem impedir a atualização no banco."""
+def publicar_evento_status(
+    agendamento: Agendamento,
+    status_anterior: str,
+    usuario_id: int,
+    tipo_usuario: str,
+    motivo: str = None,
+):
+    """Publica o evento de mudanca de status sem impedir a atualizacao no banco."""
     try:
         credentials = pika.PlainCredentials(settings.RABBITMQ_USER, settings.RABBITMQ_PASSWORD)
         connection = pika.BlockingConnection(
@@ -66,38 +74,51 @@ def publicar_evento_cancelamento(agendamento: Agendamento, motivo: str = None):
                 "agendamento_id": agendamento.id,
                 "cliente_id": agendamento.cliente_id,
                 "prestador_id": agendamento.prestador_id,
-                "status_novo": "cancelado",
-                "motivo": motivo
+                "servico_id": agendamento.servico_id,
+                "inicio": agendamento.inicio.isoformat(),
+                "status_anterior": status_anterior,
+                "status_novo": agendamento.status,
+                "alterado_por_id": usuario_id,
+                "alterado_por_tipo": tipo_usuario,
+                "motivo": motivo,
             }),
             properties=pika.BasicProperties(delivery_mode=2)
         )
         connection.close()
-        print(f"✅ Evento de cancelamento publicado para agendamento id={agendamento.id}")
+        print(f"✅ Evento de status publicado para agendamento id={agendamento.id}")
     except Exception as e:
-        print(f"⚠️  Falha ao publicar cancelamento no RabbitMQ: {e}")
+        print(f"⚠️  Falha ao publicar status no RabbitMQ: {e}")
 
 
 def listar_agendamentos(
     db: Session,
     usuario_id: int,
     tipo_usuario: str,
-    prestador_ids: list[int] | None = None
+    prestador_ids: list[int] | None = None,
+    data: date | None = None,
 ) -> list[Agendamento]:
+    query = db.query(Agendamento)
+
+    if data:
+        inicio = datetime.combine(data, time.min)
+        fim = datetime.combine(data, time.max)
+        query = query.filter(Agendamento.inicio >= inicio, Agendamento.inicio <= fim)
+
     if tipo_usuario == "admin":
-        return db.query(Agendamento).order_by(Agendamento.inicio.desc()).all()
+        return query.order_by(Agendamento.inicio.desc()).all()
 
     if tipo_usuario == "prestador":
         if not prestador_ids:
             return []
         return (
-            db.query(Agendamento)
+            query
             .filter(Agendamento.prestador_id.in_(prestador_ids))
             .order_by(Agendamento.inicio.desc())
             .all()
         )
 
     return (
-        db.query(Agendamento)
+        query
         .filter(Agendamento.cliente_id == usuario_id)
         .order_by(Agendamento.inicio.desc())
         .all()
@@ -235,7 +256,12 @@ def atualizar_status(
     db.commit()
     db.refresh(agendamento)
 
-    if dados.status == "cancelado":
-        publicar_evento_cancelamento(agendamento, motivo=dados.motivo)
+    publicar_evento_status(
+        agendamento,
+        status_anterior=status_anterior,
+        usuario_id=usuario_id,
+        tipo_usuario=tipo_usuario,
+        motivo=dados.motivo,
+    )
 
     return agendamento

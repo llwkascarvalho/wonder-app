@@ -11,7 +11,13 @@ from src.main.core.config import settings
 from src.main.dependencies.db import get_db
 from src.main.repositories import user_repo
 from src.main.core.security import gerar_jwt
-from src.main.schemas.auth_schema import TipoUpdate, TokenResponse, UsuarioResponse, UsuarioUpdate
+from src.main.schemas.auth_schema import (
+    TipoUpdate,
+    TokenResponse,
+    UsuarioPublicoResponse,
+    UsuarioResponse,
+    UsuarioUpdate,
+)
 from src.main.storage.profile_storage import delete_profile_photo, save_profile_photo
 
 router = APIRouter(tags=["Autenticação"])
@@ -72,6 +78,10 @@ def validar_chamada_admin_interna(request: Request):
     validar_admin(request)
     if request.headers.get("X-Internal-Service") != "admin":
         raise HTTPException(status_code=403, detail="Endpoint restrito ao servico Admin.")
+
+def validar_chamada_agendamentos_interna(request: Request):
+    if request.headers.get("X-Internal-Service") not in {"agendamentos", "admin"}:
+        raise HTTPException(status_code=403, detail="Endpoint restrito a servicos internos autorizados.")
 
 def get_user_id(request: Request) -> int:
     user_id = request.headers.get("X-User-ID")
@@ -205,6 +215,11 @@ def listar_usuarios(request: Request, db: Session = Depends(get_db)):
 @router.get("/auth/usuarios/{user_id}", response_model=UsuarioResponse)
 def obter_usuario(user_id: int, request: Request, db: Session = Depends(get_db)):
     validar_admin(request)
+    return user_repo.obter_usuario(db, user_id)
+
+@router.get("/auth/internal/usuarios/{user_id}/publico", response_model=UsuarioPublicoResponse)
+def obter_usuario_publico_interno(user_id: int, request: Request, db: Session = Depends(get_db)):
+    validar_chamada_agendamentos_interna(request)
     return user_repo.obter_usuario(db, user_id)
 
 @router.patch("/auth/usuarios/{user_id}/tipo", response_model=UsuarioResponse)
