@@ -25,8 +25,23 @@ export async function criarPrestador(payload: PrestadorPayload) {
   return response.data;
 }
 
+function normalizePrestadorPayload(payload: Partial<PrestadorPayload>): Partial<PrestadorPayload> {
+  return {
+    ...payload,
+    endereco: payload.endereco ?? '',
+    numero: payload.numero ?? '',
+    bairro: payload.bairro ?? '',
+    cidade: payload.cidade ?? '',
+    estado: payload.estado ?? '',
+    complemento: payload.complemento ?? '',
+  };
+}
+
 export async function atualizarPrestador(prestadorId: number, payload: Partial<PrestadorPayload>) {
-  const response = await api.put<Prestador>(`/catalogo/prestadores/${prestadorId}`, payload);
+  const response = await api.put<Prestador>(
+    `/catalogo/prestadores/${prestadorId}`,
+    normalizePrestadorPayload(payload)
+  );
   return response.data;
 }
 

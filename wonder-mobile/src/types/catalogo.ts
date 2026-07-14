@@ -11,6 +11,12 @@ export type Prestador = {
   usuario_id: number | string;
   nome_estab: string;
   documento: string;
+  endereco?: string | null;
+  numero?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  estado?: string | null;
+  complemento?: string | null;
   status: string;
   foto_url?: string | null;
 };

@@ -31,9 +31,13 @@ import {
 } from '../services/providerOnboarding';
 import { theme } from '../styles/theme';
 import { Categoria } from '../types/catalogo';
-import { Horario, Prestador, Servico } from '../types/provider';
+import { Horario, Prestador, PrestadorPayload, Servico } from '../types/provider';
 
 const dayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+
+function normalizeOptionalText(value: string) {
+  return value.trim();
+}
 
 export function ProviderProfileScreen() {
   const { usuario, signOut } = useAuth();
@@ -44,6 +48,12 @@ export function ProviderProfileScreen() {
   const [horarios, setHorarios] = useState<Horario[]>([]);
   const [nomeEstab, setNomeEstab] = useState('');
   const [documento, setDocumento] = useState('');
+  const [endereco, setEndereco] = useState('');
+  const [numero, setNumero] = useState('');
+  const [bairro, setBairro] = useState('');
+  const [cidade, setCidade] = useState('');
+  const [estado, setEstado] = useState('');
+  const [complemento, setComplemento] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingCategoryId, setSavingCategoryId] = useState<number | null>(null);
@@ -75,6 +85,12 @@ export function ProviderProfileScreen() {
       setPrestador(foundPrestador);
       setNomeEstab(foundPrestador?.nome_estab || '');
       setDocumento(foundPrestador?.documento || '');
+      setEndereco(foundPrestador?.endereco || '');
+      setNumero(foundPrestador?.numero || '');
+      setBairro(foundPrestador?.bairro || '');
+      setCidade(foundPrestador?.cidade || '');
+      setEstado(foundPrestador?.estado || '');
+      setComplemento(foundPrestador?.complemento || '');
       setCategoriasAtivas(await listarCategoriasAtivas());
 
       if (foundPrestador) {
@@ -111,9 +127,18 @@ export function ProviderProfileScreen() {
     setSaving(true);
     setError('');
     try {
-      const created = await criarPrestador({
+      const payload: PrestadorPayload = {
         nome_estab: nomeEstab.trim(),
         documento: documento.trim(),
+        endereco: normalizeOptionalText(endereco),
+        numero: normalizeOptionalText(numero),
+        bairro: normalizeOptionalText(bairro),
+        cidade: normalizeOptionalText(cidade),
+        estado: normalizeOptionalText(estado).toUpperCase(),
+        complemento: normalizeOptionalText(complemento),
+      };
+      const created = await criarPrestador({
+        ...payload,
       });
       setPrestador(created);
       await loadProviderProfile();
@@ -137,13 +162,26 @@ export function ProviderProfileScreen() {
     setSaving(true);
     setError('');
     try {
-      const updated = await atualizarPrestador(prestador.id, {
+      const payload: PrestadorPayload = {
         nome_estab: nomeEstab.trim(),
         documento: documento.trim(),
-      });
+        endereco: normalizeOptionalText(endereco),
+        numero: normalizeOptionalText(numero),
+        bairro: normalizeOptionalText(bairro),
+        cidade: normalizeOptionalText(cidade),
+        estado: normalizeOptionalText(estado).toUpperCase(),
+        complemento: normalizeOptionalText(complemento),
+      };
+      const updated = await atualizarPrestador(prestador.id, payload);
       setPrestador(updated);
       setNomeEstab(updated.nome_estab);
       setDocumento(updated.documento);
+      setEndereco(updated.endereco || '');
+      setNumero(updated.numero || '');
+      setBairro(updated.bairro || '');
+      setCidade(updated.cidade || '');
+      setEstado(updated.estado || '');
+      setComplemento(updated.complemento || '');
       setEditingEstablishment(false);
     } catch {
       setError('Nao foi possivel atualizar o estabelecimento.');
@@ -196,6 +234,12 @@ export function ProviderProfileScreen() {
   function handleCancelEditEstablishment() {
     setNomeEstab(prestador?.nome_estab || '');
     setDocumento(prestador?.documento || '');
+    setEndereco(prestador?.endereco || '');
+    setNumero(prestador?.numero || '');
+    setBairro(prestador?.bairro || '');
+    setCidade(prestador?.cidade || '');
+    setEstado(prestador?.estado || '');
+    setComplemento(prestador?.complemento || '');
     setEditingEstablishment(false);
     setError('');
   }
@@ -321,6 +365,23 @@ export function ProviderProfileScreen() {
                   onChangeText={setNomeEstab}
                 />
                 <Input label="CPF/CNPJ" placeholder="00.000.000/0000-00" value={documento} onChangeText={setDocumento} />
+                <Text style={styles.cardSectionTitle}>Localizacao</Text>
+                <Input label="Endereco" placeholder="Rua Principal" value={endereco} onChangeText={setEndereco} />
+                <Input label="Numero" placeholder="123" value={numero} onChangeText={setNumero} />
+                <Input label="Bairro" placeholder="Centro" value={bairro} onChangeText={setBairro} />
+                <Input label="Cidade" placeholder="Pau dos Ferros" value={cidade} onChangeText={setCidade} />
+                <Input
+                  label="Estado"
+                  placeholder="RN"
+                  value={estado}
+                  onChangeText={(value) => setEstado(value.toUpperCase())}
+                />
+                <Input
+                  label="Complemento"
+                  placeholder="Sala, bloco ou referencia"
+                  value={complemento}
+                  onChangeText={setComplemento}
+                />
                 <View style={styles.editActions}>
                   <Button title="Cancelar" size="sm" variant="secondary" onPress={handleCancelEditEstablishment} disabled={saving} />
                   <Button title="Salvar" size="sm" onPress={handleUpdatePrestador} loading={saving} />
@@ -344,6 +405,8 @@ export function ProviderProfileScreen() {
                 </View>
                 <InfoRow label="Nome do estabelecimento" value={prestador.nome_estab} />
                 <InfoRow label="CPF/CNPJ" value={prestador.documento} />
+                <Text style={styles.cardSectionTitle}>Localizacao</Text>
+                <InfoRow label="Endereco" value={formatAddress(prestador)} />
                 <InfoRow label="Horario de funcionamento" value={horariosResumo} />
                 <InfoRow label="Status do cadastro" value={prestador.status} />
               </>
@@ -462,6 +525,13 @@ export function ProviderProfileScreen() {
       />
     </ProfileScreenContent>
   );
+}
+
+function formatAddress(prestador: Prestador) {
+  const linhaEndereco = [prestador.endereco, prestador.numero].filter(Boolean).join(', ');
+  const linhaCidade = [prestador.cidade, prestador.estado].filter(Boolean).join(' - ');
+  const partes = [linhaEndereco, prestador.bairro, linhaCidade, prestador.complemento].filter(Boolean);
+  return partes.length ? partes.join('\n') : 'Endereco nao informado.';
 }
 
 function MetricItem({ icon, label, value }: { icon: ProviderIconName; label: string; value: string }) {

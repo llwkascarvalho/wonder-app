@@ -57,6 +57,12 @@ class PrestadorCategoriaResponse(BaseModel):
 class PrestadorBase(BaseModel):
     nome_estab: str
     documento: str
+    endereco: Optional[str] = None
+    numero: Optional[str] = None
+    bairro: Optional[str] = None
+    cidade: Optional[str] = None
+    estado: Optional[str] = None
+    complemento: Optional[str] = None
 
 class PrestadorCreate(PrestadorBase):
     pass
@@ -64,6 +70,12 @@ class PrestadorCreate(PrestadorBase):
 class PrestadorUpdate(BaseModel):
     nome_estab: Optional[str] = None
     documento: Optional[str] = None
+    endereco: Optional[str] = None
+    numero: Optional[str] = None
+    bairro: Optional[str] = None
+    cidade: Optional[str] = None
+    estado: Optional[str] = None
+    complemento: Optional[str] = None
 
 class PrestadorResponse(PrestadorBase):
     id: int
