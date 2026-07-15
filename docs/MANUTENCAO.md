@@ -22,7 +22,7 @@ Tabelas cobertas por banco:
 | Banco             | Tabelas                                                                 |
 |--------------------|--------------------------------------------------------------------------|
 | db_autenticacao    | customuser, logs_auditoria                                              |
-| db_catalogo        | categoria, prestador, servico, horariofuncionamento, fotoestabelecimento, avaliacao, logs_auditoria |
+| db_catalogo        | categoria, prestador, prestador_categoria, servico, horariofuncionamento, avaliacao, logs_auditoria |
 | db_agendamentos    | agendamento, historico_agendamento, logs_auditoria                      |
 | db_notificacoes    | notificacao, logs_auditoria                                             |
 

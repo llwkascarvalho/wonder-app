@@ -85,7 +85,7 @@ jobs:
           GOOGLE_CLIENT_SECRET=ci-dummy-client-secret
           GOOGLE_REDIRECT_URI=http://localhost:8000/auth/google/callback
 
-          GEMINI_API_KEY=ci-dummy-key
+          OPENROUTER_API_KEY=ci-dummy-key
 
           RABBITMQ_HOST=rabbitmq
           RABBITMQ_PORT=5672
@@ -94,7 +94,7 @@ jobs:
           EOF
 
       - name: Criar .env do serviço de IA
-        run: echo "GEMINI_API_KEY=ci-dummy-key" > services/ai/.env
+        run: echo "OPENROUTER_API_KEY=ci-dummy-key" > services/ai/.env
 
       - name: Criar .env.monitor restrito para o Admin
         run: |

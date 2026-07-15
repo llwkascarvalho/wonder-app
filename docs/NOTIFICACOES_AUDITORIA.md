@@ -12,15 +12,13 @@
 ## Eventos existentes
 
 - O servico de agendamentos publica eventos na fila `wonder.eventos` ao criar agendamentos.
-- O servico de agendamentos tambem publica evento ao cancelar agendamentos.
+- O servico de agendamentos tambem publica evento ao atualizar status de agendamentos.
 - O consumer do servico de notificacao escuta `wonder.eventos` em background.
-- Atualmente o consumer cria notificacoes somente para o `cliente_id` recebido no evento.
+- O consumer cria notificacoes para cliente e prestador conforme o evento. Para o prestador, resolve `prestador_id -> usuario_id` consultando o Catalogo.
 
-## Fora de escopo desta branch
+## Destinatarios atuais
 
-Notificacoes para prestador nao foram implementadas nesta branch. Para isso, e necessaria uma issue separada de eventos/RabbitMQ definindo:
-
-- quais eventos devem notificar o prestador;
-- qual mensagem cada evento deve gerar;
-- quais usuarios recebem cada notificacao;
-- como tratar notificacoes para cliente e prestador no mesmo evento.
+- Novo agendamento: cliente e prestador.
+- Cancelamento pelo cliente: cliente e prestador.
+- Cancelamento pelo prestador: cliente.
+- Confirmacao/conclusao: cliente.
