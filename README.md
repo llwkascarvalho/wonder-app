@@ -29,7 +29,7 @@ O projeto nasceu como estudo de caso da disciplina de Sistemas Distribuídos, ev
 | Banco de Dados | PostgreSQL 16 (um banco isolado por serviço) |
 | Mensageria | RabbitMQ 3 |
 | Containerização | Docker e Docker Compose |
-| IA / LLM | OpenRouter (API do Google Gemini) |
+| IA / LLM | OpenRouter |
 | Autenticação | Google OAuth2 |
 | CI/CD | GitHub Actions |
 
@@ -47,6 +47,7 @@ O sistema segue uma arquitetura de microsserviços, com um API Gateway centraliz
 | Agendamentos | 8003 |
 | Notificação | 8004 |
 | AI (Assistente) | 8005 |
+| Admin (Auditoria/Monitoramento) | 8006 |
 
 Além dos serviços de negócio, o ambiente conta com containers de apoio para **backup automático** (`pg_dump` agendado via cron) e **admin/monitoramento** (relatórios unificados de auditoria e métricas via `pg_stat_statements`).
 
@@ -71,6 +72,9 @@ cd wonder-app
 cp .env.example .env
 # Edite o .env e preencha GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET e OPENROUTER_API_KEY
 
+# Opcional para o painel Admin/monitoramento:
+cp .env.monitor.example .env.monitor
+
 # 3. Subir o ambiente completo
 docker compose up --build
 ```
@@ -81,7 +85,6 @@ Após a subida dos containers, o Gateway estará disponível em `http://localhos
 
 - **Wiki do projeto:** visão geral, escopo, diagramas de arquitetura, contrato de endpoints e seção de auditoria/monitoramento/backup — [acesse aqui](https://github.com/llwkascarvalho/wonder-app/wiki).
 - **Swagger UI:** cada serviço expõe sua documentação automática em `/docs` (ex: `http://localhost:8002/docs` para o Catálogo).
-- **Relatório do Processo de Software:** [`docs/RELATORIO_PROCESSO.md`](docs/RELATORIO_PROCESSO.md).
 
 ## 7. Equipe
 
