@@ -15,8 +15,6 @@ export function ProviderCard({ provider, onPress }: ProviderCardProps) {
     provider.categorias.length > 0
       ? provider.categorias.map((categoria) => categoria.nome).join(', ')
       : 'Categorias nao informadas';
-  const avaliacaoTexto =
-    provider.mediaAvaliacao === null ? 'Sem avaliações' : `${provider.mediaAvaliacao.toFixed(1)} de 5`;
 
   return (
     <Card onPress={onPress} style={styles.card}>
@@ -33,11 +31,10 @@ export function ProviderCard({ provider, onPress }: ProviderCardProps) {
         <Text style={styles.categories} numberOfLines={1}>
           {categoriasTexto}
         </Text>
-        <Text style={styles.rating}>{avaliacaoTexto}</Text>
       </View>
 
       <Text style={[styles.status, provider.disponivelHoje ? styles.available : styles.closed]}>
-        {provider.disponivelHoje ? 'Disponível hoje' : 'Fechado'}
+        {provider.disponivelHoje ? 'Disponivel hoje' : 'Fechado'}
       </Text>
     </Card>
   );
@@ -68,10 +65,6 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
     fontSize: theme.fontSize.xs,
     fontWeight: theme.fontWeight.medium,
-  },
-  rating: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.xs,
   },
   status: {
     fontSize: theme.fontSize.xs,

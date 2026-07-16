@@ -1,14 +1,12 @@
 import {
-  listarAvaliacoesPrestador,
   listarCategoriasPrestador,
   listarHorariosPrestador,
 } from '../services/catalogo';
-import { Avaliacao, Categoria, Horario, Prestador } from '../types/catalogo';
+import { Categoria, Horario, Prestador } from '../types/catalogo';
 
 export type ProviderCardModel = {
   prestador: Prestador;
   categorias: Categoria[];
-  mediaAvaliacao: number | null;
   disponivelHoje: boolean;
 };
 
@@ -55,29 +53,18 @@ export function estaDisponivelHoje(horarios: Horario[]) {
   });
 }
 
-export function calcularMediaAvaliacoes(avaliacoes: Avaliacao[]) {
-  if (avaliacoes.length === 0) {
-    return null;
-  }
-
-  return avaliacoes.reduce((soma, item) => soma + item.nota, 0) / avaliacoes.length;
-}
-
 async function carregarDadosCard(prestador: Prestador): Promise<ProviderCardModel> {
-  const [categoriasResult, avaliacoesResult, horariosResult] = await Promise.allSettled([
+  const [categoriasResult, horariosResult] = await Promise.allSettled([
     listarCategoriasPrestador(prestador.id),
-    listarAvaliacoesPrestador(prestador.id),
     listarHorariosPrestador(prestador.id),
   ]);
 
   const categorias = categoriasResult.status === 'fulfilled' ? categoriasResult.value : [];
-  const avaliacoes = avaliacoesResult.status === 'fulfilled' ? avaliacoesResult.value : [];
   const horarios = horariosResult.status === 'fulfilled' ? horariosResult.value : [];
 
   return {
     prestador,
     categorias,
-    mediaAvaliacao: calcularMediaAvaliacoes(avaliacoes),
     disponivelHoje: estaDisponivelHoje(horarios),
   };
 }

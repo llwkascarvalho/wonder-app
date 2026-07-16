@@ -10,7 +10,6 @@ import { ServiceCard } from '../components/catalog/ServiceCard';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { SearchStackParamList } from '../navigation/SearchStack';
 import {
-  listarAvaliacoesPrestador,
   listarCategoriasPrestador,
   listarHorariosPrestador,
   listarServicosPrestador,
@@ -18,7 +17,6 @@ import {
 } from '../services/catalogo';
 import { theme } from '../styles/theme';
 import {
-  Avaliacao,
   Categoria,
   DIAS_SEMANA,
   Horario,
@@ -45,7 +43,6 @@ export function PrestadorProfileScreen() {
   const [prestador, setPrestador] = useState<Prestador | null>(null);
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [horarios, setHorarios] = useState<Horario[]>([]);
-  const [avaliacoes, setAvaliacoes] = useState<Avaliacao[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -58,12 +55,11 @@ export function PrestadorProfileScreen() {
       setErro(null);
 
       try {
-        const [prestadorData, servicosData, horariosData, avaliacoesData, categoriasData] =
+        const [prestadorData, servicosData, horariosData, categoriasData] =
           await Promise.all([
             obterPrestador(prestadorId),
             listarServicosPrestador(prestadorId),
             listarHorariosPrestador(prestadorId),
-            listarAvaliacoesPrestador(prestadorId),
             listarCategoriasPrestador(prestadorId),
           ]);
 
@@ -72,7 +68,6 @@ export function PrestadorProfileScreen() {
         setPrestador(prestadorData);
         setServicos(servicosData);
         setHorarios(horariosData);
-        setAvaliacoes(avaliacoesData);
         setCategorias(categoriasData);
       } catch {
         if (ativo) setErro('Nao foi possivel carregar os dados do prestador.');
@@ -101,10 +96,6 @@ export function PrestadorProfileScreen() {
     );
   }
 
-  const mediaAvaliacao =
-    avaliacoes.length > 0
-      ? avaliacoes.reduce((soma, item) => soma + item.nota, 0) / avaliacoes.length
-      : null;
   const enderecoFormatado = formatAddress(prestador);
   const temEndereco = hasAddress(prestador);
 
@@ -127,14 +118,6 @@ export function PrestadorProfileScreen() {
           <Text style={styles.subtitle}>
             {prestador.status === 'ativo' ? 'Disponivel para agendamentos' : prestador.status}
           </Text>
-          {mediaAvaliacao !== null ? (
-            <Text style={styles.avaliacaoText}>
-              {mediaAvaliacao.toFixed(1)} de 5 ({avaliacoes.length}{' '}
-              {avaliacoes.length === 1 ? 'avaliacao' : 'avaliacoes'})
-            </Text>
-          ) : (
-            <Text style={styles.subtitle}>Ainda sem avaliacoes</Text>
-          )}
         </View>
       </View>
 
@@ -242,11 +225,6 @@ const styles = StyleSheet.create({
   subtitle: {
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.md,
-  },
-  avaliacaoText: {
-    color: theme.colors.primary,
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.semibold,
   },
   chips: {
     flexDirection: 'row',
