@@ -23,6 +23,7 @@ from src.main.schemas.prestador_schema import (
     PrestadorUpdate,
     ServicoCreate,
     ServicoResponse,
+    ServicoUpdate,
 )
 from src.main.storage.catalog_image_storage import delete_catalog_image, save_catalog_image
 
@@ -109,6 +110,18 @@ def associar_minhas_categorias(
     return prestador_repo.associar_categorias(db, prestador.id, dados, get_user_id(request))
 
 
+@router.put("/prestadores/me/categorias", response_model=List[PrestadorCategoriaResponse])
+def substituir_minhas_categorias(
+    dados: PrestadorCategoriaCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    prestador = prestador_repo.obter_por_usuario(db, get_user_id(request))
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Cadastro de prestador nao encontrado.")
+    return prestador_repo.substituir_categorias(db, prestador.id, dados, get_user_id(request))
+
+
 @router.delete("/prestadores/me/categorias/{categoria_id}")
 def remover_minha_categoria(categoria_id: int, request: Request, db: Session = Depends(get_db)):
     prestador = prestador_repo.obter_por_usuario(db, get_user_id(request))
@@ -164,6 +177,16 @@ def associar_categorias_prestador(
     db: Session = Depends(get_db),
 ):
     return prestador_repo.associar_categorias(db, prestador_id, dados, get_user_id(request))
+
+
+@router.put("/prestadores/{prestador_id}/categorias", response_model=List[PrestadorCategoriaResponse])
+def substituir_categorias_prestador(
+    prestador_id: int,
+    dados: PrestadorCategoriaCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    return prestador_repo.substituir_categorias(db, prestador_id, dados, get_user_id(request))
 
 
 @router.delete("/prestadores/{prestador_id}/categorias/{categoria_id}")
@@ -237,6 +260,17 @@ def criar_servico(prestador_id: int, dados: ServicoCreate, request: Request, db:
     return prestador_repo.criar_servico(db, prestador_id, dados, get_user_id(request))
 
 
+@router.put("/prestadores/{prestador_id}/servicos/{servico_id}", response_model=ServicoResponse)
+def atualizar_servico(
+    prestador_id: int,
+    servico_id: int,
+    dados: ServicoUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    return prestador_repo.atualizar_servico(db, prestador_id, servico_id, dados, get_user_id(request))
+
+
 @router.post("/prestadores/{prestador_id}/servicos/{servico_id}/foto", response_model=ServicoResponse)
 async def atualizar_foto_servico(
     prestador_id: int,
@@ -280,6 +314,11 @@ def remover_prestador(prestador_id: int, request: Request, db: Session = Depends
 @router.delete("/prestadores/{prestador_id}/horarios/{horario_id}")
 def deletar_horario(prestador_id: int, horario_id: int, request: Request, db: Session = Depends(get_db)):
     return prestador_repo.deletar_horario(db, prestador_id, horario_id, get_user_id(request))
+
+
+@router.delete("/prestadores/{prestador_id}/servicos/{servico_id}")
+def deletar_servico(prestador_id: int, servico_id: int, request: Request, db: Session = Depends(get_db)):
+    return prestador_repo.deletar_servico(db, prestador_id, servico_id, get_user_id(request))
 
 
 # ENDPOINTS ADMINISTRATIVOS USADOS PELO SERVICO ADMIN

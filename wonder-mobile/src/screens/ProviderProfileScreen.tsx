@@ -14,6 +14,7 @@ import { ProviderServiceModal } from '../components/ProviderServiceModal';
 import { useAuth } from '../contexts/AuthContext';
 import {
   atualizarPrestador,
+  atualizarServico,
   criarHorario,
   criarPrestador,
   criarServico,
@@ -21,6 +22,7 @@ import {
   listarServicos,
   obterPrestadorLogado,
   removerHorario,
+  removerServico,
   uploadFotoPrestador,
 } from '../services/provider';
 import {
@@ -61,6 +63,7 @@ export function ProviderProfileScreen() {
   const [error, setError] = useState('');
   const [editingEstablishment, setEditingEstablishment] = useState(false);
   const [serviceModalVisible, setServiceModalVisible] = useState(false);
+  const [editingService, setEditingService] = useState<Servico | null>(null);
   const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
 
   const horariosResumo = useMemo(() => {
@@ -244,7 +247,7 @@ export function ProviderProfileScreen() {
     setError('');
   }
 
-  async function handleCreateService(payload: { nome: string; preco: number; duracao_min: number; categoria_id?: number }) {
+  async function handleSaveService(payload: { nome: string; preco: number; duracao_min: number; categoria_id?: number }) {
     if (!prestador) {
       return;
     }
@@ -252,11 +255,48 @@ export function ProviderProfileScreen() {
     setSaving(true);
     setError('');
     try {
-      await criarServico(prestador.id, payload);
+      if (editingService) {
+        await atualizarServico(prestador.id, editingService.id, payload);
+      } else {
+        await criarServico(prestador.id, payload);
+      }
       setServiceModalVisible(false);
+      setEditingService(null);
       setServicos(await listarServicos(prestador.id));
     } catch {
-      setError('Nao foi possivel cadastrar o servico.');
+      setError(editingService ? 'Nao foi possivel atualizar o servico.' : 'Nao foi possivel cadastrar o servico.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleOpenCreateService() {
+    setEditingService(null);
+    setServiceModalVisible(true);
+  }
+
+  function handleOpenEditService(servico: Servico) {
+    setEditingService(servico);
+    setServiceModalVisible(true);
+  }
+
+  function handleCloseServiceModal() {
+    setServiceModalVisible(false);
+    setEditingService(null);
+  }
+
+  async function handleRemoveService(servicoId: number) {
+    if (!prestador) {
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    try {
+      await removerServico(prestador.id, servicoId);
+      setServicos(await listarServicos(prestador.id));
+    } catch {
+      setError('Nao foi possivel remover o servico.');
     } finally {
       setSaving(false);
     }
@@ -417,7 +457,6 @@ export function ProviderProfileScreen() {
 
           <Text style={styles.sectionTitle}>Gestao</Text>
           <Card style={styles.metricsCard}>
-            <MetricItem icon="star" label="Avaliacao" value="-" />
             <MetricItem icon="category" label="Categorias" value={String(categorias.length)} />
             <MetricItem icon="content-cut" label="Servicos" value={String(servicos.length)} />
             <MetricItem icon="schedule" label="Horarios" value={String(horarios.length)} />
@@ -496,15 +535,23 @@ export function ProviderProfileScreen() {
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Servicos cadastrados</Text>
-            <Button title="Cadastrar" size="sm" onPress={() => setServiceModalVisible(true)} />
+            <Button title="Cadastrar" size="sm" onPress={handleOpenCreateService} />
           </View>
 
           {servicos.map((servico) => (
             <Card key={servico.id} style={styles.listCard}>
-              <Text style={styles.cardTitle}>{servico.nome}</Text>
-              <Text style={styles.cardText}>
-                R$ {servico.preco.toFixed(2)} - {servico.duracao_min} min
-              </Text>
+              <View style={styles.serviceRow}>
+                <View style={styles.serviceInfo}>
+                  <Text style={styles.cardTitle}>{servico.nome}</Text>
+                  <Text style={styles.cardText}>
+                    R$ {servico.preco.toFixed(2)} - {servico.duracao_min} min
+                  </Text>
+                </View>
+                <View style={styles.serviceActions}>
+                  <Button title="Editar" size="sm" variant="secondary" onPress={() => handleOpenEditService(servico)} disabled={saving} />
+                  <Button title="Remover" size="sm" variant="outline" onPress={() => handleRemoveService(servico.id)} disabled={saving} />
+                </View>
+              </View>
             </Card>
           ))}
         </>
@@ -514,8 +561,9 @@ export function ProviderProfileScreen() {
         visible={serviceModalVisible}
         loading={saving}
         categories={categorias}
-        onClose={() => setServiceModalVisible(false)}
-        onSave={handleCreateService}
+        initialService={editingService}
+        onClose={handleCloseServiceModal}
+        onSave={handleSaveService}
       />
       <ProviderScheduleModal
         visible={scheduleModalVisible}
@@ -676,6 +724,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.spacing.sm,
     justifyContent: 'space-between',
+  },
+  serviceRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    justifyContent: 'space-between',
+  },
+  serviceInfo: {
+    flex: 1,
+    gap: theme.spacing.xs,
+  },
+  serviceActions: {
+    flexDirection: 'row',
+    gap: theme.spacing.xs,
   },
   cardTitle: {
     color: theme.colors.text,

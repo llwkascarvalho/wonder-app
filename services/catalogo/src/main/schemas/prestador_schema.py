@@ -13,6 +13,12 @@ class ServicoBase(BaseModel):
 class ServicoCreate(ServicoBase):
     pass
 
+class ServicoUpdate(BaseModel):
+    nome: Optional[str] = None
+    preco: Optional[float] = None
+    duracao_min: Optional[int] = None
+    categoria_id: Optional[int] = None
+
 class ServicoResponse(ServicoBase):
     id: int
     prestador_id: int

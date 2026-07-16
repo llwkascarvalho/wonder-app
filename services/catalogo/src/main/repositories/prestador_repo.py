@@ -24,6 +24,7 @@ from src.main.schemas.prestador_schema import (
     PrestadorStatusUpdate,
     PrestadorUpdate,
     ServicoCreate,
+    ServicoUpdate,
 )
 
 STATUS_VALIDOS = {"rascunho", "pendente", "ativo", "rejeitado", "suspenso"}
@@ -275,6 +276,39 @@ def associar_categorias(
     return vinculos
 
 
+def substituir_categorias(
+    db: Session, prestador_id: int, dados: PrestadorCategoriaCreate, usuario_id: str
+) -> list[PrestadorCategoria]:
+    prestador = obter_por_id(db, prestador_id)
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
+    exigir_dono_editavel(prestador, usuario_id)
+
+    categoria_ids = list(dict.fromkeys(dados.categoria_ids))
+    if not categoria_ids:
+        raise HTTPException(status_code=400, detail="Informe ao menos uma categoria.")
+
+    categorias = (
+        db.query(Categoria)
+        .filter(Categoria.id.in_(categoria_ids), Categoria.status == "ativa")
+        .all()
+    )
+    categorias_encontradas = {categoria.id for categoria in categorias}
+    if categorias_encontradas != set(categoria_ids):
+        raise HTTPException(status_code=400, detail="Uma ou mais categorias sao invalidas ou inativas.")
+
+    db.query(PrestadorCategoria).filter(PrestadorCategoria.prestador_id == prestador_id).delete()
+    vinculos = [
+        PrestadorCategoria(prestador_id=prestador_id, categoria_id=categoria_id)
+        for categoria_id in categoria_ids
+    ]
+    db.add_all(vinculos)
+    db.commit()
+    for vinculo in vinculos:
+        db.refresh(vinculo)
+    return vinculos
+
+
 def remover_categoria_prestador(db: Session, prestador_id: int, categoria_id: int, usuario_id: str) -> dict:
     prestador = obter_por_id(db, prestador_id)
     if not prestador:
@@ -319,6 +353,62 @@ def criar_servico(db: Session, prestador_id: int, dados: ServicoCreate, usuario_
     db.commit()
     db.refresh(servico)
     return servico
+
+
+def atualizar_servico(
+    db: Session,
+    prestador_id: int,
+    servico_id: int,
+    dados: ServicoUpdate,
+    usuario_id: str,
+) -> Servico:
+    prestador = obter_por_id(db, prestador_id)
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
+    exigir_dono_editavel(prestador, usuario_id)
+
+    servico = obter_servico(db, prestador_id, servico_id)
+    if not servico:
+        raise HTTPException(status_code=404, detail="Servico nao encontrado.")
+
+    campos_informados = dados.model_fields_set
+    if "nome" in campos_informados:
+        if dados.nome is None:
+            raise HTTPException(status_code=400, detail="Nome do servico e obrigatorio.")
+        servico.nome = dados.nome
+    if "preco" in campos_informados:
+        if dados.preco is None:
+            raise HTTPException(status_code=400, detail="Preco do servico e obrigatorio.")
+        servico.preco = dados.preco
+    if "duracao_min" in campos_informados:
+        if dados.duracao_min is None:
+            raise HTTPException(status_code=400, detail="Duracao do servico e obrigatoria.")
+        servico.duracao_min = dados.duracao_min
+    if "categoria_id" in campos_informados:
+        if dados.categoria_id is not None:
+            categoria = db.query(Categoria).filter(Categoria.id == dados.categoria_id).first()
+            if not categoria:
+                raise HTTPException(status_code=400, detail="Categoria invalida.")
+        servico.categoria_id = dados.categoria_id
+
+    db.commit()
+    db.refresh(servico)
+    return servico
+
+
+def deletar_servico(db: Session, prestador_id: int, servico_id: int, usuario_id: str) -> dict:
+    prestador = obter_por_id(db, prestador_id)
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
+    exigir_dono_editavel(prestador, usuario_id)
+
+    servico = obter_servico(db, prestador_id, servico_id)
+    if not servico:
+        raise HTTPException(status_code=404, detail="Servico nao encontrado.")
+
+    db.delete(servico)
+    db.commit()
+    return {"mensagem": f"Servico id={servico_id} removido com sucesso."}
 
 
 def atualizar_foto_prestador(db: Session, prestador_id: int, foto_url: str, usuario_id: str) -> tuple[Prestador, str | None]:
