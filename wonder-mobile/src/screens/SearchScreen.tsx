@@ -1,4 +1,4 @@
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -53,6 +53,12 @@ export function SearchScreen() {
     const timeout = setTimeout(buscarPrestadores, 350);
     return () => clearTimeout(timeout);
   }, [buscarPrestadores]);
+
+  useFocusEffect(
+    useCallback(() => {
+      buscarPrestadores();
+    }, [buscarPrestadores])
+  );
 
   return (
     <View style={styles.container}>

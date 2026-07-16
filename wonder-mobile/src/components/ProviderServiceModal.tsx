@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { theme } from '../styles/theme';
@@ -15,6 +15,12 @@ type ProviderServiceModalProps = {
   loading?: boolean;
   onClose: () => void;
   categories?: ServiceCategoryOption[];
+  initialService?: {
+    nome: string;
+    preco: number;
+    duracao_min: number;
+    categoria_id?: number | null;
+  } | null;
   onSave: (payload: { nome: string; preco: number; duracao_min: number; categoria_id?: number }) => Promise<void>;
 };
 
@@ -23,6 +29,7 @@ export function ProviderServiceModal({
   loading = false,
   onClose,
   categories,
+  initialService,
   onSave,
 }: ProviderServiceModalProps) {
   const [nome, setNome] = useState('');
@@ -31,6 +38,18 @@ export function ProviderServiceModal({
   const [categoriaId, setCategoriaId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const shouldSelectCategory = Boolean(categories?.length);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    setNome(initialService?.nome || '');
+    setPreco(initialService ? String(initialService.preco) : '');
+    setDuracao(initialService ? String(initialService.duracao_min) : '');
+    setCategoriaId(initialService?.categoria_id || null);
+    setError('');
+  }, [initialService, visible]);
 
   async function handleSave() {
     const precoNumber = Number(preco.replace(',', '.'));
@@ -63,7 +82,7 @@ export function ProviderServiceModal({
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.content}>
-          <Text style={styles.title}>Cadastro de servico</Text>
+          <Text style={styles.title}>{initialService ? 'Editar servico' : 'Cadastro de servico'}</Text>
 
           <Input label="Nome do servico" placeholder="Corte degradado" value={nome} onChangeText={setNome} />
           <Input

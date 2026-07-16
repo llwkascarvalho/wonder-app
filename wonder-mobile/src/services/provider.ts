@@ -78,6 +78,18 @@ export async function criarServico(prestadorId: number, payload: ServicoPayload)
   return response.data;
 }
 
+export async function atualizarServico(prestadorId: number, servicoId: number, payload: ServicoPayload) {
+  const response = await api.put<Servico>(
+    `/catalogo/prestadores/${prestadorId}/servicos/${servicoId}`,
+    payload
+  );
+  return response.data;
+}
+
+export async function removerServico(prestadorId: number, servicoId: number) {
+  await api.delete(`/catalogo/prestadores/${prestadorId}/servicos/${servicoId}`);
+}
+
 export async function listarHorarios(prestadorId: number) {
   const response = await api.get<Horario[]>(`/catalogo/prestadores/${prestadorId}/horarios`);
   return response.data;
