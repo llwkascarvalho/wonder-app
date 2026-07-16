@@ -66,7 +66,7 @@ export function AdminHomeScreen() {
       ) : null}
 
       <Card style={styles.hubCard} onPress={() => navigation.navigate('AdminProviders')}>
-        <View>
+        <View style={styles.cardContent}>
           <Text style={styles.cardTitle}>Prestadores pendentes</Text>
           <Text style={styles.cardText}>Solicitacoes aguardando analise.</Text>
           {pendentes !== null ? <Text style={styles.cardText}>Pendentes: {pendentes}</Text> : null}
@@ -75,7 +75,7 @@ export function AdminHomeScreen() {
       </Card>
 
       <Card style={styles.hubCard} onPress={() => navigation.navigate('AdminCategories')}>
-        <View>
+        <View style={styles.cardContent}>
           <Text style={styles.cardTitle}>Categorias</Text>
           <Text style={styles.cardText}>Consulte as categorias cadastradas.</Text>
         </View>
@@ -83,15 +83,15 @@ export function AdminHomeScreen() {
       </Card>
 
       <Card style={styles.hubCard} onPress={() => navigation.navigate('AdminMonitoring')}>
-        <View>
-          <Text style={styles.cardTitle}>Monitoramento</Text>
-          <Text style={styles.cardText}>Queries lentas, conexoes ativas e dead tuples.</Text>
+        <View style={styles.cardContent}>
+          <Text style={styles.cardTitle}>Observabilidade</Text>
+          <Text style={styles.cardText}>Auditoria, saude dos bancos, consultas custosas e alertas.</Text>
         </View>
         <IconCircle name="monitor" />
       </Card>
 
       <Card style={styles.hubCard} onPress={() => navigation.navigate('AdminAudit')}>
-        <View>
+        <View style={styles.cardContent}>
           <Text style={styles.cardTitle}>Auditoria</Text>
           <Text style={styles.cardText}>Logs recentes e resumo por operacao.</Text>
         </View>
@@ -136,6 +136,10 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     justifyContent: 'space-between',
   },
+  cardContent: {
+    flex: 1,
+    minWidth: 0,
+  },
   cardTitle: {
     color: theme.colors.text,
     fontSize: theme.fontSize.lg,
@@ -150,6 +154,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: theme.colors.primary,
     borderRadius: theme.borderRadius.pill,
+    flexShrink: 0,
     height: 40,
     justifyContent: 'center',
     width: 40,

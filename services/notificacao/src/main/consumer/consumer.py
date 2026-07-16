@@ -96,6 +96,11 @@ def texto_horario(inicio_formatado: str | None) -> str:
     return f" para {inicio_formatado}" if inicio_formatado else ""
 
 
+def texto_motivo(motivo: str | None) -> str:
+    motivo_normalizado = (motivo or "").strip()
+    return f" Motivo: {motivo_normalizado}" if motivo_normalizado else ""
+
+
 def montar_notificacoes(dados: dict, prestador: dict, nome_servico: str | None) -> list[tuple[int, str, str]]:
     cliente_id = int(dados["cliente_id"])
     prestador_usuario_id = int(prestador["usuario_id"])
@@ -105,6 +110,7 @@ def montar_notificacoes(dados: dict, prestador: dict, nome_servico: str | None) 
     horario = texto_horario(inicio)
     status_novo = dados.get("status_novo")
     alterado_por_tipo = str(dados.get("alterado_por_tipo") or "").lower()
+    motivo = texto_motivo(dados.get("motivo"))
     notificacoes: list[tuple[int, str, str]] = []
 
     if not status_novo:
@@ -130,14 +136,14 @@ def montar_notificacoes(dados: dict, prestador: dict, nome_servico: str | None) 
                 (
                     prestador_usuario_id,
                     "cancelado_cliente",
-                    f"Um cliente cancelou um agendamento{detalhe}{horario}.",
+                    f"Um cliente cancelou um agendamento{detalhe}{horario}.{motivo}",
                 )
             )
             notificacoes.append(
                 (
                     cliente_id,
                     "cancelado_cliente",
-                    f"Seu agendamento{detalhe} foi cancelado.",
+                    f"Seu agendamento{detalhe} foi cancelado.{motivo}",
                 )
             )
         else:
@@ -145,7 +151,7 @@ def montar_notificacoes(dados: dict, prestador: dict, nome_servico: str | None) 
                 (
                     cliente_id,
                     "cancelado_prestador",
-                    f"Seu agendamento{detalhe} foi cancelado.",
+                    f"Seu agendamento{detalhe} foi cancelado pelo prestador.{motivo}",
                 )
             )
         return notificacoes

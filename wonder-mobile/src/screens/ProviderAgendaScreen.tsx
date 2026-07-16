@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Image,
+  Modal,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -30,6 +41,18 @@ const tabs: Array<{ key: AgendaTab; label: string }> = [
 
 const openStatuses = ['pendente', 'confirmado'];
 const doneStatuses = ['concluido', 'finalizado'];
+const statusLabels: Record<string, string> = {
+  pendente: 'Agendado',
+  confirmado: 'Agendado',
+  cancelado: 'Cancelado',
+  concluido: 'Concluido',
+  finalizado: 'Finalizado',
+};
+
+function extractBackendMessage(error: unknown, fallback: string): string {
+  const detail = (error as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+  return typeof detail === 'string' ? detail : fallback;
+}
 
 function formatDateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
@@ -54,6 +77,8 @@ export function ProviderAgendaScreen() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [cancelTarget, setCancelTarget] = useState<Agendamento | null>(null);
+  const [cancelMotivo, setCancelMotivo] = useState('');
 
   const servicosById = useMemo(() => {
     return servicos.reduce<Record<number, Servico>>((acc, servico) => {
@@ -103,16 +128,51 @@ export function ProviderAgendaScreen() {
     loadAgenda();
   }, [loadAgenda]);
 
-  async function handleStatus(agendamentoId: number, status: string) {
+  async function handleStatus(agendamentoId: number, status: string, motivo?: string) {
     setSavingId(agendamentoId);
     setError('');
     try {
-      await atualizarStatusAgendamento(agendamentoId, status);
+      await atualizarStatusAgendamento(agendamentoId, status, motivo);
       setAgendamentos(await listarAgendamentos(selectedDate));
-    } catch {
-      setError('Nao foi possivel atualizar o agendamento.');
+      return true;
+    } catch (statusError) {
+      const message = extractBackendMessage(statusError, 'Nao foi possivel atualizar o agendamento.');
+      setError(message);
+      Alert.alert('Nao foi possivel atualizar', message);
+      return false;
     } finally {
       setSavingId(null);
+    }
+  }
+
+  function openCancelModal(agendamento: Agendamento) {
+    setCancelTarget(agendamento);
+    setCancelMotivo('');
+  }
+
+  function closeCancelModal() {
+    if (savingId !== null) {
+      return;
+    }
+    setCancelTarget(null);
+    setCancelMotivo('');
+  }
+
+  async function confirmCancel() {
+    const motivo = cancelMotivo.trim();
+    if (!cancelTarget) {
+      return;
+    }
+
+    if (!motivo) {
+      Alert.alert('Motivo obrigatorio', 'Informe o motivo do cancelamento.');
+      return;
+    }
+
+    const cancelled = await handleStatus(cancelTarget.id, 'cancelado', motivo);
+    if (cancelled) {
+      setCancelTarget(null);
+      setCancelMotivo('');
     }
   }
 
@@ -196,7 +256,7 @@ export function ProviderAgendaScreen() {
             saving={savingId === agendamento.id}
             showActions={activeTab === 'abertos'}
             onFinish={() => handleStatus(agendamento.id, 'concluido')}
-            onCancel={() => handleStatus(agendamento.id, 'cancelado')}
+            onCancel={() => openCancelModal(agendamento)}
           />
         ))
       ) : (
@@ -204,6 +264,43 @@ export function ProviderAgendaScreen() {
           <Text style={styles.emptyText}>Nenhum agendamento para este filtro.</Text>
         </Card>
       )}
+
+      <Modal transparent visible={cancelTarget !== null} animationType="fade" onRequestClose={closeCancelModal}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Cancelar atendimento</Text>
+            <Text style={styles.modalText}>
+              Informe o motivo. O cancelamento nao sera permitido proximo do atendimento.
+            </Text>
+            <TextInput
+              multiline
+              maxLength={100}
+              editable={savingId === null}
+              placeholder="Ex.: Prestador indisponivel no horario."
+              placeholderTextColor={theme.colors.textMuted}
+              value={cancelMotivo}
+              onChangeText={setCancelMotivo}
+              style={styles.reasonInput}
+            />
+            <View style={styles.modalActions}>
+              <Button
+                title="Voltar"
+                size="sm"
+                variant="secondary"
+                disabled={savingId !== null}
+                onPress={closeCancelModal}
+              />
+              <Button
+                title={savingId !== null ? 'Cancelando...' : 'Confirmar'}
+                size="sm"
+                variant="danger"
+                disabled={savingId !== null}
+                onPress={confirmCancel}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -248,7 +345,7 @@ function AppointmentCard({
         </View>
       ) : (
         <Text style={[styles.statusBadge, agendamento.status === 'cancelado' && styles.statusCanceled]}>
-          {agendamento.status}
+          {statusLabels[agendamento.status] ?? agendamento.status}
         </Text>
       )}
     </Card>
@@ -400,5 +497,44 @@ const styles = StyleSheet.create({
   error: {
     color: theme.colors.error,
     fontSize: theme.fontSize.sm,
+  },
+  modalBackdrop: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: theme.spacing.lg,
+  },
+  modalContent: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.lg,
+    gap: theme.spacing.md,
+    padding: theme.spacing.lg,
+    width: '100%',
+  },
+  modalTitle: {
+    color: theme.colors.text,
+    fontSize: theme.fontSize.lg,
+    fontWeight: theme.fontWeight.bold,
+  },
+  modalText: {
+    color: theme.colors.textSecondary,
+    fontSize: theme.fontSize.sm,
+    lineHeight: 18,
+  },
+  reasonInput: {
+    backgroundColor: theme.colors.surfaceMuted,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    color: theme.colors.text,
+    minHeight: 88,
+    padding: theme.spacing.md,
+    textAlignVertical: 'top',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    justifyContent: 'flex-end',
   },
 });

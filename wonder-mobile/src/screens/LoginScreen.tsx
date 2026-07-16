@@ -27,7 +27,7 @@ export function LoginScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.logoContainer}>
-        <Image source={require('../../assets/icon.png')} style={styles.logoMark} />
+        <Image source={require('../../assets/wonder-logo.png')} style={styles.logoMark} />
         <Logo size={38} />
       </View>
 
@@ -44,7 +44,6 @@ export function LoginScreen() {
 
       <View style={styles.footer}>
         <View style={styles.divider} />
-        <Text style={styles.footerText}>Não tem uma conta? Cadastre-se</Text>
       </View>
     </View>
   );

@@ -167,7 +167,14 @@ def route_listar(
     """Lista agendamentos conforme o papel do usuario logado."""
     tipo_usuario = x_user_role.lower()
     prestador_ids = listar_prestadores_usuario(x_user_id, tipo_usuario)
-    agendamentos = listar_agendamentos(db, x_user_id, tipo_usuario, prestador_ids, data)
+    agendamentos = listar_agendamentos(
+        db,
+        x_user_id,
+        tipo_usuario,
+        catalogo_headers(x_user_id, tipo_usuario),
+        prestador_ids,
+        data,
+    )
 
     if tipo_usuario == "prestador":
         return enriquecer_agendamentos_cliente(agendamentos)

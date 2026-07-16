@@ -1,6 +1,9 @@
 from sqlalchemy.orm import Session
 from src.main.models.agendamento_model import Agendamento, HistoricoAgendamento
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
+from urllib.error import URLError
+from urllib.request import Request as UrlRequest, urlopen
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from fastapi import HTTPException
@@ -12,6 +15,103 @@ from src.main.services.disponibilidade_service import (
 import pika
 import json
 from src.main.core.config import settings
+
+OPEN_STATUSES = {"pendente", "confirmado"}
+CANCELAMENTO_MINUTOS_LIMITE = 15
+AUTO_CONCLUSAO_APOS_MINUTOS = 60
+
+
+def agora_local() -> datetime:
+    return datetime.now(ZoneInfo(settings.APP_TIMEZONE)).replace(tzinfo=None)
+
+
+def buscar_duracao_servico(prestador_id: int, servico_id: int, headers: dict[str, str]) -> int:
+    request = UrlRequest(
+        f"{settings.CATALOGO_URL}/catalogo/prestadores/{prestador_id}/servicos",
+        headers=headers,
+    )
+
+    try:
+        with urlopen(request, timeout=5) as response:
+            servicos = json.loads(response.read().decode("utf-8"))
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Servico de Catalogo indisponivel para resolver duracao do servico: {exc}",
+        )
+
+    for servico in servicos:
+        if str(servico.get("id")) == str(servico_id):
+            return int(servico.get("duracao_min") or 0)
+
+    raise HTTPException(status_code=404, detail="Servico do agendamento nao encontrado.")
+
+
+def concluir_agendamentos_vencidos(
+    db: Session,
+    agendamentos: list[Agendamento],
+    headers: dict[str, str],
+) -> None:
+    agora = agora_local()
+    alterou = False
+
+    for agendamento in agendamentos:
+        if agendamento.status not in OPEN_STATUSES:
+            continue
+
+        duracao_min = buscar_duracao_servico(
+            agendamento.prestador_id,
+            agendamento.servico_id,
+            headers,
+        )
+        limite_conclusao = agendamento.inicio + timedelta(
+            minutes=duracao_min + AUTO_CONCLUSAO_APOS_MINUTOS
+        )
+
+        if agora < limite_conclusao:
+            continue
+
+        status_anterior = agendamento.status
+        agendamento.status = "concluido"
+        db.add(
+            HistoricoAgendamento(
+                agendamento_id=agendamento.id,
+                usuario_id=0,
+                status_anterior=status_anterior,
+                status_novo="concluido",
+                motivo="Concluido automaticamente apos o horario do atendimento.",
+            )
+        )
+        alterou = True
+
+    if alterou:
+        db.commit()
+        for agendamento in agendamentos:
+            db.refresh(agendamento)
+
+
+def validar_cancelamento(
+    agendamento: Agendamento,
+    motivo: str | None,
+) -> str:
+    if agendamento.status not in OPEN_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail="Apenas agendamentos em aberto podem ser cancelados.",
+        )
+
+    motivo_normalizado = (motivo or "").strip()
+    if not motivo_normalizado:
+        raise HTTPException(status_code=400, detail="Informe o motivo do cancelamento.")
+
+    limite_cancelamento = agendamento.inicio - timedelta(minutes=CANCELAMENTO_MINUTOS_LIMITE)
+    if agora_local() >= limite_cancelamento:
+        raise HTTPException(
+            status_code=409,
+            detail="Este agendamento nao pode ser cancelado proximo do atendimento.",
+        )
+
+    return motivo_normalizado[:100]
 
 
 def publicar_evento(agendamento: Agendamento):
@@ -94,6 +194,7 @@ def listar_agendamentos(
     db: Session,
     usuario_id: int,
     tipo_usuario: str,
+    catalogo_headers: dict[str, str],
     prestador_ids: list[int] | None = None,
     data: date | None = None,
 ) -> list[Agendamento]:
@@ -105,24 +206,30 @@ def listar_agendamentos(
         query = query.filter(Agendamento.inicio >= inicio, Agendamento.inicio <= fim)
 
     if tipo_usuario == "admin":
-        return query.order_by(Agendamento.inicio.desc()).all()
+        agendamentos = query.order_by(Agendamento.inicio.desc()).all()
+        concluir_agendamentos_vencidos(db, agendamentos, catalogo_headers)
+        return agendamentos
 
     if tipo_usuario == "prestador":
         if not prestador_ids:
             return []
-        return (
+        agendamentos = (
             query
             .filter(Agendamento.prestador_id.in_(prestador_ids))
             .order_by(Agendamento.inicio.desc())
             .all()
         )
+        concluir_agendamentos_vencidos(db, agendamentos, catalogo_headers)
+        return agendamentos
 
-    return (
+    agendamentos = (
         query
         .filter(Agendamento.cliente_id == usuario_id)
         .order_by(Agendamento.inicio.desc())
         .all()
     )
+    concluir_agendamentos_vencidos(db, agendamentos, catalogo_headers)
+    return agendamentos
 
 
 def obter_agendamento(db: Session, agendamento_id: int, cliente_id: int) -> Agendamento:
@@ -243,6 +350,10 @@ def atualizar_status(
         )
 
     status_anterior = agendamento.status
+    motivo = dados.motivo
+    if dados.status == "cancelado":
+        motivo = validar_cancelamento(agendamento, dados.motivo)
+
     agendamento.status = dados.status
 
     historico = HistoricoAgendamento(
@@ -250,7 +361,7 @@ def atualizar_status(
         usuario_id=usuario_id,
         status_anterior=status_anterior,
         status_novo=dados.status,
-        motivo=dados.motivo
+        motivo=motivo
     )
     db.add(historico)
     db.commit()
@@ -261,7 +372,7 @@ def atualizar_status(
         status_anterior=status_anterior,
         usuario_id=usuario_id,
         tipo_usuario=tipo_usuario,
-        motivo=dados.motivo,
+        motivo=motivo,
     )
 
     return agendamento

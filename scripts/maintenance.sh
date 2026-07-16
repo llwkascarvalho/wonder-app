@@ -20,7 +20,7 @@ set -euo pipefail
 # foram criadas nos scripts sql/*.sql e mapeadas no ORM (__tablename__).
 DATABASES=(
   "db_auth|db_autenticacao|customuser logs_auditoria"
-  "db_catalogo|db_catalogo|categoria prestador servico horariofuncionamento fotoestabelecimento avaliacao logs_auditoria"
+  "db_catalogo|db_catalogo|categoria prestador prestador_categoria servico horariofuncionamento avaliacao logs_auditoria"
   "db_agendamentos|db_agendamentos|agendamento historico_agendamento logs_auditoria"
   "db_notificacoes|db_notificacoes|notificacao logs_auditoria"
 )

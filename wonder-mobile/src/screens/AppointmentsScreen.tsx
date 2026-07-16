@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { Card } from '../components/Card';
 import { CatalogImage } from '../components/catalog/CatalogImage';
@@ -29,8 +39,8 @@ const tabs: Array<{ key: AgendaTab; label: string }> = [
 ];
 
 const STATUS_LABEL: Record<string, string> = {
-  pendente: 'Pendente',
-  confirmado: 'Confirmado',
+  pendente: 'Agendado',
+  confirmado: 'Agendado',
   cancelado: 'Cancelado',
   concluido: 'Concluido',
   finalizado: 'Finalizado',
@@ -129,6 +139,8 @@ export function AppointmentsScreen() {
   const [atualizando, setAtualizando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [cancelandoId, setCancelandoId] = useState<number | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Agendamento | null>(null);
+  const [cancelMotivo, setCancelMotivo] = useState('');
 
   const carregarAgendamentos = useCallback(async () => {
     setErro(null);
@@ -159,24 +171,38 @@ export function AppointmentsScreen() {
   }
 
   function confirmarCancelamento(agendamento: Agendamento) {
-    Alert.alert('Cancelar agendamento', 'Deseja cancelar este agendamento?', [
-      { text: 'Voltar', style: 'cancel' },
-      {
-        text: 'Cancelar agendamento',
-        style: 'destructive',
-        onPress: () => cancelarAgendamento(agendamento.id),
-      },
-    ]);
+    setCancelTarget(agendamento);
+    setCancelMotivo('');
   }
 
-  async function cancelarAgendamento(agendamentoId: number) {
-    setCancelandoId(agendamentoId);
+  function fecharCancelamento() {
+    if (cancelandoId !== null) {
+      return;
+    }
+    setCancelTarget(null);
+    setCancelMotivo('');
+  }
+
+  async function cancelarAgendamento() {
+    const motivo = cancelMotivo.trim();
+    if (!cancelTarget) {
+      return;
+    }
+
+    if (!motivo) {
+      Alert.alert('Motivo obrigatorio', 'Informe o motivo do cancelamento.');
+      return;
+    }
+
+    setCancelandoId(cancelTarget.id);
 
     try {
-      await atualizarStatusAgendamento(agendamentoId, {
+      await atualizarStatusAgendamento(cancelTarget.id, {
         status: 'cancelado',
-        motivo: 'Cancelado pelo cliente via app.',
+        motivo,
       });
+      setCancelTarget(null);
+      setCancelMotivo('');
       await carregarAgendamentos();
       setActiveTab('cancelados');
       Alert.alert('Agendamento cancelado', 'O agendamento foi movido para Cancelados.');
@@ -247,6 +273,47 @@ export function AppointmentsScreen() {
           )}
         />
       )}
+
+      <Modal transparent visible={cancelTarget !== null} animationType="fade" onRequestClose={fecharCancelamento}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Cancelar agendamento</Text>
+            <Text style={styles.modalText}>
+              Informe o motivo. O cancelamento nao sera permitido proximo do atendimento.
+            </Text>
+            <TextInput
+              multiline
+              maxLength={100}
+              editable={cancelandoId === null}
+              placeholder="Ex.: Nao poderei comparecer no horario."
+              placeholderTextColor={theme.colors.textMuted}
+              value={cancelMotivo}
+              onChangeText={setCancelMotivo}
+              style={styles.reasonInput}
+            />
+            <View style={styles.modalActions}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={cancelandoId !== null}
+                onPress={fecharCancelamento}
+                style={[styles.modalButton, styles.modalButtonSecondary, cancelandoId !== null && styles.cancelButtonDisabled]}
+              >
+                <Text style={styles.modalButtonSecondaryText}>Voltar</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={cancelandoId !== null}
+                onPress={cancelarAgendamento}
+                style={[styles.modalButton, styles.modalButtonDanger, cancelandoId !== null && styles.cancelButtonDisabled]}
+              >
+                <Text style={styles.modalButtonDangerText}>
+                  {cancelandoId !== null ? 'Cancelando...' : 'Confirmar'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -449,5 +516,68 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.md,
     textAlign: 'center',
+  },
+  modalBackdrop: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: theme.spacing.lg,
+  },
+  modalContent: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.lg,
+    gap: theme.spacing.md,
+    padding: theme.spacing.lg,
+    width: '100%',
+  },
+  modalTitle: {
+    color: theme.colors.text,
+    fontSize: theme.fontSize.lg,
+    fontWeight: theme.fontWeight.bold,
+  },
+  modalText: {
+    color: theme.colors.textSecondary,
+    fontSize: theme.fontSize.sm,
+    lineHeight: 18,
+  },
+  reasonInput: {
+    backgroundColor: theme.colors.surfaceMuted,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    color: theme.colors.text,
+    minHeight: 88,
+    padding: theme.spacing.md,
+    textAlignVertical: 'top',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    justifyContent: 'flex-end',
+  },
+  modalButton: {
+    alignItems: 'center',
+    borderRadius: theme.borderRadius.pill,
+    minHeight: 42,
+    minWidth: 104,
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.md,
+  },
+  modalButtonSecondary: {
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  modalButtonDanger: {
+    backgroundColor: theme.colors.error,
+  },
+  modalButtonSecondaryText: {
+    color: theme.colors.primary,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.bold,
+  },
+  modalButtonDangerText: {
+    color: theme.colors.white,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.bold,
   },
 });

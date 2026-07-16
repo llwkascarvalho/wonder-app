@@ -95,7 +95,7 @@ export function AdminTabs() {
         name="AdminMonitoring"
         component={AdminMonitoringScreen}
         options={{
-          title: 'Monitor',
+          title: 'Observ.',
           tabBarIcon: ({ color, size }) => <TabIcon name="AdminMonitoring" color={color} size={size} />,
         }}
       />
