@@ -7,10 +7,10 @@ import { useNotifications } from '../contexts/NotificationsContext';
 import { listarNotificacoes, marcarNotificacaoComoLida } from '../services/notificacoes';
 import { theme } from '../styles/theme';
 import { Notificacao } from '../types/notificacao';
+import { formatBackendDateTime, parseBackendDate } from '../utils/dateTime';
 
 function formatarData(criadoEm: string): string {
-  const data = new Date(criadoEm);
-  return data.toLocaleString('pt-BR', {
+  return formatBackendDateTime(criadoEm, criadoEm, {
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',
@@ -30,7 +30,9 @@ export function NotificationsScreen() {
     setErro(null);
     try {
       const resultado = await listarNotificacoes();
-      resultado.sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime());
+      resultado.sort(
+        (a, b) => parseBackendDate(b.criado_em).getTime() - parseBackendDate(a.criado_em).getTime(),
+      );
       setNotificacoes(resultado);
     } catch {
       setErro('Não foi possível carregar suas notificações.');

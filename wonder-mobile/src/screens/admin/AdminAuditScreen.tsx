@@ -8,15 +8,7 @@ import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { listarAuditoriaAdmin, obterResumoAuditoriaAdmin } from '../../services/admin';
 import { theme } from '../../styles/theme';
 import { AdminLogAuditoria, AdminResumoAuditoria } from '../../types/admin';
-
-function formatDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString('pt-BR');
-}
+import { formatBackendDateTime } from '../../utils/dateTime';
 
 export function AdminAuditScreen() {
   const navigation = useNavigation();
@@ -91,7 +83,7 @@ export function AdminAuditScreen() {
           <Card key={`${log.banco}-${log.id}`} style={styles.logCard}>
             <View style={styles.logHeader}>
               <Text style={styles.operation}>{log.operacao}</Text>
-              <Text style={styles.dateText}>{formatDate(log.data_hora)}</Text>
+              <Text style={styles.dateText}>{formatBackendDateTime(log.data_hora)}</Text>
             </View>
             <Text style={styles.cardTitle}>{log.tabela_afetada}</Text>
             <Text style={styles.cardText}>Banco: {log.banco}</Text>

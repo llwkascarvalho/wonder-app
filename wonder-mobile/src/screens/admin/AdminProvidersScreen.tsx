@@ -11,20 +11,12 @@ import { AdminProvidersStackParamList } from '../../navigation/AdminProvidersSta
 import { listarPrestadoresPendentes } from '../../services/admin';
 import { theme } from '../../styles/theme';
 import { AdminPrestador } from '../../types/admin';
+import { formatBackendDateTime } from '../../utils/dateTime';
 
 type Navigation = NativeStackNavigationProp<AdminProvidersStackParamList, 'AdminProvidersList'>;
 
 function formatDate(value?: string | null): string {
-  if (!value) {
-    return 'Sem data de envio';
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString('pt-BR', {
+  return formatBackendDateTime(value, 'Sem data de envio', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',

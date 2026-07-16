@@ -4,7 +4,7 @@ from src.main.routes.ai_routes import router as ai_router
 
 app = FastAPI(
     title="Wonder - Serviço AI",
-    description="Responsável pelas análises e recomendações via Google Gemini.",
+    description="Responsável pelas análises e recomendações via OpenRouter.",
     version="1.0.0"
 )
 

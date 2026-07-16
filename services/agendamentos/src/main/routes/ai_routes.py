@@ -116,7 +116,7 @@ def sugestoes(x_user_id: int = Header(..., alias="X-User-ID")):
             "Responda com uma lista de exatamente 3 sugestões curtas e diretas."
         )
 
-    # 3. Chama o Gemini via OpenRouter
+    # 3. Chama o provedor configurado via OpenRouter
     try:
         response = client.chat.completions.create(
             model="openrouter/free",

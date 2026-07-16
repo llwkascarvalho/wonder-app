@@ -20,6 +20,7 @@ import { AdminProvidersStackParamList } from '../../navigation/AdminProvidersSta
 import { atualizarStatusPrestadorAdmin, obterPrestadorAdmin } from '../../services/admin';
 import { theme } from '../../styles/theme';
 import { AdminPrestadorDetalhe, AdminPrestadorStatus } from '../../types/admin';
+import { formatBackendDateTime } from '../../utils/dateTime';
 
 type Route = RouteProp<AdminProvidersStackParamList, 'AdminProviderDetails'>;
 type Navigation = NativeStackNavigationProp<AdminProvidersStackParamList, 'AdminProviderDetails'>;
@@ -28,16 +29,7 @@ type NoteAction = 'rejeitado' | 'rascunho';
 const dayLabels = ['Domingo', 'Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta', 'Sabado'];
 
 function formatDate(value?: string | null): string {
-  if (!value) {
-    return '-';
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString('pt-BR');
+  return formatBackendDateTime(value, '-');
 }
 
 function extractBackendMessage(error: unknown, fallback: string): string {
