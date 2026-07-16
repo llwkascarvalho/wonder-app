@@ -1,0 +1,256 @@
+services:
+
+  # ─── API GATEWAY ───────────────────────────────────────────
+  gateway:
+    build: ./gateway
+    container_name: wonder_gateway
+    ports:
+      - "8000:8000"
+    env_file: .env
+    depends_on:
+      - auth
+      - catalogo
+      - agendamentos
+      - notificacao
+      - ai
+      - admin
+    networks:
+      - wonder-network
+
+  # ─── MICROSSERVIÇOS ────────────────────────────────────────
+  auth:
+    build: ./services/auth
+    container_name: wonder_auth
+    ports:
+      - "8001:8001"
+    env_file: .env
+    volumes:
+      - auth_uploads:/app/uploads
+    depends_on:
+      db_auth:
+        condition: service_healthy
+    networks:
+      - wonder-network
+
+  catalogo:
+    build: ./services/catalogo
+    container_name: wonder_catalogo
+    ports:
+      - "8002:8002"
+    env_file: .env
+    volumes:
+      - catalogo_uploads:/app/uploads
+    depends_on:
+      db_catalogo:
+        condition: service_healthy
+    networks:
+      - wonder-network
+
+  agendamentos:
+    build: ./services/agendamentos
+    container_name: wonder_agendamentos
+    ports:
+      - "8003:8003"
+    env_file: .env
+    environment:
+      APP_TIMEZONE: ${APP_TIMEZONE:-America/Fortaleza}
+    depends_on:
+      db_agendamentos:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - wonder-network
+
+  notificacao:
+    build: ./services/notificacao
+    container_name: wonder_notificacao
+    ports:
+      - "8004:8004"
+    env_file: .env
+    environment:
+      RABBITMQ_QUEUE: ${RABBITMQ_QUEUE:-wonder.eventos}
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-}
+      RABBITMQ_ROUTING_KEY: ${RABBITMQ_ROUTING_KEY:-wonder.eventos}
+      RABBITMQ_MAX_RETRIES: ${RABBITMQ_MAX_RETRIES:-3}
+      CATALOGO_URL: ${CATALOGO_URL:-http://catalogo:8002}
+    depends_on:
+      db_notificacoes:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - wonder-network
+
+  ai:
+    build: ./services/ai
+    container_name: wonder_ai
+    ports:
+      - "8005:8005"
+    env_file: ./services/ai/.env
+    networks:
+      - wonder-network
+
+  admin:
+    build: ./services/admin
+    container_name: wonder_admin
+    ports:
+      - "8006:8006"
+    env_file:
+      - path: .env.monitor
+        required: false
+    volumes:
+      - ./.env.monitor:/app/.env.monitor:ro
+      - ./scripts:/app/scripts:ro
+      - ./docs/reports:/app/docs/reports
+    depends_on:
+      db_auth:
+        condition: service_healthy
+      db_catalogo:
+        condition: service_healthy
+      db_agendamentos:
+        condition: service_healthy
+      db_notificacoes:
+        condition: service_healthy
+    networks:
+      - wonder-network
+
+  # ─── BANCOS DE DADOS ───────────────────────────────────────
+  db_auth:
+    image: postgres:16-alpine
+    container_name: wonder_db_auth
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=all"]
+    environment:
+      POSTGRES_DB: db_autenticacao
+      POSTGRES_USER: wonder_user
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
+    volumes:
+      - db_auth_data:/var/lib/postgresql/data
+      - ./sql/auth.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wonder_user -d db_autenticacao"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wonder-network
+
+  db_catalogo:
+    image: postgres:16-alpine
+    container_name: wonder_db_catalogo
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=all"]
+    environment:
+      POSTGRES_DB: db_catalogo
+      POSTGRES_USER: wonder_user
+      POSTGRES_PASSWORD: ${CATALOGO_DB_PASSWORD}
+    volumes:
+      - db_catalogo_data:/var/lib/postgresql/data
+      - ./sql/catalogo.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wonder_user -d db_catalogo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wonder-network
+
+  db_agendamentos:
+    image: postgres:16-alpine
+    container_name: wonder_db_agendamentos
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=all"]
+    environment:
+      POSTGRES_DB: db_agendamentos
+      POSTGRES_USER: wonder_user
+      POSTGRES_PASSWORD: ${AGENDAMENTOS_DB_PASSWORD}
+    volumes:
+      - db_agendamentos_data:/var/lib/postgresql/data
+      - ./sql/agendamentos.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wonder_user -d db_agendamentos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wonder-network
+
+  db_notificacoes:
+    image: postgres:16-alpine
+    container_name: wonder_db_notificacoes
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=all"]
+    environment:
+      POSTGRES_DB: db_notificacoes
+      POSTGRES_USER: wonder_user
+      POSTGRES_PASSWORD: ${NOTIFICACOES_DB_PASSWORD}
+    volumes:
+      - db_notificacoes_data:/var/lib/postgresql/data
+      - ./sql/notificacoes.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wonder_user -d db_notificacoes"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wonder-network
+
+  # ─── MENSAGERIA ────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: wonder_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wonder-network
+
+  # BACKUP
+  backup:
+    image: postgres:16-alpine
+    container_name: wonder_backup
+    env_file: .env
+    depends_on:
+      db_auth:
+        condition: service_healthy
+      db_catalogo:
+        condition: service_healthy
+      db_agendamentos:
+        condition: service_healthy
+      db_notificacoes:
+        condition: service_healthy
+    volumes:
+      - ./scripts/backup.sh:/scripts/backup.sh:ro
+      - backups_data:/backups
+    command: >
+      sh -c "while true; do sh /scripts/backup.sh; sleep $${BACKUP_INTERVAL_SECONDS:-86400}; done"
+    networks:
+      - wonder-network
+
+# ─── VOLUMES ─────────────────────────────────────────────────
+volumes:
+  db_auth_data:
+  db_catalogo_data:
+  db_agendamentos_data:
+  db_notificacoes_data:
+  backups_data:
+  auth_uploads:
+  catalogo_uploads:
+
+# ─── REDE ────────────────────────────────────────────────────
+networks:
+  wonder-network:
+    driver: bridge

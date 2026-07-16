@@ -1,0 +1,75 @@
+from datetime import datetime, time
+from typing import Optional
+
+from pydantic import BaseModel, Field
+
+
+class ServicoResponse(BaseModel):
+    id: int
+    prestador_id: int
+    nome: str
+    preco: float
+    duracao_min: int
+    categoria_id: Optional[int] = None
+    foto_url: Optional[str] = None
+
+
+class HorarioResponse(BaseModel):
+    id: int
+    prestador_id: int
+    dia_semana: int
+    hora_inicio: time
+    hora_fim: time
+
+
+class CategoriaResponse(BaseModel):
+    id: int
+    nome: str
+    descricao: Optional[str] = None
+    status: str
+    foto_url: Optional[str] = None
+
+
+class PrestadorCategoriaResponse(BaseModel):
+    prestador_id: int
+    categoria: CategoriaResponse
+
+
+class PrestadorResponse(BaseModel):
+    id: int
+    usuario_id: int | str
+    nome_estab: str
+    documento: str
+    status: str
+    foto_url: Optional[str] = None
+    solicitante_nome: Optional[str] = None
+    solicitante_foto_url: Optional[str] = None
+    enviado_em: Optional[datetime] = None
+    aprovado_em: Optional[datetime] = None
+    aprovado_por: Optional[str] = None
+    motivo_rejeicao: Optional[str] = None
+
+
+class PrestadorDetalheResponse(PrestadorResponse):
+    servicos: list[ServicoResponse] = Field(default_factory=list)
+    horarios: list[HorarioResponse] = Field(default_factory=list)
+    categorias: list[PrestadorCategoriaResponse] = Field(default_factory=list)
+
+
+class PrestadorStatusUpdate(BaseModel):
+    status: str
+    motivo_rejeicao: Optional[str] = None
+
+
+class CategoriaCreate(BaseModel):
+    nome: str
+    descricao: Optional[str] = None
+
+
+class CategoriaUpdate(BaseModel):
+    nome: Optional[str] = None
+    descricao: Optional[str] = None
+
+
+class CategoriaStatusUpdate(BaseModel):
+    status: str

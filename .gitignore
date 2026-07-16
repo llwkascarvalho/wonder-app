@@ -156,6 +156,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+**/.env
 
 # Spyder project settings
 .spyderproject
@@ -219,6 +220,7 @@ __marimo__/
 
 # Ambiente
 .env
+.env.monitor
 *.env
 
 # Docker
@@ -229,9 +231,13 @@ docker-compose.override.yml
 
 # Banco de dados local
 *.sql.bak
+backups/
+*.sql.gz
 
 # Python
 __pycache__/
 *.pyc
 .venv/
 venv/
+logs/
+docs/reports/monitor_*.md

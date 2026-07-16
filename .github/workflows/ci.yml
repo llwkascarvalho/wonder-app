@@ -1,0 +1,151 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  lint:
+    name: Lint (flake8)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar flake8
+        run: pip install flake8
+
+      - name: Rodar flake8 em services/ e gateway/
+        run: flake8 services/ gateway/
+
+  build:
+    name: Build (docker compose)
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Criar .env mínimo (necessário para docker compose ler as variáveis)
+        run: cp .env.example .env
+
+      - name: Criar .env.monitor minimo para o Admin
+        run: cp .env.monitor.example .env.monitor
+
+      - name: Build de todos os containers
+        run: docker compose build
+
+  health:
+    name: Health check (docker compose up)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Criar .env de CI com valores fictícios (necessário para os bancos subirem)
+        run: |
+          cat > .env << 'EOF'
+          AUTH_DB_HOST=db_auth
+          AUTH_DB_PORT=5432
+          AUTH_DB_NAME=db_autenticacao
+          AUTH_DB_USER=wonder_user
+          AUTH_DB_PASSWORD=ci_password
+
+          CATALOGO_DB_HOST=db_catalogo
+          CATALOGO_DB_PORT=5432
+          CATALOGO_DB_NAME=db_catalogo
+          CATALOGO_DB_USER=wonder_user
+          CATALOGO_DB_PASSWORD=ci_password
+
+          AGENDAMENTOS_DB_HOST=db_agendamentos
+          AGENDAMENTOS_DB_PORT=5432
+          AGENDAMENTOS_DB_NAME=db_agendamentos
+          AGENDAMENTOS_DB_USER=wonder_user
+          AGENDAMENTOS_DB_PASSWORD=ci_password
+
+          NOTIFICACOES_DB_HOST=db_notificacoes
+          NOTIFICACOES_DB_PORT=5432
+          NOTIFICACOES_DB_NAME=db_notificacoes
+          NOTIFICACOES_DB_USER=wonder_user
+          NOTIFICACOES_DB_PASSWORD=ci_password
+
+          JWT_SECRET_KEY=ci-secret-key-not-for-production
+          JWT_ALGORITHM=HS256
+          JWT_EXPIRATION_MINUTES=60
+
+          GOOGLE_CLIENT_ID=ci-dummy-client-id
+          GOOGLE_CLIENT_SECRET=ci-dummy-client-secret
+          GOOGLE_REDIRECT_URI=http://localhost:8000/auth/google/callback
+
+          OPENROUTER_API_KEY=ci-dummy-key
+
+          RABBITMQ_HOST=rabbitmq
+          RABBITMQ_PORT=5672
+          RABBITMQ_USER=wonder_user
+          RABBITMQ_PASSWORD=ci_password
+          EOF
+
+      - name: Criar .env do serviço de IA
+        run: echo "OPENROUTER_API_KEY=ci-dummy-key" > services/ai/.env
+
+      - name: Criar .env.monitor restrito para o Admin
+        run: |
+          cat > .env.monitor << 'EOF'
+          AUTH_DB_HOST=db_auth
+          AUTH_DB_PORT=5432
+          AUTH_DB_NAME=db_autenticacao
+          AUTH_DB_USER=wonder_user
+          AUTH_DB_PASSWORD=ci_password
+
+          CATALOGO_DB_HOST=db_catalogo
+          CATALOGO_DB_PORT=5432
+          CATALOGO_DB_NAME=db_catalogo
+          CATALOGO_DB_USER=wonder_user
+          CATALOGO_DB_PASSWORD=ci_password
+
+          AGENDAMENTOS_DB_HOST=db_agendamentos
+          AGENDAMENTOS_DB_PORT=5432
+          AGENDAMENTOS_DB_NAME=db_agendamentos
+          AGENDAMENTOS_DB_USER=wonder_user
+          AGENDAMENTOS_DB_PASSWORD=ci_password
+
+          NOTIFICACOES_DB_HOST=db_notificacoes
+          NOTIFICACOES_DB_PORT=5432
+          NOTIFICACOES_DB_NAME=db_notificacoes
+          NOTIFICACOES_DB_USER=wonder_user
+          NOTIFICACOES_DB_PASSWORD=ci_password
+          EOF
+
+      - name: Subir o ambiente
+        run: docker compose up -d --wait --wait-timeout 120
+
+      - name: Aguardar o Gateway responder e validar /health
+        run: |
+          for i in $(seq 1 15); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health || echo "000")
+            if [ "$status" = "200" ]; then
+              echo "Gateway respondeu 200 em /health."
+              exit 0
+            fi
+            echo "Tentativa $i: gateway ainda não respondeu (status $status). Aguardando..."
+            sleep 4
+          done
+          echo "Gateway não respondeu 200 em /health a tempo."
+          docker compose logs gateway
+          exit 1
+
+      - name: Logs em caso de falha
+        if: failure()
+        run: docker compose logs
+
+      - name: Encerrar o ambiente
+        if: always()
+        run: docker compose down -v

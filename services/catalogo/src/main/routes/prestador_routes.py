@@ -1,0 +1,413 @@
+from typing import List
+
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from sqlalchemy.orm import Session
+
+from src.main.dependencies.db import get_db
+from src.main.repositories import prestador_repo
+from src.main.schemas.prestador_schema import (
+    AvaliacaoCreate,
+    AvaliacaoResponse,
+    CategoriaCreate,
+    CategoriaResponse,
+    CategoriaStatusUpdate,
+    CategoriaUpdate,
+    HorarioCreate,
+    HorarioResponse,
+    PrestadorCategoriaCreate,
+    PrestadorCategoriaResponse,
+    PrestadorCreate,
+    PrestadorDetalheResponse,
+    PrestadorResponse,
+    PrestadorStatusUpdate,
+    PrestadorUpdate,
+    ServicoCreate,
+    ServicoResponse,
+    ServicoUpdate,
+)
+from src.main.storage.catalog_image_storage import delete_catalog_image, save_catalog_image
+
+router = APIRouter(tags=["Catalogo"])
+STATUS_LEITURA_DONO = {"rascunho", "rejeitado", "ativo", "suspenso"}
+
+
+def get_user_id(request: Request) -> str:
+    return request.headers.get("X-User-ID", "desconhecido")
+
+
+def is_admin(request: Request) -> bool:
+    return request.headers.get("X-User-Role", "").lower() == "admin"
+
+
+def exigir_admin(request: Request):
+    if not is_admin(request):
+        raise HTTPException(status_code=403, detail="Acesso restrito a administradores.")
+
+
+def pode_ler_dados_prestador(prestador, request: Request) -> bool:
+    if not prestador:
+        return False
+
+    if is_admin(request):
+        return True
+
+    if prestador.status == "ativo":
+        return True
+
+    is_owner = str(prestador.usuario_id) == str(get_user_id(request))
+    return is_owner and prestador.status in STATUS_LEITURA_DONO
+
+
+# LEITURA PUBLICA/AUTENTICADA
+
+@router.get("/prestadores", response_model=List[PrestadorResponse])
+def listar_prestadores(
+    request: Request,
+    nome: str = None,
+    categoria_id: int = None,
+    db: Session = Depends(get_db),
+):
+    prestadores = prestador_repo.listar_ativos(db, nome=nome, categoria_id=categoria_id)
+
+    if is_admin(request):
+        prestador_repo.registrar_auditoria(
+            db, get_user_id(request), "prestador", f"Admin listou {len(prestadores)} prestadores"
+        )
+
+    return prestadores
+
+
+@router.get("/categorias", response_model=List[CategoriaResponse])
+def listar_categorias(db: Session = Depends(get_db)):
+    return prestador_repo.listar_categorias_ativas(db)
+
+
+@router.get("/prestadores/me", response_model=PrestadorResponse)
+def obter_meu_prestador(request: Request, db: Session = Depends(get_db)):
+    prestador = prestador_repo.obter_por_usuario(db, get_user_id(request))
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Cadastro de prestador nao encontrado.")
+    return prestador
+
+
+@router.get("/prestadores/me/categorias", response_model=List[PrestadorCategoriaResponse])
+def listar_minhas_categorias(request: Request, db: Session = Depends(get_db)):
+    prestador = prestador_repo.obter_por_usuario(db, get_user_id(request))
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Cadastro de prestador nao encontrado.")
+    return prestador_repo.listar_categorias_prestador(db, prestador.id)
+
+
+@router.post("/prestadores/me/categorias", response_model=List[PrestadorCategoriaResponse], status_code=201)
+def associar_minhas_categorias(
+    dados: PrestadorCategoriaCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    prestador = prestador_repo.obter_por_usuario(db, get_user_id(request))
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Cadastro de prestador nao encontrado.")
+    return prestador_repo.associar_categorias(db, prestador.id, dados, get_user_id(request))
+
+
+@router.put("/prestadores/me/categorias", response_model=List[PrestadorCategoriaResponse])
+def substituir_minhas_categorias(
+    dados: PrestadorCategoriaCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    prestador = prestador_repo.obter_por_usuario(db, get_user_id(request))
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Cadastro de prestador nao encontrado.")
+    return prestador_repo.substituir_categorias(db, prestador.id, dados, get_user_id(request))
+
+
+@router.delete("/prestadores/me/categorias/{categoria_id}")
+def remover_minha_categoria(categoria_id: int, request: Request, db: Session = Depends(get_db)):
+    prestador = prestador_repo.obter_por_usuario(db, get_user_id(request))
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Cadastro de prestador nao encontrado.")
+    return prestador_repo.remover_categoria_prestador(db, prestador.id, categoria_id, get_user_id(request))
+
+
+@router.get("/prestadores/{prestador_id}", response_model=PrestadorResponse)
+def obter_prestador(prestador_id: int, request: Request, db: Session = Depends(get_db)):
+    prestador = prestador_repo.obter_por_id(db, prestador_id)
+    if not prestador or (not is_admin(request) and prestador.status != "ativo"):
+        raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
+
+    if is_admin(request):
+        prestador_repo.registrar_auditoria(
+            db, get_user_id(request), "prestador", f"Admin consultou prestador id={prestador_id}"
+        )
+
+    return prestador
+
+
+@router.get("/prestadores/{prestador_id}/servicos", response_model=List[ServicoResponse])
+def listar_servicos_prestador(prestador_id: int, request: Request, db: Session = Depends(get_db)):
+    prestador = prestador_repo.obter_por_id(db, prestador_id)
+    if not pode_ler_dados_prestador(prestador, request):
+        raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
+
+    servicos = prestador_repo.listar_servicos(db, prestador_id)
+
+    if is_admin(request):
+        prestador_repo.registrar_auditoria(
+            db, get_user_id(request), "servico", f"Admin listou {len(servicos)} servicos do id={prestador_id}"
+        )
+
+    return servicos
+
+
+@router.get("/prestadores/{prestador_id}/categorias", response_model=List[PrestadorCategoriaResponse])
+def listar_categorias_prestador(prestador_id: int, request: Request, db: Session = Depends(get_db)):
+    prestador = prestador_repo.obter_por_id(db, prestador_id)
+    is_owner = prestador and str(prestador.usuario_id) == str(get_user_id(request))
+    if not prestador or (not is_admin(request) and not is_owner and prestador.status != "ativo"):
+        raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
+    return prestador_repo.listar_categorias_prestador(db, prestador_id)
+
+
+@router.post("/prestadores/{prestador_id}/categorias", response_model=List[PrestadorCategoriaResponse], status_code=201)
+def associar_categorias_prestador(
+    prestador_id: int,
+    dados: PrestadorCategoriaCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    return prestador_repo.associar_categorias(db, prestador_id, dados, get_user_id(request))
+
+
+@router.put("/prestadores/{prestador_id}/categorias", response_model=List[PrestadorCategoriaResponse])
+def substituir_categorias_prestador(
+    prestador_id: int,
+    dados: PrestadorCategoriaCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    return prestador_repo.substituir_categorias(db, prestador_id, dados, get_user_id(request))
+
+
+@router.delete("/prestadores/{prestador_id}/categorias/{categoria_id}")
+def remover_categoria_prestador(
+    prestador_id: int,
+    categoria_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    return prestador_repo.remover_categoria_prestador(db, prestador_id, categoria_id, get_user_id(request))
+
+
+@router.get("/prestadores/{prestador_id}/horarios", response_model=List[HorarioResponse])
+def listar_horarios(prestador_id: int, request: Request, db: Session = Depends(get_db)):
+    prestador = prestador_repo.obter_por_id(db, prestador_id)
+    if not pode_ler_dados_prestador(prestador, request):
+        raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
+    return prestador_repo.listar_horarios(db, prestador_id)
+
+
+@router.get("/prestadores/{prestador_id}/avaliacoes", response_model=List[AvaliacaoResponse])
+def listar_avaliacoes(prestador_id: int, request: Request, db: Session = Depends(get_db)):
+    prestador = prestador_repo.obter_por_id(db, prestador_id)
+    if not prestador or (not is_admin(request) and prestador.status != "ativo"):
+        raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
+    return prestador_repo.listar_avaliacoes(db, prestador_id)
+
+
+# ESCRITA DO PROPRIO PRESTADOR
+
+@router.post("/prestadores", response_model=PrestadorResponse, status_code=201)
+def criar_prestador(dados: PrestadorCreate, request: Request, db: Session = Depends(get_db)):
+    return prestador_repo.criar_prestador(db, dados, get_user_id(request))
+
+
+@router.put("/prestadores/{prestador_id}", response_model=PrestadorResponse)
+def atualizar_prestador(prestador_id: int, dados: PrestadorUpdate, request: Request, db: Session = Depends(get_db)):
+    return prestador_repo.atualizar_prestador(db, prestador_id, dados, get_user_id(request))
+
+
+@router.post("/prestadores/{prestador_id}/enviar-aprovacao", response_model=PrestadorResponse)
+def enviar_para_aprovacao(prestador_id: int, request: Request, db: Session = Depends(get_db)):
+    return prestador_repo.enviar_para_aprovacao(db, prestador_id, get_user_id(request))
+
+
+@router.post("/prestadores/{prestador_id}/foto", response_model=PrestadorResponse)
+async def atualizar_foto_prestador(
+    prestador_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    foto_url = await save_catalog_image(file, "prestadores", prestador_id)
+    try:
+        prestador, foto_antiga = prestador_repo.atualizar_foto_prestador(
+            db,
+            prestador_id,
+            foto_url,
+            get_user_id(request),
+        )
+    except Exception:
+        delete_catalog_image(foto_url)
+        raise
+
+    delete_catalog_image(foto_antiga)
+    return prestador
+
+
+@router.post("/prestadores/{prestador_id}/servicos", response_model=ServicoResponse, status_code=201)
+def criar_servico(prestador_id: int, dados: ServicoCreate, request: Request, db: Session = Depends(get_db)):
+    return prestador_repo.criar_servico(db, prestador_id, dados, get_user_id(request))
+
+
+@router.put("/prestadores/{prestador_id}/servicos/{servico_id}", response_model=ServicoResponse)
+def atualizar_servico(
+    prestador_id: int,
+    servico_id: int,
+    dados: ServicoUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    return prestador_repo.atualizar_servico(db, prestador_id, servico_id, dados, get_user_id(request))
+
+
+@router.post("/prestadores/{prestador_id}/servicos/{servico_id}/foto", response_model=ServicoResponse)
+async def atualizar_foto_servico(
+    prestador_id: int,
+    servico_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    foto_url = await save_catalog_image(file, "servicos", servico_id)
+    try:
+        servico, foto_antiga = prestador_repo.atualizar_foto_servico(
+            db,
+            prestador_id,
+            servico_id,
+            foto_url,
+            get_user_id(request),
+        )
+    except Exception:
+        delete_catalog_image(foto_url)
+        raise
+
+    delete_catalog_image(foto_antiga)
+    return servico
+
+
+@router.post("/prestadores/{prestador_id}/horarios", response_model=HorarioResponse, status_code=201)
+def criar_horario(prestador_id: int, dados: HorarioCreate, request: Request, db: Session = Depends(get_db)):
+    return prestador_repo.criar_horario(db, prestador_id, dados, get_user_id(request))
+
+
+@router.post("/prestadores/{prestador_id}/avaliacoes", response_model=AvaliacaoResponse, status_code=201)
+def criar_avaliacao(prestador_id: int, dados: AvaliacaoCreate, request: Request, db: Session = Depends(get_db)):
+    return prestador_repo.criar_avaliacao(db, prestador_id, dados, get_user_id(request))
+
+
+@router.delete("/prestadores/{prestador_id}")
+def remover_prestador(prestador_id: int, request: Request, db: Session = Depends(get_db)):
+    return prestador_repo.remover_prestador(db, prestador_id, get_user_id(request))
+
+
+@router.delete("/prestadores/{prestador_id}/horarios/{horario_id}")
+def deletar_horario(prestador_id: int, horario_id: int, request: Request, db: Session = Depends(get_db)):
+    return prestador_repo.deletar_horario(db, prestador_id, horario_id, get_user_id(request))
+
+
+@router.delete("/prestadores/{prestador_id}/servicos/{servico_id}")
+def deletar_servico(prestador_id: int, servico_id: int, request: Request, db: Session = Depends(get_db)):
+    return prestador_repo.deletar_servico(db, prestador_id, servico_id, get_user_id(request))
+
+
+# ENDPOINTS ADMINISTRATIVOS USADOS PELO SERVICO ADMIN
+
+@router.get("/admin/prestadores/pendentes", response_model=List[PrestadorResponse])
+def admin_listar_pendentes(request: Request, db: Session = Depends(get_db)):
+    exigir_admin(request)
+    prestadores = prestador_repo.listar_pendentes(db)
+    prestador_repo.registrar_auditoria(
+        db, get_user_id(request), "prestador", f"Admin listou {len(prestadores)} prestadores pendentes"
+    )
+    return prestadores
+
+
+@router.get("/admin/prestadores/{prestador_id}", response_model=PrestadorDetalheResponse)
+def admin_obter_detalhe(prestador_id: int, request: Request, db: Session = Depends(get_db)):
+    exigir_admin(request)
+    prestador = prestador_repo.obter_por_id(db, prestador_id)
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
+    prestador_repo.registrar_auditoria(
+        db, get_user_id(request), "prestador", f"Admin consultou detalhe do prestador id={prestador_id}"
+    )
+    return prestador
+
+
+@router.patch("/admin/prestadores/{prestador_id}/status", response_model=PrestadorResponse)
+def admin_atualizar_status(
+    prestador_id: int,
+    dados: PrestadorStatusUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    exigir_admin(request)
+    return prestador_repo.atualizar_status_admin(db, prestador_id, dados, get_user_id(request))
+
+
+@router.get("/admin/categorias", response_model=List[CategoriaResponse])
+def admin_listar_categorias(request: Request, db: Session = Depends(get_db)):
+    exigir_admin(request)
+    categorias = prestador_repo.listar_todas_categorias(db)
+    prestador_repo.registrar_auditoria(
+        db, get_user_id(request), "categoria", f"Admin listou {len(categorias)} categorias"
+    )
+    return categorias
+
+
+@router.post("/admin/categorias", response_model=CategoriaResponse, status_code=201)
+def admin_criar_categoria(dados: CategoriaCreate, request: Request, db: Session = Depends(get_db)):
+    exigir_admin(request)
+    return prestador_repo.criar_categoria(db, dados)
+
+
+@router.post("/admin/categorias/{categoria_id}/foto", response_model=CategoriaResponse)
+async def admin_atualizar_foto_categoria(
+    categoria_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    exigir_admin(request)
+    foto_url = await save_catalog_image(file, "categorias", categoria_id)
+    try:
+        categoria, foto_antiga = prestador_repo.atualizar_foto_categoria(db, categoria_id, foto_url)
+    except Exception:
+        delete_catalog_image(foto_url)
+        raise
+
+    delete_catalog_image(foto_antiga)
+    return categoria
+
+
+@router.put("/admin/categorias/{categoria_id}", response_model=CategoriaResponse)
+def admin_atualizar_categoria(
+    categoria_id: int,
+    dados: CategoriaUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    exigir_admin(request)
+    return prestador_repo.atualizar_categoria(db, categoria_id, dados)
+
+
+@router.patch("/admin/categorias/{categoria_id}/status", response_model=CategoriaResponse)
+def admin_atualizar_status_categoria(
+    categoria_id: int,
+    dados: CategoriaStatusUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    exigir_admin(request)
+    return prestador_repo.atualizar_status_categoria(db, categoria_id, dados)
