@@ -1,5 +1,5 @@
 import { api } from './api';
-import { Avaliacao, Categoria, Horario, Prestador, Servico } from '../types/catalogo';
+import { Categoria, Horario, Prestador, Servico } from '../types/catalogo';
 
 type PrestadorCategoriaResponse = {
   prestador_id: number;
@@ -39,9 +39,4 @@ export async function listarCategoriasPrestador(prestadorId: number): Promise<Ca
     `/catalogo/prestadores/${prestadorId}/categorias`
   );
   return response.data.map((item) => item.categoria);
-}
-
-export async function listarAvaliacoesPrestador(prestadorId: number): Promise<Avaliacao[]> {
-  const response = await api.get<Avaliacao[]>(`/catalogo/prestadores/${prestadorId}/avaliacoes`);
-  return response.data;
 }

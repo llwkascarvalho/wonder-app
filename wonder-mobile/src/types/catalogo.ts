@@ -39,13 +39,6 @@ export type Horario = {
   hora_fim: string;
 };
 
-export type Avaliacao = {
-  id: number;
-  agendamento_id: number;
-  prestador_id: number;
-  nota: number;
-};
-
 export const DIAS_SEMANA = [
   'Dia invalido',
   'Segunda-feira',
