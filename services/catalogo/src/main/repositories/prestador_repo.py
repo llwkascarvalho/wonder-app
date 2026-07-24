@@ -1,9 +1,11 @@
 from datetime import datetime
 
+import httpx
 from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from src.main.core.config import settings
 from src.main.models.prestador_model import (
     Avaliacao,
     Categoria,
@@ -491,8 +493,47 @@ def criar_avaliacao(db: Session, prestador_id: int, dados: AvaliacaoCreate, usua
     prestador = obter_por_id(db, prestador_id)
     if not prestador:
         raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
-    if str(prestador.usuario_id) != str(usuario_id):
-        raise HTTPException(status_code=403, detail="Sem permissao para modificar este prestador.")
+
+    # Confirma, via chamada interna ao serviço de Agendamentos, que este
+    # agendamento realmente existe, pertence a quem está avaliando (o
+    # endpoint GET /agendamentos/{id} já filtra por cliente_id == X-User-ID)
+    # e já foi concluído. O agendamento vive em outro banco de dados
+    # (isolamento por microsserviço), por isso a validação não pode ser
+    # feita apenas consultando as tabelas locais do Catálogo.
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            response = client.get(
+                f"{settings.AGENDAMENTOS_SERVICE_URL}/agendamentos/{dados.agendamento_id}",
+                headers={"X-User-ID": str(usuario_id)},
+            )
+    except httpx.RequestError:
+        raise HTTPException(
+            status_code=503, detail="Não foi possível validar o agendamento no momento."
+        )
+
+    if response.status_code == 404:
+        raise HTTPException(
+            status_code=404, detail="Agendamento não encontrado ou não pertence a este usuário."
+        )
+    if response.status_code != 200:
+        raise HTTPException(status_code=503, detail="Não foi possível validar o agendamento.")
+
+    agendamento = response.json()
+
+    if agendamento.get("prestador_id") != prestador_id:
+        raise HTTPException(
+            status_code=400, detail="Este agendamento não pertence a este prestador."
+        )
+    if agendamento.get("status") != "concluido":
+        raise HTTPException(
+            status_code=400, detail="Só é possível avaliar agendamentos já concluídos."
+        )
+
+    ja_avaliado = (
+        db.query(Avaliacao).filter(Avaliacao.agendamento_id == dados.agendamento_id).first()
+    )
+    if ja_avaliado:
+        raise HTTPException(status_code=409, detail="Este agendamento já foi avaliado.")
 
     avaliacao = Avaliacao(
         agendamento_id=dados.agendamento_id,
