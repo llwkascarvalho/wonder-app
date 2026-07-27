@@ -241,3 +241,14 @@ __pycache__/
 venv/
 logs/
 docs/reports/monitor_*.md
+
+# Artefatos locais de deploy/migracao e revisao
+dumps/
+uploads_dump/
+dumps.tar.gz
+dumps.tar.gz.b64
+uploads_dump.tar.gz
+uploads_dump.tar.gz.b64
+tmp/
+tmp_slide_review/
+tmp_slide_review_2/
