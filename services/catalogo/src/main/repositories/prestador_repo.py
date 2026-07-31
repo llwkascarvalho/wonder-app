@@ -9,6 +9,7 @@ from src.main.core.config import settings
 from src.main.models.prestador_model import (
     Avaliacao,
     Categoria,
+    FotoEstabelecimento,
     HorarioFuncionamento,
     LogAuditoria,
     Prestador,
@@ -447,6 +448,71 @@ def atualizar_foto_servico(
     db.commit()
     db.refresh(servico)
     return servico, foto_antiga
+
+
+# GALERIA DE FOTOS DO ESTABELECIMENTO (ate 8 fotos por prestador)
+
+MAX_FOTOS_ESTABELECIMENTO = 8
+
+
+def listar_fotos_estabelecimento(db: Session, prestador_id: int) -> list[FotoEstabelecimento]:
+    return (
+        db.query(FotoEstabelecimento)
+        .filter(FotoEstabelecimento.prestador_id == prestador_id)
+        .order_by(FotoEstabelecimento.ordem)
+        .all()
+    )
+
+
+def adicionar_foto_estabelecimento(
+    db: Session, prestador_id: int, foto_url: str, usuario_id: str
+) -> FotoEstabelecimento:
+    prestador = obter_por_id(db, prestador_id)
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
+    exigir_dono_editavel(prestador, usuario_id)
+
+    total_atual = (
+        db.query(FotoEstabelecimento)
+        .filter(FotoEstabelecimento.prestador_id == prestador_id)
+        .count()
+    )
+    if total_atual >= MAX_FOTOS_ESTABELECIMENTO:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Limite de {MAX_FOTOS_ESTABELECIMENTO} fotos do estabelecimento atingido.",
+        )
+
+    foto = FotoEstabelecimento(prestador_id=prestador_id, foto=foto_url, ordem=total_atual)
+    db.add(foto)
+    db.commit()
+    db.refresh(foto)
+    return foto
+
+
+def remover_foto_estabelecimento(
+    db: Session, prestador_id: int, foto_id: int, usuario_id: str
+) -> str:
+    prestador = obter_por_id(db, prestador_id)
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
+    exigir_dono_editavel(prestador, usuario_id)
+
+    foto = (
+        db.query(FotoEstabelecimento)
+        .filter(
+            FotoEstabelecimento.id == foto_id,
+            FotoEstabelecimento.prestador_id == prestador_id,
+        )
+        .first()
+    )
+    if not foto:
+        raise HTTPException(status_code=404, detail="Foto nao encontrada.")
+
+    foto_url = foto.foto
+    db.delete(foto)
+    db.commit()
+    return foto_url
 
 
 def criar_horario(db: Session, prestador_id: int, dados: HorarioCreate, usuario_id: str) -> HorarioFuncionamento:

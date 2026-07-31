@@ -134,3 +134,14 @@ class AvaliacaoResponse(AvaliacaoCreate):
 
     class Config:
         from_attributes = True
+
+# SCHEMAS DE GALERIA DE FOTOS DO ESTABELECIMENTO
+
+class FotoEstabelecimentoResponse(BaseModel):
+    id: int
+    prestador_id: int
+    foto_url: str
+    ordem: int
+
+    class Config:
+        from_attributes = True

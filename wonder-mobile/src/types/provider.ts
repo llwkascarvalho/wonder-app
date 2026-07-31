@@ -65,3 +65,10 @@ export type HorarioPayload = {
   hora_inicio: string;
   hora_fim: string;
 };
+
+export type FotoEstabelecimento = {
+  id: number;
+  prestador_id: number;
+  foto_url: string;
+  ordem: number;
+};
