@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Integer, String, Float, ForeignKey, JSON, SmallInteger, Time, UniqueConstraint
+from sqlalchemy import Column, DateTime, Integer, String, Float, ForeignKey, JSON, SmallInteger, Time, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 from src.main.core.database import Base
 
@@ -26,6 +26,28 @@ class Prestador(Base):
     horarios = relationship("HorarioFuncionamento", back_populates="prestador")
     avaliacoes = relationship("Avaliacao", back_populates="prestador")
     categorias = relationship("PrestadorCategoria", back_populates="prestador")
+    fotos_estabelecimento = relationship(
+        "FotoEstabelecimento",
+        back_populates="prestador",
+        order_by="FotoEstabelecimento.ordem",
+        cascade="all, delete-orphan",
+    )
+
+    @property
+    def foto_url(self):
+        return self.foto
+
+
+class FotoEstabelecimento(Base):
+    __tablename__ = "foto_estabelecimento"
+
+    id = Column(Integer, primary_key=True, index=True)
+    prestador_id = Column(Integer, ForeignKey("prestador.id", ondelete="CASCADE"), nullable=False)
+    foto = Column(String(500), nullable=False)
+    ordem = Column(Integer, nullable=False, default=0)
+    criado_em = Column(DateTime, nullable=False, server_default=func.now())
+
+    prestador = relationship("Prestador", back_populates="fotos_estabelecimento")
 
     @property
     def foto_url(self):

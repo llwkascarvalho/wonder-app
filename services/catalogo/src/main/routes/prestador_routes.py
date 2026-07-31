@@ -12,6 +12,7 @@ from src.main.schemas.prestador_schema import (
     CategoriaResponse,
     CategoriaStatusUpdate,
     CategoriaUpdate,
+    FotoEstabelecimentoResponse,
     HorarioCreate,
     HorarioResponse,
     PrestadorCategoriaCreate,
@@ -294,6 +295,46 @@ async def atualizar_foto_servico(
 
     delete_catalog_image(foto_antiga)
     return servico
+
+
+# GALERIA DE FOTOS DO ESTABELECIMENTO (ate 8 fotos, exibidas no perfil do prestador)
+
+@router.get("/prestadores/{prestador_id}/fotos", response_model=List[FotoEstabelecimentoResponse])
+def listar_fotos_estabelecimento(prestador_id: int, db: Session = Depends(get_db)):
+    return prestador_repo.listar_fotos_estabelecimento(db, prestador_id)
+
+
+@router.post(
+    "/prestadores/{prestador_id}/fotos",
+    response_model=FotoEstabelecimentoResponse,
+    status_code=201,
+)
+async def adicionar_foto_estabelecimento(
+    prestador_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    foto_url = await save_catalog_image(file, "prestadores", prestador_id)
+    try:
+        foto = prestador_repo.adicionar_foto_estabelecimento(
+            db, prestador_id, foto_url, get_user_id(request)
+        )
+    except Exception:
+        delete_catalog_image(foto_url)
+        raise
+    return foto
+
+
+@router.delete("/prestadores/{prestador_id}/fotos/{foto_id}", status_code=204)
+def remover_foto_estabelecimento(
+    prestador_id: int, foto_id: int, request: Request, db: Session = Depends(get_db)
+):
+    foto_url = prestador_repo.remover_foto_estabelecimento(
+        db, prestador_id, foto_id, get_user_id(request)
+    )
+    delete_catalog_image(foto_url)
+    return None
 
 
 @router.post("/prestadores/{prestador_id}/horarios", response_model=HorarioResponse, status_code=201)
