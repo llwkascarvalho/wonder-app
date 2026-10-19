@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { theme } from '../styles/theme';
 
 export function LoginScreen() {
-  const { signInWithGoogle } = useAuth();
+  const { demoModeEnabled, signInDemo, signInWithGoogle } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,7 +37,18 @@ export function LoginScreen() {
           Entre com sua conta Google para acessar seus agendamentos e serviços.
         </Text>
 
-        <Button title="Entrar com Google" loading={loading} onPress={handleLogin} size="lg" />
+        {!demoModeEnabled ? (
+          <Button title="Entrar com Google" loading={loading} onPress={handleLogin} size="lg" />
+        ) : null}
+
+        {demoModeEnabled ? (
+          <Button
+            title="Continuar sem login (demonstração)"
+            onPress={signInDemo}
+            variant="outline"
+            size="lg"
+          />
+        ) : null}
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </View>

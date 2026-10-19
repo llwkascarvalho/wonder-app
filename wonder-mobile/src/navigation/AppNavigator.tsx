@@ -27,7 +27,7 @@ const navigationTheme = {
 };
 
 export function AppNavigator() {
-  const { token, loading } = useAuth();
+  const { token, isDemoSession, loading } = useAuth();
 
   if (loading) {
     return <LoadingIndicator text="Carregando sessão..." />;
@@ -36,7 +36,7 @@ export function AppNavigator() {
   return (
     <NavigationContainer theme={navigationTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {token ? (
+        {token || isDemoSession ? (
           <Stack.Screen name="MainTabs" component={MainTabs} />
         ) : (
           <Stack.Screen name="Login" component={LoginScreen} />

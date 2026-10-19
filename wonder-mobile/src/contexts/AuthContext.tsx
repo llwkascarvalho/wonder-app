@@ -11,23 +11,39 @@ import {
 import { AuthState } from '../types/auth';
 
 type AuthContextValue = AuthState & {
+  demoModeEnabled: boolean;
+  isDemoSession: boolean;
   signInWithGoogle: () => Promise<void>;
+  signInDemo: () => Promise<void>;
   signOut: () => Promise<void>;
   restoreToken: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const DEMO_MODE_ENABLED = process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
+const DEMO_USER = {
+  id: 'demo-client',
+  email: 'demo@wonder.local',
+  tipo_usuario: 'cliente',
+};
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [token, setToken] = useState<string | null>(null);
+  const [isDemoSession, setIsDemoSession] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const usuario = token ? getUsuarioFromToken(token) : null;
+  const usuario = token ? getUsuarioFromToken(token) : isDemoSession ? DEMO_USER : null;
 
   async function restoreToken() {
     setLoading(true);
 
     try {
+      if (DEMO_MODE_ENABLED) {
+        await clearToken();
+        setToken(null);
+        return;
+      }
+
       const storedToken = await getStoredToken();
 
       if (storedToken && !isTokenValid(storedToken)) {
@@ -44,12 +60,20 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   async function signInWithGoogle() {
     const newToken = await loginWithGoogle();
+    setIsDemoSession(false);
     setToken(newToken);
+  }
+
+  async function signInDemo() {
+    await clearToken();
+    setToken(null);
+    setIsDemoSession(true);
   }
 
   async function signOut() {
     await clearToken();
     setToken(null);
+    setIsDemoSession(false);
   }
 
   useEffect(() => {
@@ -70,11 +94,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
       token,
       usuario,
       loading,
+      demoModeEnabled: DEMO_MODE_ENABLED,
+      isDemoSession,
       signInWithGoogle,
+      signInDemo,
       signOut,
       restoreToken,
     }),
-    [token, usuario, loading]
+    [token, usuario, loading, isDemoSession]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
