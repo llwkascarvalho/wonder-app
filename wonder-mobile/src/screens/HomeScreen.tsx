@@ -19,6 +19,7 @@ export function HomeScreen() {
   const [prestadores, setPrestadores] = useState<ProviderCardModel[]>([]);
   const [carregandoCategorias, setCarregandoCategorias] = useState(true);
   const [carregandoPrestadores, setCarregandoPrestadores] = useState(true);
+  const [erroCategorias, setErroCategorias] = useState<string | null>(null);
   const [erroPrestadores, setErroPrestadores] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,9 +30,15 @@ export function HomeScreen() {
 
       try {
         const resultado = await listarCategorias();
-        if (ativo) setCategorias(resultado);
+        if (ativo) {
+          setCategorias(resultado);
+          setErroCategorias(null);
+        }
       } catch {
-        if (ativo) setCategorias([]);
+        if (ativo) {
+          setCategorias([]);
+          setErroCategorias('Nao foi possivel carregar as categorias da API.');
+        }
       } finally {
         if (ativo) setCarregandoCategorias(false);
       }
@@ -76,6 +83,10 @@ export function HomeScreen() {
       <Text style={styles.sectionTitle}>Categorias</Text>
       {carregandoCategorias ? (
         <LoadingIndicator text="Carregando categorias..." />
+      ) : erroCategorias ? (
+        <Card>
+          <Text style={styles.cardText}>{erroCategorias}</Text>
+        </Card>
       ) : categorias.length === 0 ? (
         <Card>
           <Text style={styles.cardText}>Nenhuma categoria disponivel.</Text>
