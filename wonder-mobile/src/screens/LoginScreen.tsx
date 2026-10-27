@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { theme } from '../styles/theme';
 
 export function LoginScreen() {
-  const { demoModeEnabled, signInDemo, signInWithGoogle } = useAuth();
+  const { demoModeEnabled, signInDemo, signIn, token, error: sessionError, retryProfile, signOut } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,7 +16,7 @@ export function LoginScreen() {
     setError(null);
 
     try {
-      await signInWithGoogle();
+      await signIn();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível concluir o login.');
     } finally {
@@ -34,12 +34,16 @@ export function LoginScreen() {
       <View style={styles.form}>
         <Text style={styles.title}>Bem-vindo ao Wonder</Text>
         <Text style={styles.subtitle}>
-          Entre com sua conta Google para acessar seus agendamentos e serviços.
+          Entre com sua conta para acessar seus agendamentos e serviços.
+          Se ainda não tem conta, cadastre-se na página de login do Keycloak.
         </Text>
 
-        {!demoModeEnabled ? (
-          <Button title="Entrar com Google" loading={loading} onPress={handleLogin} size="lg" />
-        ) : null}
+        {token ? (
+          <>
+            <Button title="Tentar novamente" onPress={retryProfile} size="lg" />
+            <Button title="Sair" onPress={signOut} variant="outline" />
+          </>
+        ) : <Button title="Entrar" loading={loading} onPress={handleLogin} size="lg" />}
 
         {demoModeEnabled ? (
           <Button
@@ -50,7 +54,7 @@ export function LoginScreen() {
           />
         ) : null}
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error || sessionError ? <Text style={styles.error}>{error || sessionError}</Text> : null}
       </View>
 
       <View style={styles.footer}>

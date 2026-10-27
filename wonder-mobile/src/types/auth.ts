@@ -1,19 +1,23 @@
-export type Usuario = {
-  id: string;
-  email?: string;
-  tipo_usuario?: 'cliente' | 'prestador' | 'admin' | string;
-};
+import type { UserProfile } from './profile';
 
+export type Usuario = UserProfile;
 export type AuthState = {
   token: string | null;
   usuario: Usuario | null;
   loading: boolean;
+  error: string | null;
 };
-
+export type SessionTokens = {
+  accessToken: string;
+  refreshToken: string | null;
+  idToken: string | null;
+  expiresAt: number;
+};
 export type DecodedJwtPayload = {
-  sub?: string | number;
-  id?: string | number;
-  email?: string;
-  tipo_usuario?: string;
+  sub?: string;
+  name?: string;
+  preferred_username?: string;
+  email?: string | null;
+  realm_access?: { roles?: string[] };
   exp?: number;
 };
