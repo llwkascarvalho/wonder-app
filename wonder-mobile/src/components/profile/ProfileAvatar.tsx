@@ -27,9 +27,9 @@ export function ProfileAvatar({ nome, fotoUrl, loading = false, onPress }: Profi
       ) : (
         <Text style={styles.initial}>{initial}</Text>
       )}
-      <View style={styles.cameraBadge}>
+      {onPress ? <View style={styles.cameraBadge}>
         <MaterialIcons name="photo-camera" color={theme.colors.white} size={18} />
-      </View>
+      </View> : null}
     </Pressable>
   );
 }
