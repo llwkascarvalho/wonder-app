@@ -2,7 +2,8 @@ import { AxiosError } from 'axios';
 
 import { api } from './api';
 import { ProfilePhotoAsset } from '../types/profile';
-import { adaptarPayloadPrestador, adaptarPrestador, PrestadorApiResponse } from './providerAdapter';
+import { appendProfilePhoto } from './profileService';
+import { adaptarPrestador, PrestadorApiResponse } from './providerAdapter';
 import {
   ProviderCategoryLink,
   ProviderOnboardingCategory,
@@ -59,9 +60,15 @@ export async function obterMeuPrestador(): Promise<ProviderOnboardingProfile | n
 }
 
 export async function criarPerfilPrestador(
-  payload: ProviderOnboardingProfilePayload
+  payload: ProviderOnboardingProfilePayload,
+  arquivo?: ProfilePhotoAsset
 ): Promise<ProviderOnboardingProfile> {
-  const response = await api.post<PrestadorApiResponse>('/catalogo/prestadores', adaptarPayloadPrestador(payload));
+  const form = new FormData();
+  for (const [key, value] of Object.entries(payload)) {
+    if (value != null) form.append(key, value);
+  }
+  if (arquivo) appendProfilePhoto(form, arquivo);
+  const response = await api.post<PrestadorApiResponse>('/catalogo/prestadores', form);
   return adaptarPrestador(response.data);
 }
 
@@ -69,7 +76,7 @@ export async function atualizarPerfilPrestador(
   prestadorId: number,
   payload: Partial<ProviderOnboardingProfilePayload>
 ): Promise<ProviderOnboardingProfile> {
-  const response = await api.put<PrestadorApiResponse>(`/catalogo/prestadores/${prestadorId}`, adaptarPayloadPrestador(payload));
+  const response = await api.put<PrestadorApiResponse>(`/catalogo/prestadores/${prestadorId}`, payload);
   return adaptarPrestador(response.data);
 }
 

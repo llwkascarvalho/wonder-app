@@ -127,6 +127,31 @@ O Core precisa preservar o status dos erros durante o encaminhamento interno de
 erro. A correção desse comportamento é acompanhada na issue
 [PI-Wonder #94](https://github.com/JoaoManoelFontes/PI-Wonder/issues/94).
 
+## Cadastro profissional no Core Spring
+
+O formulário usa as etapas **Dados → Endereço → Revisão**, que compartilham um
+único objeto em memória. Avançar, voltar ou selecionar uma aba preserva os campos
+e não grava dados na API. O botão **Enviar cadastro** envia um único
+`POST /catalogo/prestadores` com `multipart/form-data`. Os campos de texto de
+`CadastroPrestadorRequest` são partes individuais: `nomeEstab`, `documento`,
+`endereco`, `numero`, `bairro`, `cidade`, `estado` e `complemento`. A foto opcional
+vai na parte `arquivo`, na mesma requisição. O Axios define o Content-Type com
+o boundary do formulário; não há um upload anterior ou envio separado de foto.
+
+Somente `nomeEstab` é obrigatório, conforme o DTO. Campos opcionais vazios são
+omitidos do multipart; os limites de tamanho acompanham a API. A seleção da foto
+usa a galeria, com prévia e opção de remover, e segue a validação do perfil:
+JPEG, PNG ou WebP de até 5 MiB. Na web envia o `File`; no celular envia URI, nome
+e MIME. Categorias, serviços e horários não fazem parte
+deste formulário porque não são campos desse endpoint.
+
+Na abertura, o app consulta o cadastro existente via GET. Após o POST bem-sucedido,
+exibe o status devolvido pela API, sem chamar `/enviar-aprovacao`. Em caso de erro,
+mantém os valores e a foto selecionada para nova tentativa. O formulário em memória não sobrevive ao
+recarregamento do app. Os testes de onboarding verificam a navegação, o payload
+multipart com e sem foto, permissão da galeria, cancelamento, falhas e proteção
+contra envio duplicado usando API simulada.
+
 ## Rollback
 
 Este frontend exige Core que aceite tokens Keycloak e implemente `/perfis/eu` com o DTO acima. Para rollback, restaure em conjunto a versão anterior do frontend, sua configuração Google/redirect e o backend/gateway antigo compatível com `/auth/google/login` e `/auth/me`. Não combine o frontend novo com a autenticação legada. O descarte do JWT antigo exige novo login após rollback; os tokens novos não substituem o armazenamento antigo.

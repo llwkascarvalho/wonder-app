@@ -25,6 +25,18 @@ export function validateProfilePhoto(asset: ProfilePhotoAsset): void {
   if (size > 5242880) throw new Error('A foto deve ter até 5 MiB.');
 }
 
+export function appendProfilePhoto(form: FormData, asset: ProfilePhotoAsset): void {
+  validateProfilePhoto(asset);
+  if (Platform.OS === 'web') {
+    form.append('arquivo', asset.file!, asset.file!.name);
+  } else {
+    const extension = asset.mimeType === 'image/jpeg' ? 'jpg' : asset.mimeType === 'image/png' ? 'png' : 'webp';
+    form.append('arquivo', {
+      uri: asset.uri, name: asset.fileName || `perfil.${extension}`, type: asset.mimeType,
+    } as unknown as Blob);
+  }
+}
+
 export async function updateMyProfile(payload: UserProfileUpdate): Promise<PerfilUsuarioResponse> {
   if (payload.telefone && payload.telefone.length > 20) {
     throw new Error('O telefone deve ter até 20 caracteres.');
@@ -32,16 +44,7 @@ export async function updateMyProfile(payload: UserProfileUpdate): Promise<Perfi
   const form = new FormData();
   if (payload.telefone?.trim()) form.append('numeroTelefone', payload.telefone);
   if (payload.foto) {
-    validateProfilePhoto(payload.foto);
-    const asset = payload.foto;
-    if (Platform.OS === 'web') {
-      form.append('arquivo', asset.file!, asset.file!.name);
-    } else {
-      const extension = asset.mimeType === 'image/jpeg' ? 'jpg' : asset.mimeType === 'image/png' ? 'png' : 'webp';
-      form.append('arquivo', {
-        uri: asset.uri, name: asset.fileName || `perfil.${extension}`, type: asset.mimeType,
-      } as unknown as Blob);
-    }
+    appendProfilePhoto(form, payload.foto);
   }
   if (!payload.telefone?.trim() && !payload.foto) throw new Error('Nenhuma alteração para salvar.');
   const response = await api.put<PerfilUsuarioResponse>('/perfis/eu', form);

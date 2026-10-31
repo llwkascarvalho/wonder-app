@@ -1,101 +1,54 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { Image, StyleSheet, Text } from 'react-native';
 
-import { Button } from '../Button';
 import { Card } from '../Card';
-import { CatalogImage } from '../catalog/CatalogImage';
+import { Button } from '../Button';
 import { Input } from '../Input';
 import { theme } from '../../styles/theme';
-import { ProviderOnboardingProfile } from '../../types/providerOnboarding';
+import { ProviderRegistrationDraft } from '../../types/providerOnboarding';
+import { ProfilePhotoAsset } from '../../types/profile';
+import { registrationFields } from '../../utils/providerRegistration';
 
-type ProviderDataStepProps = {
-  profile: ProviderOnboardingProfile | null;
-  saving: boolean;
-  uploadingPhoto?: boolean;
-  onChangePhoto?: () => Promise<void>;
-  onAdvance: (payload: { nome_estab: string; documento: string }) => Promise<void>;
+export type ProviderRegistrationFieldsProps = {
+  values: ProviderRegistrationDraft;
+  onChange: (changes: Partial<ProviderRegistrationDraft>) => void;
+  errors: Partial<Record<keyof ProviderRegistrationDraft, string>>;
+  disabled: boolean;
 };
 
-export function ProviderDataStep({
-  profile,
-  saving,
-  uploadingPhoto = false,
-  onChangePhoto,
-  onAdvance,
-}: ProviderDataStepProps) {
-  const [nomeEstab, setNomeEstab] = useState(profile?.nome_estab || '');
-  const [documento, setDocumento] = useState(profile?.documento || '');
-  const [error, setError] = useState('');
+type ProviderDataStepProps = ProviderRegistrationFieldsProps & {
+  photo?: ProfilePhotoAsset;
+  picking: boolean;
+  onSelectPhoto: () => Promise<void>;
+  onRemovePhoto: () => void;
+};
 
-  useEffect(() => {
-    setNomeEstab(profile?.nome_estab || '');
-    setDocumento(profile?.documento || '');
-  }, [profile]);
-
-  async function handleSave() {
-    if (!nomeEstab.trim() || !documento.trim()) {
-      setError('Informe nome do estabelecimento e documento.');
-      return;
-    }
-
-    setError('');
-    await onAdvance({
-      nome_estab: nomeEstab.trim(),
-      documento: documento.trim(),
-    });
-  }
-
+export function ProviderDataStep({ values, onChange, errors, disabled, photo, picking, onSelectPhoto, onRemovePhoto }: ProviderDataStepProps) {
   return (
     <Card style={styles.card}>
       <Text style={styles.title}>Dados do estabelecimento</Text>
-      <Input
-        label="Nome do estabelecimento"
-        placeholder="Diego BarberShop"
-        value={nomeEstab}
-        onChangeText={setNomeEstab}
-      />
-      <Input label="CPF/CNPJ" placeholder="00.000.000/0000-00" value={documento} onChangeText={setDocumento} />
-      {profile?.id && onChangePhoto ? (
-        <>
-          <Text style={styles.photoTitle}>Foto do estabelecimento</Text>
-          <CatalogImage fotoUrl={profile.foto_url} kind="provider" style={styles.photo} />
-          <Button
-            title={profile.foto_url ? 'Alterar foto' : 'Adicionar foto'}
-            variant="secondary"
-            loading={uploadingPhoto}
-            disabled={saving}
-            onPress={onChangePhoto}
-          />
-        </>
-      ) : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Button title="Avancar" loading={saving} onPress={handleSave} />
+      {(['nomeEstab', 'documento'] as const).map((key) => (
+        <Input
+          key={key}
+          label={registrationFields[key].label}
+          value={values[key]}
+          maxLength={registrationFields[key].maxLength}
+          editable={!disabled}
+          error={errors[key]}
+          onChangeText={(value) => onChange({ [key]: value })}
+        />
+      ))}
+      <Text style={styles.text}>Foto do estabelecimento (opcional)</Text>
+      {photo ? <Image source={{ uri: photo.uri }} accessibilityLabel="Foto selecionada do estabelecimento" style={styles.photo} /> : null}
+      <Button title={photo ? 'Trocar foto' : 'Selecionar foto'} variant="secondary" loading={picking} disabled={disabled} onPress={onSelectPhoto} />
+      <Text style={styles.text}>{photo ? photo.fileName || 'Foto selecionada' : 'JPEG, PNG ou WebP de até 5 MiB.'}</Text>
+      {photo ? <Button title="Remover foto" variant="outline" disabled={disabled} onPress={onRemovePhoto} /> : null}
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    gap: theme.spacing.md,
-  },
-  title: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.xl,
-    fontWeight: theme.fontWeight.bold,
-  },
-  error: {
-    color: theme.colors.error,
-    fontSize: theme.fontSize.sm,
-  },
-  photoTitle: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.bold,
-  },
-  photo: {
-    alignSelf: 'center',
-    borderRadius: theme.borderRadius.md,
-    height: 120,
-    width: 120,
-  },
+  card: { gap: theme.spacing.md },
+  title: { color: theme.colors.text, fontSize: theme.fontSize.xl, fontWeight: theme.fontWeight.bold },
+  text: { color: theme.colors.textSecondary, fontSize: theme.fontSize.sm },
+  photo: { width: 120, height: 120, borderRadius: theme.borderRadius.md, alignSelf: 'center' },
 });
