@@ -19,49 +19,58 @@ export function HomeScreen() {
   const [prestadores, setPrestadores] = useState<ProviderCardModel[]>([]);
   const [carregandoCategorias, setCarregandoCategorias] = useState(true);
   const [carregandoPrestadores, setCarregandoPrestadores] = useState(true);
+  const [erroCategorias, setErroCategorias] = useState<string | null>(null);
   const [erroPrestadores, setErroPrestadores] = useState<string | null>(null);
 
   useEffect(() => {
-    let ativo = true;
+    const controle = new AbortController();
 
     async function carregarCategorias() {
       setCarregandoCategorias(true);
 
       try {
-        const resultado = await listarCategorias();
-        if (ativo) setCategorias(resultado);
+        const resultado = await listarCategorias(controle.signal);
+        if (!controle.signal.aborted) {
+          setCategorias(resultado);
+          setErroCategorias(null);
+        }
       } catch {
-        if (ativo) setCategorias([]);
+        if (!controle.signal.aborted) {
+          setCategorias([]);
+          setErroCategorias('Nao foi possivel carregar as categorias da API.');
+        }
       } finally {
-        if (ativo) setCarregandoCategorias(false);
+        if (!controle.signal.aborted) setCarregandoCategorias(false);
       }
     }
 
     carregarCategorias();
     return () => {
-      ativo = false;
+      controle.abort();
     };
   }, []);
 
-  const carregarPrestadores = useCallback(async () => {
+  const carregarPrestadores = useCallback(async (signal: AbortSignal) => {
     setCarregandoPrestadores(true);
     setErroPrestadores(null);
 
     try {
       const resultado = await listarPrestadores({
         categoria_id: categoriaSelecionada ?? undefined,
-      });
-      const cards = await carregarCardsPrestadores(resultado);
-      setPrestadores(cards);
+      }, signal);
+      const cards = await carregarCardsPrestadores(resultado, signal);
+      if (!signal.aborted) setPrestadores(cards);
     } catch {
-      setErroPrestadores('Nao foi possivel carregar os prestadores.');
+      if (!signal.aborted) setErroPrestadores('Nao foi possivel carregar os prestadores.');
     } finally {
-      setCarregandoPrestadores(false);
+      if (!signal.aborted) setCarregandoPrestadores(false);
     }
   }, [categoriaSelecionada]);
 
   useEffect(() => {
-    carregarPrestadores();
+    const controle = new AbortController();
+    carregarPrestadores(controle.signal);
+    return () => controle.abort();
   }, [carregarPrestadores]);
 
   function abrirPrestador(prestadorId: number) {
@@ -76,6 +85,10 @@ export function HomeScreen() {
       <Text style={styles.sectionTitle}>Categorias</Text>
       {carregandoCategorias ? (
         <LoadingIndicator text="Carregando categorias..." />
+      ) : erroCategorias ? (
+        <Card>
+          <Text style={styles.cardText}>{erroCategorias}</Text>
+        </Card>
       ) : categorias.length === 0 ? (
         <Card>
           <Text style={styles.cardText}>Nenhuma categoria disponivel.</Text>

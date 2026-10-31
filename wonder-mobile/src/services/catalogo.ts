@@ -1,4 +1,6 @@
 import { api } from './api';
+import { Categoria, Horario, Prestador, Servico } from '../types/catalogo';
+import { adaptarPrestador, PrestadorApiResponse } from './providerAdapter';
 import { Categoria, FotoEstabelecimento, Horario, Prestador, Servico } from '../types/catalogo';
 
 type PrestadorCategoriaResponse = {
@@ -9,19 +11,19 @@ type PrestadorCategoriaResponse = {
 export async function listarPrestadores(params?: {
   nome?: string;
   categoria_id?: number;
-}): Promise<Prestador[]> {
-  const response = await api.get<Prestador[]>('/catalogo/prestadores', { params });
-  return response.data;
+}, signal?: AbortSignal): Promise<Prestador[]> {
+  const response = await api.get<PrestadorApiResponse[]>('/catalogo/prestadores', { params, signal });
+  return response.data.map(adaptarPrestador);
 }
 
-export async function listarCategorias(): Promise<Categoria[]> {
-  const response = await api.get<Categoria[]>('/catalogo/categorias');
+export async function listarCategorias(signal?: AbortSignal): Promise<Categoria[]> {
+  const response = await api.get<Categoria[]>('/catalogo/categorias', { signal });
   return response.data;
 }
 
 export async function obterPrestador(prestadorId: number): Promise<Prestador> {
-  const response = await api.get<Prestador>(`/catalogo/prestadores/${prestadorId}`);
-  return response.data;
+  const response = await api.get<PrestadorApiResponse>(`/catalogo/prestadores/${prestadorId}`);
+  return adaptarPrestador(response.data);
 }
 
 export async function listarServicosPrestador(prestadorId: number): Promise<Servico[]> {
@@ -29,16 +31,16 @@ export async function listarServicosPrestador(prestadorId: number): Promise<Serv
   return response.data;
 }
 
-export async function listarHorariosPrestador(prestadorId: number): Promise<Horario[]> {
-  const response = await api.get<Horario[]>(`/catalogo/prestadores/${prestadorId}/horarios`);
+export async function listarHorariosPrestador(prestadorId: number, signal?: AbortSignal): Promise<Horario[]> {
+  const response = await api.get<Horario[]>(`/catalogo/prestadores/${prestadorId}/horarios`, { signal });
   return response.data;
 }
 
-export async function listarCategoriasPrestador(prestadorId: number): Promise<Categoria[]> {
-  const response = await api.get<PrestadorCategoriaResponse[]>(
-    `/catalogo/prestadores/${prestadorId}/categorias`
+export async function listarCategoriasPrestador(prestadorId: number, signal?: AbortSignal): Promise<Categoria[]> {
+  const response = await api.get<Categoria[]>(
+    `/catalogo/prestadores/${prestadorId}/categorias`, { signal }
   );
-  return response.data.map((item) => item.categoria);
+  return response.data;
 }
 
 export async function listarFotosEstabelecimento(

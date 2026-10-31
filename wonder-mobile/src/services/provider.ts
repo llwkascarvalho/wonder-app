@@ -1,5 +1,6 @@
 import api from './api';
 import { ProfilePhotoAsset } from '../types/profile';
+import { adaptarPayloadPrestador, adaptarPrestador, PrestadorApiResponse } from './providerAdapter';
 import {
   Agendamento,
   FotoEstabelecimento,
@@ -12,8 +13,8 @@ import {
 } from '../types/provider';
 
 export async function listarPrestadores() {
-  const response = await api.get<Prestador[]>('/catalogo/prestadores');
-  return response.data;
+  const response = await api.get<PrestadorApiResponse[]>('/catalogo/prestadores');
+  return response.data.map(adaptarPrestador);
 }
 
 export async function obterPrestadorLogado(usuarioId: string | number) {
@@ -22,8 +23,8 @@ export async function obterPrestadorLogado(usuarioId: string | number) {
 }
 
 export async function criarPrestador(payload: PrestadorPayload) {
-  const response = await api.post<Prestador>('/catalogo/prestadores', payload);
-  return response.data;
+  const response = await api.post<PrestadorApiResponse>('/catalogo/prestadores', adaptarPayloadPrestador(payload));
+  return adaptarPrestador(response.data);
 }
 
 function normalizePrestadorPayload(payload: Partial<PrestadorPayload>): Partial<PrestadorPayload> {
@@ -39,11 +40,11 @@ function normalizePrestadorPayload(payload: Partial<PrestadorPayload>): Partial<
 }
 
 export async function atualizarPrestador(prestadorId: number, payload: Partial<PrestadorPayload>) {
-  const response = await api.put<Prestador>(
+  const response = await api.put<PrestadorApiResponse>(
     `/catalogo/prestadores/${prestadorId}`,
-    normalizePrestadorPayload(payload)
+    adaptarPayloadPrestador(normalizePrestadorPayload(payload))
   );
-  return response.data;
+  return adaptarPrestador(response.data);
 }
 
 export async function uploadFotoPrestador(
@@ -60,13 +61,13 @@ export async function uploadFotoPrestador(
     type: mimeType,
   } as unknown as Blob);
 
-  const response = await api.post<Prestador>(`/catalogo/prestadores/${prestadorId}/foto`, formData, {
+  const response = await api.post<PrestadorApiResponse>(`/catalogo/prestadores/${prestadorId}/foto`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
   });
 
-  return response.data;
+  return adaptarPrestador(response.data);
 }
 
 export async function listarFotosEstabelecimento(

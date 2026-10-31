@@ -11,8 +11,8 @@ type ProfileInfoCardProps = {
 export function ProfileInfoCard({ profile }: ProfileInfoCardProps) {
   return (
     <Card style={styles.card}>
-      <InfoRow label="Nome" value={profile.nome} />
-      <InfoRow label="Email" value={profile.email} />
+      <InfoRow label="Nome" value={profile.nome || 'Não informado'} />
+      <InfoRow label="Email" value={profile.email || 'Não informado'} />
       <InfoRow label="Telefone" value={profile.telefone || 'Nao informado'} />
       <InfoRow label="Tipo de usuario" value={profile.tipo_usuario} />
     </Card>

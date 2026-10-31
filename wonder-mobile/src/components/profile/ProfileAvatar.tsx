@@ -1,7 +1,9 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { resolveProfilePhotoUrl } from '../../services/profileService';
+import { getProfilePhoto } from '../../services/profileService';
+import { getSession, getSessionVersion, isCurrentSession, subscribeSession } from '../../services/session';
 import { theme } from '../../styles/theme';
 
 type ProfileAvatarProps = {
@@ -9,10 +11,36 @@ type ProfileAvatarProps = {
   fotoUrl?: string | null;
   loading?: boolean;
   onPress?: () => void;
+  revision?: number;
 };
 
-export function ProfileAvatar({ nome, fotoUrl, loading = false, onPress }: ProfileAvatarProps) {
-  const photoSource = resolveProfilePhotoUrl(fotoUrl);
+export function ProfileAvatar({ nome, fotoUrl, loading = false, onPress, revision = 0 }: ProfileAvatarProps) {
+  const [photoSource, setPhotoSource] = useState<string>();
+  useEffect(() => {
+    let active = true;
+    let localUrl: string | undefined;
+    const expected = getSessionVersion();
+    function release() {
+      if (localUrl && Platform.OS === 'web') URL.revokeObjectURL(localUrl);
+      localUrl = undefined;
+    }
+    setPhotoSource(undefined);
+    const unsubscribe = subscribeSession(() => {
+      if (!isCurrentSession(expected)) {
+        active = false;
+        setPhotoSource(undefined);
+        release();
+      }
+    });
+    if (fotoUrl && getSession()) {
+      getProfilePhoto(fotoUrl).then((uri) => {
+        localUrl = uri;
+        if (!active || !isCurrentSession(expected)) { release(); return; }
+        setPhotoSource(uri);
+      }).catch(() => { if (active) setPhotoSource(undefined); });
+    }
+    return () => { active = false; unsubscribe(); release(); };
+  }, [fotoUrl, revision]);
   const initial = nome.trim().slice(0, 1).toUpperCase() || 'W';
 
   return (
@@ -23,13 +51,13 @@ export function ProfileAvatar({ nome, fotoUrl, loading = false, onPress }: Profi
       style={({ pressed }) => [styles.avatar, pressed && styles.pressed, loading && styles.loading]}
     >
       {photoSource ? (
-        <Image source={{ uri: photoSource }} style={styles.image} />
+        <Image source={{ uri: photoSource }} style={styles.image} onError={() => setPhotoSource(undefined)} />
       ) : (
         <Text style={styles.initial}>{initial}</Text>
       )}
-      <View style={styles.cameraBadge}>
+      {onPress ? <View style={styles.cameraBadge}>
         <MaterialIcons name="photo-camera" color={theme.colors.white} size={18} />
-      </View>
+      </View> : null}
     </Pressable>
   );
 }
