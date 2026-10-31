@@ -1,12 +1,15 @@
 from datetime import datetime
 
+import httpx
 from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from src.main.core.config import settings
 from src.main.models.prestador_model import (
     Avaliacao,
     Categoria,
+    FotoEstabelecimento,
     HorarioFuncionamento,
     LogAuditoria,
     Prestador,
@@ -447,6 +450,71 @@ def atualizar_foto_servico(
     return servico, foto_antiga
 
 
+# GALERIA DE FOTOS DO ESTABELECIMENTO (ate 8 fotos por prestador)
+
+MAX_FOTOS_ESTABELECIMENTO = 8
+
+
+def listar_fotos_estabelecimento(db: Session, prestador_id: int) -> list[FotoEstabelecimento]:
+    return (
+        db.query(FotoEstabelecimento)
+        .filter(FotoEstabelecimento.prestador_id == prestador_id)
+        .order_by(FotoEstabelecimento.ordem)
+        .all()
+    )
+
+
+def adicionar_foto_estabelecimento(
+    db: Session, prestador_id: int, foto_url: str, usuario_id: str
+) -> FotoEstabelecimento:
+    prestador = obter_por_id(db, prestador_id)
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
+    exigir_dono_editavel(prestador, usuario_id)
+
+    total_atual = (
+        db.query(FotoEstabelecimento)
+        .filter(FotoEstabelecimento.prestador_id == prestador_id)
+        .count()
+    )
+    if total_atual >= MAX_FOTOS_ESTABELECIMENTO:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Limite de {MAX_FOTOS_ESTABELECIMENTO} fotos do estabelecimento atingido.",
+        )
+
+    foto = FotoEstabelecimento(prestador_id=prestador_id, foto=foto_url, ordem=total_atual)
+    db.add(foto)
+    db.commit()
+    db.refresh(foto)
+    return foto
+
+
+def remover_foto_estabelecimento(
+    db: Session, prestador_id: int, foto_id: int, usuario_id: str
+) -> str:
+    prestador = obter_por_id(db, prestador_id)
+    if not prestador:
+        raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
+    exigir_dono_editavel(prestador, usuario_id)
+
+    foto = (
+        db.query(FotoEstabelecimento)
+        .filter(
+            FotoEstabelecimento.id == foto_id,
+            FotoEstabelecimento.prestador_id == prestador_id,
+        )
+        .first()
+    )
+    if not foto:
+        raise HTTPException(status_code=404, detail="Foto nao encontrada.")
+
+    foto_url = foto.foto
+    db.delete(foto)
+    db.commit()
+    return foto_url
+
+
 def criar_horario(db: Session, prestador_id: int, dados: HorarioCreate, usuario_id: str) -> HorarioFuncionamento:
     prestador = obter_por_id(db, prestador_id)
     if not prestador:
@@ -491,8 +559,47 @@ def criar_avaliacao(db: Session, prestador_id: int, dados: AvaliacaoCreate, usua
     prestador = obter_por_id(db, prestador_id)
     if not prestador:
         raise HTTPException(status_code=404, detail="Prestador nao encontrado.")
-    if str(prestador.usuario_id) != str(usuario_id):
-        raise HTTPException(status_code=403, detail="Sem permissao para modificar este prestador.")
+
+    # Confirma, via chamada interna ao serviço de Agendamentos, que este
+    # agendamento realmente existe, pertence a quem está avaliando (o
+    # endpoint GET /agendamentos/{id} já filtra por cliente_id == X-User-ID)
+    # e já foi concluído. O agendamento vive em outro banco de dados
+    # (isolamento por microsserviço), por isso a validação não pode ser
+    # feita apenas consultando as tabelas locais do Catálogo.
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            response = client.get(
+                f"{settings.AGENDAMENTOS_SERVICE_URL}/agendamentos/{dados.agendamento_id}",
+                headers={"X-User-ID": str(usuario_id)},
+            )
+    except httpx.RequestError:
+        raise HTTPException(
+            status_code=503, detail="Não foi possível validar o agendamento no momento."
+        )
+
+    if response.status_code == 404:
+        raise HTTPException(
+            status_code=404, detail="Agendamento não encontrado ou não pertence a este usuário."
+        )
+    if response.status_code != 200:
+        raise HTTPException(status_code=503, detail="Não foi possível validar o agendamento.")
+
+    agendamento = response.json()
+
+    if agendamento.get("prestador_id") != prestador_id:
+        raise HTTPException(
+            status_code=400, detail="Este agendamento não pertence a este prestador."
+        )
+    if agendamento.get("status") != "concluido":
+        raise HTTPException(
+            status_code=400, detail="Só é possível avaliar agendamentos já concluídos."
+        )
+
+    ja_avaliado = (
+        db.query(Avaliacao).filter(Avaliacao.agendamento_id == dados.agendamento_id).first()
+    )
+    if ja_avaliado:
+        raise HTTPException(status_code=409, detail="Este agendamento já foi avaliado.")
 
     avaliacao = Avaliacao(
         agendamento_id=dados.agendamento_id,

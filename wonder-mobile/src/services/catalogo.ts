@@ -1,6 +1,12 @@
 import { api } from './api';
 import { Categoria, Horario, Prestador, Servico } from '../types/catalogo';
 import { adaptarPrestador, PrestadorApiResponse } from './providerAdapter';
+import { Categoria, FotoEstabelecimento, Horario, Prestador, Servico } from '../types/catalogo';
+
+type PrestadorCategoriaResponse = {
+  prestador_id: number;
+  categoria: Categoria;
+};
 
 export async function listarPrestadores(params?: {
   nome?: string;
@@ -33,6 +39,15 @@ export async function listarHorariosPrestador(prestadorId: number, signal?: Abor
 export async function listarCategoriasPrestador(prestadorId: number, signal?: AbortSignal): Promise<Categoria[]> {
   const response = await api.get<Categoria[]>(
     `/catalogo/prestadores/${prestadorId}/categorias`, { signal }
+  );
+  return response.data;
+}
+
+export async function listarFotosEstabelecimento(
+  prestadorId: number
+): Promise<FotoEstabelecimento[]> {
+  const response = await api.get<FotoEstabelecimento[]>(
+    `/catalogo/prestadores/${prestadorId}/fotos`
   );
   return response.data;
 }

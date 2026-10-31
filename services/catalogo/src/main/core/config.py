@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     CATALOGO_UPLOAD_DIR: str = "uploads/catalogo"
     CATALOGO_UPLOAD_URL_PREFIX: str = "/catalogo/uploads"
     CATALOGO_IMAGE_MAX_BYTES: int = 5 * 1024 * 1024
+    AGENDAMENTOS_SERVICE_URL: str = "http://agendamentos:8003"
 
     @property
     def database_url(self) -> str:

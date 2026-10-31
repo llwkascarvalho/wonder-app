@@ -49,3 +49,10 @@ export const DIAS_SEMANA = [
   'Sabado',
   'Domingo',
 ] as const;
+
+export type FotoEstabelecimento = {
+  id: number;
+  prestador_id: number;
+  foto_url: string;
+  ordem: number;
+};

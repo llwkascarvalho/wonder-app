@@ -1,7 +1,7 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
-import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -11,6 +11,7 @@ import { LoadingIndicator } from '../components/LoadingIndicator';
 import { SearchStackParamList } from '../navigation/SearchStack';
 import {
   listarCategoriasPrestador,
+  listarFotosEstabelecimento,
   listarHorariosPrestador,
   listarServicosPrestador,
   obterPrestador,
@@ -19,6 +20,7 @@ import { theme } from '../styles/theme';
 import {
   Categoria,
   DIAS_SEMANA,
+  FotoEstabelecimento,
   Horario,
   Prestador,
   Servico,
@@ -44,6 +46,7 @@ export function PrestadorProfileScreen() {
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [horarios, setHorarios] = useState<Horario[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [fotos, setFotos] = useState<FotoEstabelecimento[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -55,12 +58,13 @@ export function PrestadorProfileScreen() {
       setErro(null);
 
       try {
-        const [prestadorData, servicosData, horariosData, categoriasData] =
+        const [prestadorData, servicosData, horariosData, categoriasData, fotosData] =
           await Promise.all([
             obterPrestador(prestadorId),
             listarServicosPrestador(prestadorId),
             listarHorariosPrestador(prestadorId),
             listarCategoriasPrestador(prestadorId),
+            listarFotosEstabelecimento(prestadorId),
           ]);
 
         if (!ativo) return;
@@ -69,6 +73,7 @@ export function PrestadorProfileScreen() {
         setServicos(servicosData);
         setHorarios(horariosData);
         setCategorias(categoriasData);
+        setFotos(fotosData);
       } catch {
         if (ativo) setErro('Nao foi possivel carregar os dados do prestador.');
       } finally {
@@ -132,6 +137,22 @@ export function PrestadorProfileScreen() {
       ) : (
         <Text style={styles.subtitle}>Categorias nao informadas</Text>
       )}
+
+      {fotos.length > 0 ? (
+        <>
+          <Text style={styles.sectionTitle}>Fotos do estabelecimento</Text>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={fotos}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={styles.galeriaList}
+            renderItem={({ item }) => (
+              <CatalogImage fotoUrl={item.foto_url} kind="provider" style={styles.galeriaFoto} />
+            )}
+          />
+        </>
+      ) : null}
 
       <Button
         title="Agendar servico"
@@ -241,6 +262,14 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.semibold,
+  },
+  galeriaList: {
+    gap: theme.spacing.sm,
+  },
+  galeriaFoto: {
+    borderRadius: theme.borderRadius.md,
+    height: 110,
+    width: 150,
   },
   sectionTitle: {
     color: theme.colors.text,

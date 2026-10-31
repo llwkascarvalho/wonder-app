@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -13,14 +13,17 @@ import { ProviderScheduleModal } from '../components/ProviderScheduleModal';
 import { ProviderServiceModal } from '../components/ProviderServiceModal';
 import { useAuth } from '../contexts/AuthContext';
 import {
+  adicionarFotoEstabelecimento,
   atualizarPrestador,
   atualizarServico,
   criarHorario,
   criarPrestador,
   criarServico,
+  listarFotosEstabelecimento,
   listarHorarios,
   listarServicos,
   obterPrestadorLogado,
+  removerFotoEstabelecimento,
   removerHorario,
   removerServico,
   uploadFotoPrestador,
@@ -33,7 +36,9 @@ import {
 } from '../services/providerOnboarding';
 import { theme } from '../styles/theme';
 import { Categoria } from '../types/catalogo';
-import { Horario, Prestador, PrestadorPayload, Servico } from '../types/provider';
+import { FotoEstabelecimento, Horario, Prestador, PrestadorPayload, Servico } from '../types/provider';
+
+const MAX_FOTOS_GALERIA = 8;
 
 const dayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 
@@ -60,6 +65,9 @@ export function ProviderProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [savingCategoryId, setSavingCategoryId] = useState<number | null>(null);
   const [uploadingProviderPhoto, setUploadingProviderPhoto] = useState(false);
+  const [fotos, setFotos] = useState<FotoEstabelecimento[]>([]);
+  const [uploadingFoto, setUploadingFoto] = useState(false);
+  const [removingFotoId, setRemovingFotoId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [editingEstablishment, setEditingEstablishment] = useState(false);
   const [serviceModalVisible, setServiceModalVisible] = useState(false);
@@ -97,18 +105,21 @@ export function ProviderProfileScreen() {
       setCategoriasAtivas(await listarCategoriasAtivas());
 
       if (foundPrestador) {
-        const [nextCategorias, nextServicos, nextHorarios] = await Promise.all([
+        const [nextCategorias, nextServicos, nextHorarios, nextFotos] = await Promise.all([
           listarMinhasCategoriasPrestadorSeguro(),
           listarServicos(foundPrestador.id),
           listarHorarios(foundPrestador.id),
+          listarFotosEstabelecimento(foundPrestador.id),
         ]);
         setCategorias(nextCategorias.map((item) => item.categoria));
         setServicos(nextServicos);
         setHorarios(nextHorarios);
+        setFotos(nextFotos);
       } else {
         setCategorias([]);
         setServicos([]);
         setHorarios([]);
+        setFotos([]);
       }
     } catch {
       setError('Nao foi possivel carregar o perfil do prestador.');
@@ -231,6 +242,69 @@ export function ProviderProfileScreen() {
       setError('Nao foi possivel enviar a foto do estabelecimento.');
     } finally {
       setUploadingProviderPhoto(false);
+    }
+  }
+
+  async function handleAddGaleriaFoto() {
+    if (!prestador) {
+      return;
+    }
+    if (fotos.length >= MAX_FOTOS_GALERIA) {
+      setError(`Limite de ${MAX_FOTOS_GALERIA} fotos na galeria atingido.`);
+      return;
+    }
+
+    setUploadingFoto(true);
+    setError('');
+
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        setError('Permita o acesso a galeria para adicionar fotos do estabelecimento.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        mediaTypes: ['images'],
+        quality: 0.85,
+      });
+
+      if (result.canceled || !result.assets.length) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const novaFoto = await adicionarFotoEstabelecimento(prestador.id, {
+        uri: asset.uri,
+        fileName: asset.fileName,
+        mimeType: asset.mimeType,
+      });
+
+      setFotos((atual) => [...atual, novaFoto]);
+    } catch {
+      setError('Nao foi possivel adicionar a foto a galeria.');
+    } finally {
+      setUploadingFoto(false);
+    }
+  }
+
+  async function handleRemoveGaleriaFoto(fotoId: number) {
+    if (!prestador) {
+      return;
+    }
+
+    setRemovingFotoId(fotoId);
+    setError('');
+
+    try {
+      await removerFotoEstabelecimento(prestador.id, fotoId);
+      setFotos((atual) => atual.filter((foto) => foto.id !== fotoId));
+    } catch {
+      setError('Nao foi possivel remover a foto.');
+    } finally {
+      setRemovingFotoId(null);
     }
   }
 
@@ -452,6 +526,48 @@ export function ProviderProfileScreen() {
               </>
             )}
           </Card>
+
+          <View style={styles.galeriaHeader}>
+            <Text style={styles.sectionTitle}>Galeria de fotos ({fotos.length}/{MAX_FOTOS_GALERIA})</Text>
+            <Button
+              title="Adicionar foto"
+              size="sm"
+              variant="secondary"
+              onPress={handleAddGaleriaFoto}
+              loading={uploadingFoto}
+              disabled={fotos.length >= MAX_FOTOS_GALERIA || removingFotoId !== null}
+            />
+          </View>
+
+          {fotos.length === 0 ? (
+            <Card>
+              <Text style={styles.cardText}>
+                Nenhuma foto na galeria ainda. Adicione ate {MAX_FOTOS_GALERIA} fotos para os
+                clientes verem ao abrir seu perfil.
+              </Text>
+            </Card>
+          ) : (
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={fotos}
+              keyExtractor={(item) => String(item.id)}
+              contentContainerStyle={styles.galeriaList}
+              renderItem={({ item }) => (
+                <View style={styles.galeriaItem}>
+                  <CatalogImage fotoUrl={item.foto_url} kind="provider" style={styles.galeriaFoto} />
+                  <Button
+                    title="Remover"
+                    size="sm"
+                    variant="secondary"
+                    onPress={() => handleRemoveGaleriaFoto(item.id)}
+                    loading={removingFotoId === item.id}
+                    disabled={removingFotoId !== null}
+                  />
+                </View>
+              )}
+            />
+          )}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -749,6 +865,23 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     flex: 1,
     fontSize: theme.fontSize.sm,
+  },
+  galeriaHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  galeriaList: {
+    gap: theme.spacing.sm,
+  },
+  galeriaItem: {
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  galeriaFoto: {
+    borderRadius: theme.borderRadius.md,
+    height: 110,
+    width: 150,
   },
   error: {
     color: theme.colors.error,

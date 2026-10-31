@@ -66,6 +66,20 @@ CREATE TABLE IF NOT EXISTS Avaliacao (
     criado_em       TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- Galeria de fotos do estabelecimento (ate 8 fotos por prestador,
+-- limite aplicado na camada de aplicacao). Independente do campo
+-- Prestador.foto, que e a foto de capa/logo exibida nos cards.
+CREATE TABLE IF NOT EXISTS foto_estabelecimento (
+    id            SERIAL PRIMARY KEY,
+    prestador_id  INTEGER NOT NULL REFERENCES Prestador(id) ON DELETE CASCADE,
+    foto          VARCHAR(500) NOT NULL,
+    ordem         INTEGER NOT NULL DEFAULT 0,
+    criado_em     TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_foto_estabelecimento_prestador
+    ON foto_estabelecimento(prestador_id);
+
 -- ─── AUDITORIA ─────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS logs_auditoria (
@@ -147,5 +161,9 @@ CREATE OR REPLACE TRIGGER trg_auditoria_horario
 
 CREATE OR REPLACE TRIGGER trg_auditoria_avaliacao
     AFTER INSERT OR UPDATE OR DELETE ON Avaliacao
+    FOR EACH ROW EXECUTE FUNCTION fn_auditoria();
+
+CREATE OR REPLACE TRIGGER trg_auditoria_foto_estabelecimento
+    AFTER INSERT OR UPDATE OR DELETE ON foto_estabelecimento
     FOR EACH ROW EXECUTE FUNCTION fn_auditoria();
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
