@@ -90,6 +90,37 @@ Validação mobile com Keycloak/Core reais: **pendente**. Não foram fornecidos 
 - Interfaces CUSTOMER/PROVIDER/ADMIN, múltiplas roles, aprovação administrativa, nenhum acesso antes do perfil e demonstração separada.
 - Logout OIDC e novo login, inclusive falha remota e operações pendentes.
 
+## Validação do catálogo público e disponibilidade
+
+`npm test` inclui os cenários de contrato do catálogo, fuso de Fortaleza, falha na
+consulta de horários e cancelamento de buscas antigas. Home e Busca cancelam as
+consultas anteriores ao trocar filtros ou sair da tela. A Busca mantém uma única
+consulta com espera de 350 ms durante a digitação.
+
+O selo **Atende hoje** considera somente o expediente cadastrado com horário final
+ainda futuro. Ele não garante vaga para um serviço: os intervalos livres vêm de
+`GET /agendamentos/disponibilidade`. Falha na consulta do expediente é apresentada
+como **Horários indisponíveis**, sem classificar o prestador como fechado.
+
+Para executar também a integração HTTP com o Core Spring real, inicie uma API
+local conectada a um banco de validação com as migrations e seeds do PI-Wonder e
+execute no PowerShell:
+
+```powershell
+$env:WONDER_API_TEST_URL = 'http://localhost:18080'
+npm test
+```
+
+O teste não envia JWT nem altera dados. Confere categorias, filtros, detalhe,
+serviços, expediente, dias e intervalos livres, além dos erros 400/404. Utiliza os
+agendamentos do seed em janeiro de 2030 para verificar que o confirmado bloqueia
+o horário e o cancelado não bloqueia. Sem a variável, somente esse teste HTTP é
+ignorado; os testes locais continuam sendo executados.
+
+O Core precisa preservar o status dos erros durante o encaminhamento interno de
+erro. A correção desse comportamento é acompanhada na issue
+[PI-Wonder #94](https://github.com/JoaoManoelFontes/PI-Wonder/issues/94).
+
 ## Rollback
 
 Este frontend exige Core que aceite tokens Keycloak e implemente `/perfis/eu` com o DTO acima. Para rollback, restaure em conjunto a versão anterior do frontend, sua configuração Google/redirect e o backend/gateway antigo compatível com `/auth/google/login` e `/auth/me`. Não combine o frontend novo com a autenticação legada. O descarte do JWT antigo exige novo login após rollback; os tokens novos não substituem o armazenamento antigo.
