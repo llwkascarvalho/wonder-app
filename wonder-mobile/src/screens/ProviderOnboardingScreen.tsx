@@ -340,9 +340,18 @@ export function ProviderOnboardingScreen() {
         <ProviderApplicationStatus profile={profile} onContinue={() => setShowEditableRejected(true)} />
       ) : (
         <>
-          <StepSelector activeStep={step} onSelect={setStep} hasProfileId={hasProfileId} />
+          <StepSelector activeStep={step} onSelect={setStep} disabled={saving || uploadingPhoto || savingCategoryId !== null} />
 
-          {step === 'dados' ? (
+          {step !== 'dados' && !hasProfileId ? (
+            <Card>
+              <Text style={styles.subtitle}>
+                Salve o nome do estabelecimento e o CPF/CNPJ na etapa Dados para adicionar categorias, servicos e horarios.
+              </Text>
+              <Button title="Preencher dados do estabelecimento" variant="secondary" onPress={() => setStep('dados')} />
+            </Card>
+          ) : null}
+
+          <View style={step !== 'dados' ? styles.hiddenStep : undefined}>
             <ProviderDataStep
               profile={profile}
               saving={saving}
@@ -350,7 +359,7 @@ export function ProviderOnboardingScreen() {
               onChangePhoto={profile?.id && canEdit ? handleChangeProviderPhoto : undefined}
               onAdvance={handleSaveProfile}
             />
-          ) : null}
+          </View>
 
           {step === 'categorias' ? (
             <ProviderCategoriesStep
@@ -402,7 +411,7 @@ export function ProviderOnboardingScreen() {
             />
           ) : null}
 
-          <NavigationButtons profile={profile} step={step} onStepChange={setStep} />
+          <NavigationButtons step={step} onStepChange={setStep} disabled={saving || uploadingPhoto || savingCategoryId !== null} />
         </>
       )}
     </ScrollView>
@@ -463,11 +472,11 @@ function getValidationErrors(
 
 function StepSelector({
   activeStep,
-  hasProfileId,
+  disabled,
   onSelect,
 }: {
   activeStep: StepKey;
-  hasProfileId: boolean;
+  disabled: boolean;
   onSelect: (step: StepKey) => void;
 }) {
   return (
@@ -480,7 +489,7 @@ function StepSelector({
             title={item.label}
             size="sm"
             variant={active ? 'primary' : 'outline'}
-            disabled={!hasProfileId && item.key !== 'dados'}
+            disabled={disabled}
             style={styles.stepButton}
             onPress={() => onSelect(item.key)}
           />
@@ -491,11 +500,11 @@ function StepSelector({
 }
 
 function NavigationButtons({
-  profile,
+  disabled,
   step,
   onStepChange,
 }: {
-  profile: ProviderOnboardingProfile | null;
+  disabled: boolean;
   step: StepKey;
   onStepChange: (step: StepKey) => void;
 }) {
@@ -506,12 +515,12 @@ function NavigationButtons({
   return (
     <View style={styles.navButtons}>
       {previousStep ? (
-        <Button title="Voltar" variant="secondary" onPress={() => onStepChange(previousStep)} style={styles.navButton} />
+        <Button title="Voltar" variant="secondary" disabled={disabled} onPress={() => onStepChange(previousStep)} style={styles.navButton} />
       ) : null}
       {nextStep ? (
         <Button
           title="Avancar"
-          disabled={!profile?.id}
+          disabled={disabled}
           onPress={() => onStepChange(nextStep)}
           style={styles.navButton}
         />
@@ -521,6 +530,9 @@ function NavigationButtons({
 }
 
 const styles = StyleSheet.create({
+  hiddenStep: {
+    display: 'none',
+  },
   container: {
     backgroundColor: theme.colors.background,
     gap: theme.spacing.md,

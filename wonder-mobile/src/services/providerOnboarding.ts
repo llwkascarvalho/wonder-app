@@ -2,6 +2,7 @@ import { AxiosError } from 'axios';
 
 import { api } from './api';
 import { ProfilePhotoAsset } from '../types/profile';
+import { adaptarPayloadPrestador, adaptarPrestador, PrestadorApiResponse } from './providerAdapter';
 import {
   ProviderCategoryLink,
   ProviderOnboardingCategory,
@@ -46,8 +47,8 @@ export function getBackendMessage(error: unknown, fallback: string): string {
 
 export async function obterMeuPrestador(): Promise<ProviderOnboardingProfile | null> {
   try {
-    const response = await api.get<ProviderOnboardingProfile>('/catalogo/prestadores/me');
-    return response.data;
+    const response = await api.get<PrestadorApiResponse>('/catalogo/prestadores/me');
+    return adaptarPrestador(response.data);
   } catch (error) {
     if (isNotFoundError(error)) {
       return null;
@@ -60,16 +61,16 @@ export async function obterMeuPrestador(): Promise<ProviderOnboardingProfile | n
 export async function criarPerfilPrestador(
   payload: ProviderOnboardingProfilePayload
 ): Promise<ProviderOnboardingProfile> {
-  const response = await api.post<ProviderOnboardingProfile>('/catalogo/prestadores', payload);
-  return response.data;
+  const response = await api.post<PrestadorApiResponse>('/catalogo/prestadores', adaptarPayloadPrestador(payload));
+  return adaptarPrestador(response.data);
 }
 
 export async function atualizarPerfilPrestador(
   prestadorId: number,
   payload: Partial<ProviderOnboardingProfilePayload>
 ): Promise<ProviderOnboardingProfile> {
-  const response = await api.put<ProviderOnboardingProfile>(`/catalogo/prestadores/${prestadorId}`, payload);
-  return response.data;
+  const response = await api.put<PrestadorApiResponse>(`/catalogo/prestadores/${prestadorId}`, adaptarPayloadPrestador(payload));
+  return adaptarPrestador(response.data);
 }
 
 export async function uploadFotoPrestadorOnboarding(
@@ -86,7 +87,7 @@ export async function uploadFotoPrestadorOnboarding(
     type: mimeType,
   } as unknown as Blob);
 
-  const response = await api.post<ProviderOnboardingProfile>(
+  const response = await api.post<PrestadorApiResponse>(
     `/catalogo/prestadores/${prestadorId}/foto`,
     formData,
     {
@@ -96,7 +97,7 @@ export async function uploadFotoPrestadorOnboarding(
     }
   );
 
-  return response.data;
+  return adaptarPrestador(response.data);
 }
 
 export async function listarCategoriasAtivas(): Promise<ProviderOnboardingCategory[]> {
@@ -197,8 +198,8 @@ export async function removerHorarioPrestadorOnboarding(prestadorId: number, hor
 }
 
 export async function enviarPrestadorParaAprovacao(prestadorId: number): Promise<ProviderOnboardingProfile> {
-  const response = await api.post<ProviderOnboardingProfile>(
+  const response = await api.post<PrestadorApiResponse>(
     `/catalogo/prestadores/${prestadorId}/enviar-aprovacao`
   );
-  return response.data;
+  return adaptarPrestador(response.data);
 }
