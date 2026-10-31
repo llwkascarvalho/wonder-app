@@ -1,22 +1,6 @@
 import { api } from './api';
 import { Categoria, Horario, Prestador, Servico } from '../types/catalogo';
-
-type PrestadorApiResponse = Omit<Prestador, 'usuario_id' | 'nome_estab' | 'foto_url'> & {
-  perfilUsuarioId: string;
-  nomeEstab: string;
-  fotoUrl: string | null;
-};
-
-function adaptarPrestador(prestador: PrestadorApiResponse): Prestador {
-  const { perfilUsuarioId, nomeEstab, fotoUrl, ...dados } = prestador;
-
-  return {
-    ...dados,
-    usuario_id: perfilUsuarioId,
-    nome_estab: nomeEstab,
-    foto_url: fotoUrl,
-  };
-}
+import { adaptarPrestador, PrestadorApiResponse } from './providerAdapter';
 
 export async function listarPrestadores(params?: {
   nome?: string;

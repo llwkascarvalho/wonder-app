@@ -14,9 +14,17 @@ export type ProviderOnboardingProfile = {
 };
 
 export type ProviderOnboardingProfilePayload = {
-  nome_estab: string;
-  documento: string;
+  nomeEstab: string;
+  documento?: string | null;
+  endereco?: string | null;
+  numero?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  estado?: string | null;
+  complemento?: string | null;
 };
+
+export type ProviderRegistrationDraft = Record<keyof ProviderOnboardingProfilePayload, string>;
 
 export type ProviderOnboardingCategory = {
   id: number;

@@ -18,12 +18,14 @@ export type UserProfile = {
 };
 
 export type UserProfileUpdate = {
-  nome: string;
-  telefone?: string | null;
+  telefone?: string;
+  foto?: ProfilePhotoAsset;
 };
 
 export type ProfilePhotoAsset = {
   uri: string;
   fileName?: string | null;
   mimeType?: string | null;
+  fileSize?: number;
+  file?: File;
 };

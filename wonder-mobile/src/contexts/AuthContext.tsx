@@ -3,13 +3,13 @@ import { Alert } from 'react-native';
 
 import { loginKeycloak, logoutKeycloak } from '../services/auth';
 import { normalizeProfile } from '../services/identity';
-import { getMyProfile, getProfileErrorMessage } from '../services/profileService';
+import { getMyProfile, getProfileErrorMessage, updateMyProfile } from '../services/profileService';
 import {
   clearSession, getAccessToken, getSession, getSessionVersion, isCurrentSession,
   restoreSession, saveSession, subscribeSession,
 } from '../services/session';
 import type { AuthState, Usuario } from '../types/auth';
-import type { PerfilUsuarioResponse } from '../types/profile';
+import type { PerfilUsuarioResponse, UserProfileUpdate } from '../types/profile';
 
 type AuthContextValue = AuthState & {
   demoModeEnabled: boolean;
@@ -18,6 +18,7 @@ type AuthContextValue = AuthState & {
   signInDemo: () => Promise<void>;
   signOut: () => Promise<void>;
   retryProfile: () => Promise<void>;
+  updateProfile: (payload: UserProfileUpdate) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -35,8 +36,34 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [error, setError] = useState<string | null>(null);
   const rawProfile = useRef<PerfilUsuarioResponse | null>(null);
   const profileRequest = useRef(0);
+  const profileUpdate = useRef<number | null>(null);
+
+  async function updateProfile(payload: UserProfileUpdate) {
+    if (isDemoSession || !getSession()) throw new Error('Entre na sua conta para editar o perfil.');
+    if (profileUpdate.current !== null) throw new Error('Aguarde o salvamento do perfil.');
+    const expected = getSessionVersion();
+    profileUpdate.current = expected;
+    // Invalida leituras iniciadas antes e durante o salvamento.
+    profileRequest.current += 1;
+    try {
+      const profile = await updateMyProfile(payload);
+      const current = getSession();
+      if (!isCurrentSession(expected) || !current) throw new Error('Sessão encerrada.');
+      const next = normalizeProfile(profile, current.accessToken);
+      rawProfile.current = profile;
+      setToken(current.accessToken);
+      setUsuario(next);
+      setError(null);
+    } finally {
+      if (isCurrentSession(expected)) {
+        profileRequest.current += 1;
+        profileUpdate.current = null;
+      }
+    }
+  }
 
   async function loadProfile() {
+    if (profileUpdate.current !== null) return;
     const expected = getSessionVersion();
     const request = ++profileRequest.current;
     setLoading(true);
@@ -113,14 +140,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
       if (!active) return;
       setToken(next?.accessToken ?? null);
       if (!next) {
+        profileUpdate.current = null;
         rawProfile.current = null;
         profileRequest.current += 1;
         setUsuario(null);
         setIsDemoSession(false);
         setLoading(false);
       } else if (sessionError) {
-        rawProfile.current = null;
-        setUsuario(null);
+        // Mantém o perfil confirmado em falhas recuperáveis de refresh.
         setError(sessionError);
       } else if (rawProfile.current) {
         try {
@@ -151,7 +178,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   return (
     <AuthContext.Provider value={{
       token, usuario, loading, error, demoModeEnabled: DEMO_MODE_ENABLED,
-      isDemoSession, signIn, signInDemo, signOut, retryProfile: loadProfile,
+      isDemoSession, signIn, signInDemo, signOut, retryProfile: loadProfile, updateProfile,
     }}>
       {children}
     </AuthContext.Provider>

@@ -57,7 +57,9 @@ No macOS com Xcode, use `npx expo run:ios`. Use um build nativo de desenvolvimen
 
 No nativo, access token, refresh token, expiração e ID token são armazenados no SecureStore. O JWT legado (`jwt`) é descartado na restauração. A abertura do app restaura tokens, renova se necessário e consulta novamente o Core. Pedidos simultâneos compartilham a renovação e persistem o refresh token rotacionado.
 
-Cada chamada pode repetir uma vez após 401. Refresh rejeitado ou segundo 401 encerram a sessão. Um 403 informa falta de permissão sem renovar. Falha de rede/5xx no bootstrap ou refresh bloqueia a navegação, preserva credenciais recuperáveis e oferece **Tentar novamente**. A leitura de perfil usa o contexto, com recarga pelo mesmo GET. Edição e upload de foto pessoal ficam indisponíveis até existirem contratos confirmados; não há chamadas aos endpoints `/auth/me` antigos. O fluxo de solicitação de prestador permanece existente.
+Cada chamada pode repetir uma vez após 401. Refresh rejeitado ou segundo 401 encerram a sessão. Um 403 informa falta de permissão sem renovar. Falha de rede/5xx no bootstrap bloqueia a navegação, preserva credenciais recuperáveis e oferece **Tentar novamente**. Se já houver um perfil confirmado, falhas recuperáveis de refresh preservam esse perfil. A leitura de perfil usa o contexto, com recarga pelo mesmo GET. Não há chamadas aos endpoints `/auth/me` antigos. O fluxo de solicitação de prestador permanece existente.
+
+**Editar perfil** permite atualizar telefone e/ou foto em cliente, prestador e administrador por `PUT /perfis/eu` multipart autenticado. Nome e e-mail continuam somente para leitura. O telefone aceita até 20 caracteres; deixá-lo em branco preserva o valor atual. A galeria aceita JPEG, PNG e WebP de até 5 MiB com tipo/tamanho identificados. O formulário mantém a seleção após falha para nova tentativa e salva sem carregamento global. A foto é consultada com autenticação e recarregada após substituição, mesmo com URL igual; sua ausência ou falha mostra a inicial do nome. Edição permanece indisponível em demonstração.
 
 **Sair** limpa a sessão local e tenta encerrar o SSO via logout OIDC com retorno registrado e ID token hint. Caso o logout remoto falhe ou seja cancelado, o app informa que a sessão remota pode continuar ativa. Operações de login, restauração, perfil e refresh iniciadas antes do logout não podem recriar a sessão.
 
@@ -80,6 +82,10 @@ npx expo export --platform all --output-dir .expo/keycloak-export
 Os testes usam `node:test`, o TypeScript já instalado e adaptadores simulados para Expo/SecureStore. Exercitam normalização e precedência de roles, PKCE/troca de código, cancelamento, restauração, refresh concorrente e rotacionado, rejeição versus indisponibilidade, repetição limitada após 401, 403 e invalidação de respostas/escritas após logout. Não substituem validação em aparelho e serviços reais.
 
 Resultados locais em 23/10/2026: TypeScript sem erros; 20 testes aprovados; exportação Expo dos bundles Android, iOS e web concluída. A exportação comprova compatibilidade de empacotamento, sem comprovar login em navegador ou execução nativa no aparelho.
+
+Atualização de perfil em 30/10/2026: `npm run typecheck` sem erros, `npm test` com os 20 testes existentes aprovados e exportação Expo Android/iOS/web concluída em `.expo/profile-export`. Nenhum teste novo foi criado, conforme solicitado. Revisão dos consumidores do tipo de foto preservou os uploads de prestador e categorias, sem alterações nesses serviços. Os checks locais não comprovam ausência de regressões em execução integrada.
+
+Pendências desta atualização: validar telefone isolado, foto isolada e ambos com Core/Keycloak e dispositivo; persistência ao reabrir; nome/e-mail inalterados; troca de foto com URL igual; limite exato de 5 MiB; formatos/metadados inválidos; permissão negada e cancelamento; rede e respostas 400/401/403/413/415/503 com nova tentativa. Conferir multipart e imagem em web/Android/iOS. Executar smoke tests de login/cadastro/restauração/refresh/logout, abas cliente/prestador/admin/demo, catálogo, agendamento, notificações/chat, solicitação/gestão de prestador, administração e uploads existentes. Essas verificações dependem do ambiente integrado e não foram executadas nesta sessão.
 
 Validação mobile com Keycloak/Core reais: **pendente**. Não foram fornecidos issuer/client/audience reais, acesso administrativo ao realm ou código/configuração do Core externo. Antes de concluir a change, validar:
 
@@ -120,6 +126,31 @@ ignorado; os testes locais continuam sendo executados.
 O Core precisa preservar o status dos erros durante o encaminhamento interno de
 erro. A correção desse comportamento é acompanhada na issue
 [PI-Wonder #94](https://github.com/JoaoManoelFontes/PI-Wonder/issues/94).
+
+## Cadastro profissional no Core Spring
+
+O formulário usa as etapas **Dados → Endereço → Revisão**, que compartilham um
+único objeto em memória. Avançar, voltar ou selecionar uma aba preserva os campos
+e não grava dados na API. O botão **Enviar cadastro** envia um único
+`POST /catalogo/prestadores` com `multipart/form-data`. Os campos de texto de
+`CadastroPrestadorRequest` são partes individuais: `nomeEstab`, `documento`,
+`endereco`, `numero`, `bairro`, `cidade`, `estado` e `complemento`. A foto opcional
+vai na parte `arquivo`, na mesma requisição. O Axios define o Content-Type com
+o boundary do formulário; não há um upload anterior ou envio separado de foto.
+
+Somente `nomeEstab` é obrigatório, conforme o DTO. Campos opcionais vazios são
+omitidos do multipart; os limites de tamanho acompanham a API. A seleção da foto
+usa a galeria, com prévia e opção de remover, e segue a validação do perfil:
+JPEG, PNG ou WebP de até 5 MiB. Na web envia o `File`; no celular envia URI, nome
+e MIME. Categorias, serviços e horários não fazem parte
+deste formulário porque não são campos desse endpoint.
+
+Na abertura, o app consulta o cadastro existente via GET. Após o POST bem-sucedido,
+exibe o status devolvido pela API, sem chamar `/enviar-aprovacao`. Em caso de erro,
+mantém os valores e a foto selecionada para nova tentativa. O formulário em memória não sobrevive ao
+recarregamento do app. Os testes de onboarding verificam a navegação, o payload
+multipart com e sem foto, permissão da galeria, cancelamento, falhas e proteção
+contra envio duplicado usando API simulada.
 
 ## Rollback
 
