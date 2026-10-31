@@ -25,7 +25,7 @@ export function SearchScreen() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
-  const buscarPrestadores = useCallback(async () => {
+  const buscarPrestadores = useCallback(async (signal: AbortSignal) => {
     setCarregando(true);
     setErro(null);
 
@@ -33,30 +33,33 @@ export function SearchScreen() {
       const resultado = await listarPrestadores({
         nome: nome.trim() || undefined,
         categoria_id: categoriaSelecionada ?? undefined,
-      });
-      const cards = await carregarCardsPrestadores(resultado);
-      setPrestadores(cards);
+      }, signal);
+      const cards = await carregarCardsPrestadores(resultado, signal);
+      if (!signal.aborted) setPrestadores(cards);
     } catch {
-      setErro('Nao foi possivel carregar os prestadores. Tente novamente.');
+      if (!signal.aborted) setErro('Nao foi possivel carregar os prestadores. Tente novamente.');
     } finally {
-      setCarregando(false);
+      if (!signal.aborted) setCarregando(false);
     }
   }, [nome, categoriaSelecionada]);
 
   useEffect(() => {
-    listarCategorias()
-      .then(setCategorias)
-      .catch(() => setCategorias([]));
+    const controle = new AbortController();
+    listarCategorias(controle.signal)
+      .then((resultado) => { if (!controle.signal.aborted) setCategorias(resultado); })
+      .catch(() => { if (!controle.signal.aborted) setCategorias([]); });
+    return () => controle.abort();
   }, []);
-
-  useEffect(() => {
-    const timeout = setTimeout(buscarPrestadores, 350);
-    return () => clearTimeout(timeout);
-  }, [buscarPrestadores]);
 
   useFocusEffect(
     useCallback(() => {
-      buscarPrestadores();
+      const controle = new AbortController();
+      setCarregando(true);
+      const timeout = setTimeout(() => buscarPrestadores(controle.signal), 350);
+      return () => {
+        clearTimeout(timeout);
+        controle.abort();
+      };
     }, [buscarPrestadores])
   );
 

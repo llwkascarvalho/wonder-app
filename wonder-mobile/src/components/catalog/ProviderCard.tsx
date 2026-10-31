@@ -33,8 +33,10 @@ export function ProviderCard({ provider, onPress }: ProviderCardProps) {
         </Text>
       </View>
 
-      <Text style={[styles.status, provider.disponivelHoje ? styles.available : styles.closed]}>
-        {provider.disponivelHoje ? 'Disponivel hoje' : 'Fechado'}
+      <Text style={[styles.status, provider.atendeHoje ? styles.available : styles.unknown]}>
+        {provider.atendeHoje === null
+          ? 'Horarios indisponiveis'
+          : provider.atendeHoje ? 'Atende hoje' : 'Sem mais atendimento hoje'}
       </Text>
     </Card>
   );
@@ -67,6 +69,8 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeight.medium,
   },
   status: {
+    flexShrink: 1,
+    maxWidth: 110,
     fontSize: theme.fontSize.xs,
     fontWeight: theme.fontWeight.bold,
     textAlign: 'right',
@@ -74,7 +78,7 @@ const styles = StyleSheet.create({
   available: {
     color: theme.colors.success,
   },
-  closed: {
-    color: theme.colors.error,
+  unknown: {
+    color: theme.colors.textSecondary,
   },
 });

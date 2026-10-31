@@ -7,12 +7,12 @@ import { Categoria, Horario, Prestador } from '../types/catalogo';
 export type ProviderCardModel = {
   prestador: Prestador;
   categorias: Categoria[];
-  disponivelHoje: boolean;
+  atendeHoje: boolean | null;
 };
 
 const APP_TIMEZONE = 'America/Fortaleza';
 
-function getLocalNow() {
+function getLocalNow(data: Date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     day: '2-digit',
     hour: '2-digit',
@@ -22,7 +22,7 @@ function getLocalNow() {
     timeZone: APP_TIMEZONE,
     weekday: 'short',
     year: 'numeric',
-  }).formatToParts(new Date());
+  }).formatToParts(data);
 
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   const localDate = new Date(
@@ -41,8 +41,8 @@ function parseTimeMinutes(value: string) {
   return hour * 60 + minute;
 }
 
-export function estaDisponivelHoje(horarios: Horario[]) {
-  const agora = getLocalNow();
+export function atendeHoje(horarios: Horario[], data = new Date()) {
+  const agora = getLocalNow(data);
 
   return horarios.some((horario) => {
     if (horario.dia_semana !== agora.diaSemana) {
@@ -53,28 +53,30 @@ export function estaDisponivelHoje(horarios: Horario[]) {
   });
 }
 
-async function carregarDadosCard(prestador: Prestador): Promise<ProviderCardModel> {
+async function carregarDadosCard(prestador: Prestador, signal?: AbortSignal): Promise<ProviderCardModel> {
   const [categoriasResult, horariosResult] = await Promise.allSettled([
-    listarCategoriasPrestador(prestador.id),
-    listarHorariosPrestador(prestador.id),
+    listarCategoriasPrestador(prestador.id, signal),
+    listarHorariosPrestador(prestador.id, signal),
   ]);
 
+  if (signal?.aborted) throw new Error('Consulta cancelada.');
+
   const categorias = categoriasResult.status === 'fulfilled' ? categoriasResult.value : [];
-  const horarios = horariosResult.status === 'fulfilled' ? horariosResult.value : [];
 
   return {
     prestador,
     categorias,
-    disponivelHoje: estaDisponivelHoje(horarios),
+    atendeHoje: horariosResult.status === 'fulfilled' ? atendeHoje(horariosResult.value) : null,
   };
 }
 
-export async function carregarCardsPrestadores(prestadores: Prestador[]) {
-  const resultados = await Promise.all(prestadores.map(carregarDadosCard));
+export async function carregarCardsPrestadores(prestadores: Prestador[], signal?: AbortSignal) {
+  const resultados = await Promise.all(prestadores.map((prestador) => carregarDadosCard(prestador, signal)));
 
   return resultados.sort((a, b) => {
-    if (a.disponivelHoje !== b.disponivelHoje) {
-      return a.disponivelHoje ? -1 : 1;
+    const prioridade = (valor: boolean | null) => valor === true ? 0 : valor === false ? 1 : 2;
+    if (a.atendeHoje !== b.atendeHoje) {
+      return prioridade(a.atendeHoje) - prioridade(b.atendeHoje);
     }
 
     return a.prestador.nome_estab.localeCompare(b.prestador.nome_estab);
