@@ -127,6 +127,19 @@ O Core precisa preservar o status dos erros durante o encaminhamento interno de
 erro. A correção desse comportamento é acompanhada na issue
 [PI-Wonder #94](https://github.com/JoaoManoelFontes/PI-Wonder/issues/94).
 
+### Trocas de seleção na disponibilidade
+
+A tela de agendamento cancela consultas anteriores ao trocar serviço, mês ou data.
+Respostas e erros atrasados não substituem os horários nem encerram o carregamento
+da seleção atual. Trocar o contexto limpa o horário escolhido; tocar novamente no
+mesmo serviço preserva o calendário. Um conflito 409 mantém o aviso e consulta
+novamente os horários, exigindo nova seleção antes de confirmar.
+
+`node --test tests/disponibilidade-tela.test.cjs` executa a tela e os serviços com
+hooks, UI e HTTP simulados para controlar respostas fora de ordem, falhas,
+listas vazias, conflito e desmontagem. Esses testes não substituem validação
+em aparelho com a API real.
+
 ## Cadastro profissional no Core Spring
 
 O formulário usa as etapas **Dados → Endereço → Revisão**, que compartilham um

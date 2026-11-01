@@ -21,9 +21,10 @@ export async function listarDiasDisponiveis(params: {
   prestador_id: number;
   servico_id: number;
   mes: string;
-}): Promise<DiasDisponiveisResponse> {
+}, signal?: AbortSignal): Promise<DiasDisponiveisResponse> {
   const response = await api.get<DiasDisponiveisResponse>('/agendamentos/dias-disponiveis', {
     params,
+    signal,
   });
   return response.data;
 }
@@ -32,9 +33,10 @@ export async function listarDisponibilidade(params: {
   prestador_id: number;
   servico_id: number;
   data: string;
-}): Promise<DisponibilidadeResponse> {
+}, signal?: AbortSignal): Promise<DisponibilidadeResponse> {
   const response = await api.get<DisponibilidadeResponse>('/agendamentos/disponibilidade', {
     params,
+    signal,
   });
   return response.data;
 }
