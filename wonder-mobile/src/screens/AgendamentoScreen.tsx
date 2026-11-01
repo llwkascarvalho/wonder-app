@@ -1,6 +1,6 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -71,6 +71,8 @@ export function AgendamentoScreen() {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [erroConfirmacao, setErroConfirmacao] = useState<string | null>(null);
+  const consultaDias = useRef<AbortController | null>(null);
+  const consultaHorarios = useRef<AbortController | null>(null);
 
   useEffect(() => {
     let ativo = true;
@@ -78,6 +80,13 @@ export function AgendamentoScreen() {
     async function carregar() {
       setCarregandoInicial(true);
       setErro(null);
+      setServicoSelecionado(null);
+      setDataSelecionada(null);
+      setDiasDisponiveis([]);
+      setHorarios([]);
+      setHorarioSelecionado(null);
+      setCarregandoDias(false);
+      setCarregandoHorarios(false);
 
       try {
         const [prestadorData, servicosData] = await Promise.all([
@@ -99,11 +108,14 @@ export function AgendamentoScreen() {
     carregar();
     return () => {
       ativo = false;
+      consultaDias.current?.abort();
+      consultaHorarios.current?.abort();
     };
   }, [prestadorId]);
 
   useEffect(() => {
-    let ativo = true;
+    const controle = new AbortController();
+    consultaDias.current = controle;
 
     async function carregarDias() {
       if (!servicoSelecionado) {
@@ -119,87 +131,106 @@ export function AgendamentoScreen() {
           prestador_id: prestadorId,
           servico_id: servicoSelecionado.id,
           mes: mesSelecionado,
-        });
+        }, controle.signal);
 
-        if (!ativo) return;
+        if (controle.signal.aborted) return;
 
         setDiasDisponiveis(
           response.dias.filter((dia) => dia.disponivel).map((dia) => dia.data)
         );
       } catch {
-        if (ativo) {
+        if (!controle.signal.aborted) {
           setDiasDisponiveis([]);
           setErroConfirmacao('Nao foi possivel carregar os dias disponiveis.');
         }
       } finally {
-        if (ativo) setCarregandoDias(false);
+        if (!controle.signal.aborted) setCarregandoDias(false);
       }
     }
 
     carregarDias();
     return () => {
-      ativo = false;
+      controle.abort();
     };
   }, [mesSelecionado, prestadorId, servicoSelecionado]);
 
   const carregarHorarios = useCallback(
-    async (data: string) => {
+    async (data: string, manterMensagem = false) => {
       if (!servicoSelecionado) return;
 
+      consultaHorarios.current?.abort();
+      const controle = new AbortController();
+      consultaHorarios.current = controle;
       setCarregandoHorarios(true);
-      setErroConfirmacao(null);
+      setHorarios([]);
+      setHorarioSelecionado(null);
+      if (!manterMensagem) setErroConfirmacao(null);
 
       try {
         const response = await listarDisponibilidade({
           prestador_id: prestadorId,
           servico_id: servicoSelecionado.id,
           data,
-        });
+        }, controle.signal);
 
-        setHorarios(response.horarios);
+        if (!controle.signal.aborted) setHorarios(response.horarios);
       } catch {
-        setHorarios([]);
-        setErroConfirmacao('Nao foi possivel carregar os horarios disponiveis.');
+        if (!controle.signal.aborted) {
+          setHorarios([]);
+          setErroConfirmacao('Nao foi possivel carregar os horarios disponiveis.');
+        }
       } finally {
-        setCarregandoHorarios(false);
+        if (!controle.signal.aborted) setCarregandoHorarios(false);
       }
     },
     [prestadorId, servicoSelecionado]
   );
 
+  function limparHorarios() {
+    consultaHorarios.current?.abort();
+    consultaHorarios.current = null;
+    setCarregandoHorarios(false);
+    setHorarios([]);
+    setHorarioSelecionado(null);
+  }
+
   function selecionarServico(servico: Servico) {
+    if (servicoSelecionado?.id === servico.id) return;
+    consultaDias.current?.abort();
+    limparHorarios();
     setServicoSelecionado(servico);
     setMesSelecionado(getCurrentMonthKey());
     setDataSelecionada(null);
     setDiasDisponiveis([]);
-    setHorarios([]);
-    setHorarioSelecionado(null);
     setErroConfirmacao(null);
   }
 
   function trocarMes(mes: string) {
+    consultaDias.current?.abort();
+    limparHorarios();
     setMesSelecionado(mes);
+    setDiasDisponiveis([]);
     setDataSelecionada(null);
-    setHorarios([]);
-    setHorarioSelecionado(null);
     setErroConfirmacao(null);
   }
 
   function selecionarData(data: string) {
+    limparHorarios();
     setDataSelecionada(data);
-    setHorarioSelecionado(null);
-    setHorarios([]);
     carregarHorarios(data);
   }
 
   async function confirmarAgendamento() {
-    if (!servicoSelecionado || !dataSelecionada || !horarioSelecionado) {
+    if (!servicoSelecionado || !dataSelecionada || !horarioSelecionado
+        || carregandoDias || carregandoHorarios
+        || !horarios.some((horario) => horario.inicio === horarioSelecionado.inicio)) {
       setErroConfirmacao('Selecione servico, data e horario para confirmar.');
       return;
     }
 
     setEnviando(true);
     setErroConfirmacao(null);
+    const consultaNoEnvio = consultaHorarios.current;
 
     try {
       await criarAgendamento({
@@ -213,9 +244,10 @@ export function AgendamentoScreen() {
       ]);
     } catch (error) {
       if (isConflictError(error)) {
+        if (consultaNoEnvio?.signal.aborted || consultaHorarios.current !== consultaNoEnvio) return;
         setErroConfirmacao('Este horario foi ocupado. Escolha outro horario disponivel.');
         setHorarioSelecionado(null);
-        await carregarHorarios(dataSelecionada);
+        await carregarHorarios(dataSelecionada, true);
         return;
       }
 
@@ -227,7 +259,9 @@ export function AgendamentoScreen() {
     }
   }
 
-  const podeConfirmar = Boolean(servicoSelecionado && dataSelecionada && horarioSelecionado);
+  const podeConfirmar = Boolean(servicoSelecionado && dataSelecionada && horarioSelecionado
+    && !carregandoDias && !carregandoHorarios
+    && horarios.some((horario) => horario.inicio === horarioSelecionado.inicio));
   const resumo = useMemo(() => {
     if (!prestador || !servicoSelecionado || !dataSelecionada || !horarioSelecionado) {
       return null;

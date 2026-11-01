@@ -1,5 +1,4 @@
 import { api } from './api';
-import { Categoria, Horario, Prestador, Servico } from '../types/catalogo';
 import { adaptarPrestador, PrestadorApiResponse } from './providerAdapter';
 import { Categoria, FotoEstabelecimento, Horario, Prestador, Servico } from '../types/catalogo';
 
