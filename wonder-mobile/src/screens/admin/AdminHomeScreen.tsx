@@ -1,7 +1,7 @@
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
+import { CompositeNavigationProp, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AdminIcon, AdminIconName } from '../../components/admin/AdminIcon';
@@ -34,10 +34,12 @@ export function AdminHomeScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    setLoading(true);
-    load().finally(() => setLoading(false));
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      load().finally(() => setLoading(false));
+    }, [load])
+  );
 
   async function handleRefresh() {
     setRefreshing(true);

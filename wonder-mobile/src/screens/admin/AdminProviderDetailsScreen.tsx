@@ -20,6 +20,11 @@ import { AdminProvidersStackParamList } from '../../navigation/AdminProvidersSta
 import { atualizarStatusPrestadorAdmin, obterPrestadorAdmin } from '../../services/admin';
 import { theme } from '../../styles/theme';
 import { AdminPrestadorDetalhe, AdminPrestadorStatus } from '../../types/admin';
+import {
+  AdminProviderStatusAction,
+  getAdminProviderStatusActions,
+  getAdminProviderStatusSuccessMessage,
+} from '../../utils/adminProviderStatus';
 import { formatBackendDateTime } from '../../utils/dateTime';
 
 type Route = RouteProp<AdminProvidersStackParamList, 'AdminProviderDetails'>;
@@ -64,22 +69,6 @@ function extractBackendMessage(error: unknown, fallback: string): string {
   return parseDetail(responseData) || fallback;
 }
 
-function successMessage(status: AdminPrestadorStatus): string {
-  if (status === 'ativo') {
-    return 'Prestador aprovado com sucesso.';
-  }
-
-  if (status === 'rejeitado') {
-    return 'Cadastro rejeitado com sucesso.';
-  }
-
-  if (status === 'rascunho') {
-    return 'Solicitacao de correcao enviada com sucesso.';
-  }
-
-  return 'Status atualizado com sucesso.';
-}
-
 export function AdminProviderDetailsScreen() {
   const route = useRoute<Route>();
   const navigation = useNavigation<Navigation>();
@@ -104,6 +93,11 @@ export function AdminProviderDetailsScreen() {
       .join('\n');
   }, [prestador]);
 
+  const statusActions = useMemo(
+    () => (prestador ? getAdminProviderStatusActions(prestador.status) : []),
+    [prestador]
+  );
+
   const load = useCallback(async () => {
     setError('');
     try {
@@ -125,6 +119,11 @@ export function AdminProviderDetailsScreen() {
   }
 
   async function updateStatus(status: AdminPrestadorStatus, motivo?: string) {
+    if (!prestador) {
+      return;
+    }
+
+    const previousStatus = prestador.status;
     setSavingStatus(status);
     setError('');
 
@@ -136,7 +135,7 @@ export function AdminProviderDetailsScreen() {
       setNoteModalAction(null);
       setNote('');
       await load();
-      Alert.alert('Status atualizado', successMessage(status), [
+      Alert.alert('Status atualizado', getAdminProviderStatusSuccessMessage(previousStatus, status), [
         {
           text: 'OK',
           onPress: () => navigation.goBack(),
@@ -152,6 +151,34 @@ export function AdminProviderDetailsScreen() {
   function openNoteModal(action: NoteAction) {
     setNote('');
     setNoteModalAction(action);
+  }
+
+  function requestStatusUpdate(action: AdminProviderStatusAction) {
+    if (action.requiresNote) {
+      openNoteModal(action.status as NoteAction);
+      return;
+    }
+
+    if (action.requiresConfirmation) {
+      const suspending = action.status === 'suspenso';
+      Alert.alert(
+        suspending ? 'Suspender prestador' : 'Reativar prestador',
+        suspending
+          ? 'O prestador deixara de aparecer no catalogo publico. Deseja continuar?'
+          : 'O prestador voltara a aparecer no catalogo publico. Deseja continuar?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: suspending ? 'Suspender' : 'Reativar',
+            style: suspending ? 'destructive' : 'default',
+            onPress: () => updateStatus(action.status),
+          },
+        ]
+      );
+      return;
+    }
+
+    updateStatus(action.status);
   }
 
   function confirmNoteAction() {
@@ -223,26 +250,24 @@ export function AdminProviderDetailsScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <View style={styles.actions}>
-          <Button
-            title="Aprovar"
-            loading={savingStatus === 'ativo'}
-            disabled={savingStatus !== null || prestador.status !== 'pendente'}
-            onPress={() => updateStatus('ativo')}
-          />
-          <Button
-            title="Solicitar correcao"
-            variant="outline"
-            disabled={savingStatus !== null || prestador.status !== 'pendente'}
-            onPress={() => openNoteModal('rascunho')}
-          />
-          <Button
-            title="Rejeitar"
-            variant="danger"
-            disabled={savingStatus !== null || prestador.status !== 'pendente'}
-            onPress={() => openNoteModal('rejeitado')}
-          />
-        </View>
+        {statusActions.length ? (
+          <View style={styles.actions}>
+            {statusActions.map((action) => (
+              <Button
+                key={`${prestador.status}-${action.status}`}
+                title={action.label}
+                variant={action.variant}
+                loading={savingStatus === action.status}
+                disabled={savingStatus !== null}
+                onPress={() => requestStatusUpdate(action)}
+              />
+            ))}
+          </View>
+        ) : (
+          <Card>
+            <Text style={styles.cardText}>Nao ha alteracoes de status disponiveis neste momento.</Text>
+          </Card>
+        )}
       </ScrollView>
 
       <Modal transparent visible={noteModalAction !== null} animationType="fade">

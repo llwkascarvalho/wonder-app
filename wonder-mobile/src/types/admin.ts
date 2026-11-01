@@ -6,9 +6,10 @@ export type AdminPrestador = {
   usuario_id: number | string;
   nome_estab: string;
   documento: string;
-  status: AdminPrestadorStatus | string;
+  cidade?: string | null;
+  estado?: string | null;
+  status: AdminPrestadorStatus;
   foto_url?: string | null;
-  solicitante_nome?: string | null;
   solicitante_foto_url?: string | null;
   enviado_em?: string | null;
   aprovado_em?: string | null;
@@ -24,6 +25,7 @@ export type AdminServico = {
   duracao_min: number;
   categoria_id?: number | null;
   foto_url?: string | null;
+  status?: string;
 };
 
 export type AdminHorario = {
@@ -35,6 +37,11 @@ export type AdminHorario = {
 };
 
 export type AdminPrestadorDetalhe = AdminPrestador & {
+  endereco?: string | null;
+  numero?: string | null;
+  bairro?: string | null;
+  complemento?: string | null;
+  ativo: boolean;
   servicos: AdminServico[];
   horarios: AdminHorario[];
   categorias?: Array<{
