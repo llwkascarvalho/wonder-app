@@ -25,8 +25,11 @@ export async function obterPrestadorAdmin(prestadorId: number): Promise<AdminPre
 export async function atualizarStatusPrestadorAdmin(
   prestadorId: number,
   payload: AdminStatusPayload
-): Promise<AdminPrestador> {
-  const response = await api.patch<AdminPrestador>(`/admin/prestadores/${prestadorId}/status`, payload);
+): Promise<AdminPrestadorDetalhe> {
+  const response = await api.patch<AdminPrestadorDetalhe>(
+    `/admin/prestadores/${prestadorId}/status`,
+    payload
+  );
   return response.data;
 }
 

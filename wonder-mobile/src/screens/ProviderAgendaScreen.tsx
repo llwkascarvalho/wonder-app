@@ -111,7 +111,7 @@ export function ProviderAgendaScreen() {
       setAgendamentos(nextAgendamentos);
 
       if (usuario?.id) {
-        const foundPrestador = await obterPrestadorLogado(usuario.id);
+        const foundPrestador = await obterPrestadorLogado();
         setPrestador(foundPrestador);
         if (foundPrestador) {
           setServicos(await listarServicos(foundPrestador.id));

@@ -17,7 +17,6 @@ import {
   atualizarPrestador,
   atualizarServico,
   criarHorario,
-  criarPrestador,
   criarServico,
   listarFotosEstabelecimento,
   listarHorarios,
@@ -92,7 +91,7 @@ export function ProviderProfileScreen() {
     setError('');
     setLoading(true);
     try {
-      const foundPrestador = await obterPrestadorLogado(usuario.id);
+      const foundPrestador = await obterPrestadorLogado();
       setPrestador(foundPrestador);
       setNomeEstab(foundPrestador?.nome_estab || '');
       setDocumento(foundPrestador?.documento || '');
@@ -131,37 +130,6 @@ export function ProviderProfileScreen() {
   useEffect(() => {
     loadProviderProfile();
   }, [loadProviderProfile]);
-
-  async function handleCreatePrestador() {
-    if (!nomeEstab.trim() || !documento.trim()) {
-      setError('Informe nome do estabelecimento e documento.');
-      return;
-    }
-
-    setSaving(true);
-    setError('');
-    try {
-      const payload: PrestadorPayload = {
-        nome_estab: nomeEstab.trim(),
-        documento: documento.trim(),
-        endereco: normalizeOptionalText(endereco),
-        numero: normalizeOptionalText(numero),
-        bairro: normalizeOptionalText(bairro),
-        cidade: normalizeOptionalText(cidade),
-        estado: normalizeOptionalText(estado).toUpperCase(),
-        complemento: normalizeOptionalText(complemento),
-      };
-      const created = await criarPrestador({
-        ...payload,
-      });
-      setPrestador(created);
-      await loadProviderProfile();
-    } catch {
-      setError('Nao foi possivel criar o perfil do prestador.');
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function handleUpdatePrestador() {
     if (!prestador) {
@@ -448,16 +416,12 @@ export function ProviderProfileScreen() {
       <LoadingIndicator text="Carregando dados do estabelecimento..." />
       ) : !prestador ? (
         <Card style={styles.formCard}>
-          <Text style={styles.title}>Criar perfil de prestador</Text>
-          <Input
-            label="Nome do estabelecimento"
-            placeholder="Diego BarberShop"
-            value={nomeEstab}
-            onChangeText={setNomeEstab}
-          />
-          <Input label="CPF/CNPJ" placeholder="00.000.000/0000-00" value={documento} onChangeText={setDocumento} />
+          <Text style={styles.title}>Cadastro profissional indisponível</Text>
+          <Text style={styles.cardText}>
+            Não foi possível localizar o cadastro aprovado desta conta. Atualize a sessão e tente novamente.
+          </Text>
           {error ? <Text style={styles.error}>{error}</Text> : null}
-          <Button title="Salvar perfil" onPress={handleCreatePrestador} loading={saving} />
+          <Button title="Tentar novamente" onPress={loadProviderProfile} />
         </Card>
       ) : (
         <>

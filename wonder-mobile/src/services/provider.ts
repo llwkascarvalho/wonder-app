@@ -17,13 +17,8 @@ export async function listarPrestadores() {
   return response.data.map(adaptarPrestador);
 }
 
-export async function obterPrestadorLogado(usuarioId: string | number) {
-  const prestadores = await listarPrestadores();
-  return prestadores.find((prestador) => String(prestador.usuario_id) === String(usuarioId)) || null;
-}
-
-export async function criarPrestador(payload: PrestadorPayload) {
-  const response = await api.post<PrestadorApiResponse>('/catalogo/prestadores', adaptarPayloadPrestador(payload));
+export async function obterPrestadorLogado() {
+  const response = await api.get<PrestadorApiResponse>('/catalogo/prestadores/me');
   return adaptarPrestador(response.data);
 }
 
