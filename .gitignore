@@ -252,3 +252,11 @@ uploads_dump.tar.gz.b64
 tmp/
 tmp_slide_review/
 tmp_slide_review_2/
+
+# Dependencias JavaScript geradas em qualquer subdiretorio
+node_modules/
+
+# Artefatos locais de apoio e arquivos gerados
+.codex-attachments/
+outputs/
+documentos-contexto/
