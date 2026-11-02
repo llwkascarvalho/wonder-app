@@ -26,13 +26,22 @@ export function validateProfilePhoto(asset: ProfilePhotoAsset): void {
 }
 
 export function appendProfilePhoto(form: FormData, asset: ProfilePhotoAsset): void {
+  appendImageFile(form, 'arquivo', asset, 'perfil');
+}
+
+export function appendImageFile(
+  form: FormData,
+  fieldName: string,
+  asset: ProfilePhotoAsset,
+  fallbackName: string
+): void {
   validateProfilePhoto(asset);
   if (Platform.OS === 'web') {
-    form.append('arquivo', asset.file!, asset.file!.name);
+    form.append(fieldName, asset.file!, asset.file!.name);
   } else {
     const extension = asset.mimeType === 'image/jpeg' ? 'jpg' : asset.mimeType === 'image/png' ? 'png' : 'webp';
-    form.append('arquivo', {
-      uri: asset.uri, name: asset.fileName || `perfil.${extension}`, type: asset.mimeType,
+    form.append(fieldName, {
+      uri: asset.uri, name: asset.fileName || `${fallbackName}.${extension}`, type: asset.mimeType,
     } as unknown as Blob);
   }
 }

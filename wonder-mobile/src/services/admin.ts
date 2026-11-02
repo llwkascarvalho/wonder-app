@@ -1,5 +1,6 @@
 import { api } from './api';
 import { ProfilePhotoAsset } from '../types/profile';
+import { appendImageFile } from './profileService';
 import {
   AdminCategoria,
   AdminCategoriaPayload,
@@ -64,23 +65,11 @@ export async function uploadFotoCategoriaAdmin(
   asset: ProfilePhotoAsset
 ): Promise<AdminCategoria> {
   const formData = new FormData();
-  const fileName = asset.fileName || `categoria-${Date.now()}.jpg`;
-  const mimeType = asset.mimeType || 'image/jpeg';
-
-  formData.append('file', {
-    uri: asset.uri,
-    name: fileName,
-    type: mimeType,
-  } as unknown as Blob);
+  appendImageFile(formData, 'file', asset, `categoria-${categoriaId}`);
 
   const response = await api.post<AdminCategoria>(
-    `/catalogo/admin/categorias/${categoriaId}/foto`,
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    }
+    `/admin/categorias/${categoriaId}/foto`,
+    formData
   );
 
   return response.data;

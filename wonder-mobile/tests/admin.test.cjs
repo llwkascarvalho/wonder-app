@@ -22,6 +22,9 @@ function carregarModulos(api) {
       if (path.resolve(path.dirname(caminho), id) === path.resolve(__dirname, '../src/services/api')) {
         return { __esModule: true, default: api, api };
       }
+      if (id === 'react-native') {
+        return { Platform: { OS: 'web' } };
+      }
       if (id.startsWith('.')) {
         return carregar(
           path.relative(
@@ -122,4 +125,75 @@ test('mensagem diferencia aprovacao, suspensao e reativacao', () => {
   assert.match(getAdminProviderStatusSuccessMessage('pendente', 'ativo'), /aprovado/);
   assert.match(getAdminProviderStatusSuccessMessage('ativo', 'suspenso'), /suspenso/);
   assert.match(getAdminProviderStatusSuccessMessage('suspenso', 'ativo'), /reativado/);
+});
+
+test('categorias usam somente as rotas administrativas definitivas', async () => {
+  const requests = [];
+  const categoria = {
+    id: 9,
+    nome: 'Cabelo',
+    descricao: 'Servicos de cabelo',
+    status: 'ativa',
+    foto_url: null,
+  };
+  const api = {
+    get: async (route) => {
+      requests.push({ method: 'GET', route });
+      return { data: [categoria] };
+    },
+    post: async (route, payload) => {
+      requests.push({ method: 'POST', route, payload });
+      return { data: categoria };
+    },
+    put: async (route, payload) => {
+      requests.push({ method: 'PUT', route, payload });
+      return { data: categoria };
+    },
+    patch: async (route, payload) => {
+      requests.push({ method: 'PATCH', route, payload });
+      return { data: { ...categoria, status: payload.status } };
+    },
+  };
+  const admin = carregarModulos(api)('services/admin.ts');
+  const file = new Blob(['png'], { type: 'image/png' });
+  Object.defineProperty(file, 'name', { value: 'cabelo.png' });
+
+  await admin.listarCategoriasAdmin();
+  await admin.criarCategoriaAdmin({ nome: 'Cabelo', descricao: 'Servicos de cabelo' });
+  await admin.atualizarCategoriaAdmin(9, { nome: 'Cabelo e barba', descricao: null });
+  await admin.atualizarStatusCategoriaAdmin(9, { status: 'inativa' });
+  await admin.uploadFotoCategoriaAdmin(9, { uri: 'blob:cabelo', file });
+
+  assert.deepEqual(
+    requests.map(({ method, route }) => ({ method, route })),
+    [
+      { method: 'GET', route: '/admin/categorias' },
+      { method: 'POST', route: '/admin/categorias' },
+      { method: 'PUT', route: '/admin/categorias/9' },
+      { method: 'PATCH', route: '/admin/categorias/9/status' },
+      { method: 'POST', route: '/admin/categorias/9/foto' },
+    ]
+  );
+  const upload = requests[4].payload;
+  assert.ok(upload instanceof FormData);
+  assert.equal(upload.get('file').name, 'cabelo.png');
+  assert.equal(upload.get('arquivo'), null);
+});
+
+test('foto de categoria invalida e recusada antes de chamar a API', async () => {
+  let uploads = 0;
+  const admin = carregarModulos({
+    post: async () => {
+      uploads += 1;
+      return { data: {} };
+    },
+  })('services/admin.ts');
+  const file = new Blob(['gif'], { type: 'image/gif' });
+  Object.defineProperty(file, 'name', { value: 'categoria.gif' });
+
+  await assert.rejects(
+    admin.uploadFotoCategoriaAdmin(4, { uri: 'blob:categoria', file }),
+    /JPEG, PNG ou WebP/
+  );
+  assert.equal(uploads, 0);
 });

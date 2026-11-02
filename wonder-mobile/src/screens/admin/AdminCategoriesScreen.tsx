@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -22,6 +23,7 @@ import {
   listarCategoriasAdmin,
   uploadFotoCategoriaAdmin,
 } from '../../services/admin';
+import { validateProfilePhoto } from '../../services/profileService';
 import { theme } from '../../styles/theme';
 import { AdminCategoria, AdminCategoriaStatus } from '../../types/admin';
 
@@ -54,7 +56,7 @@ function extractBackendMessage(error: unknown, fallback: string): string {
     return null;
   }
 
-  return parseDetail(responseData) || fallback;
+  return parseDetail(responseData) || (error instanceof Error ? error.message : fallback);
 }
 
 export function AdminCategoriesScreen() {
@@ -137,11 +139,12 @@ export function AdminCategoriesScreen() {
     setSuccess('');
 
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (!permission.granted) {
-        setError('Permita o acesso a galeria para selecionar a imagem da categoria.');
-        return;
+      if (Platform.OS !== 'web') {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          setError('Permita o acesso a galeria para selecionar a imagem da categoria.');
+          return;
+        }
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -154,7 +157,15 @@ export function AdminCategoriesScreen() {
         return;
       }
 
-      setSelectedImage(result.assets[0]);
+      const asset = result.assets[0];
+      validateProfilePhoto({
+        uri: asset.uri,
+        fileName: asset.fileName,
+        mimeType: asset.mimeType,
+        fileSize: asset.fileSize,
+        file: asset.file,
+      });
+      setSelectedImage(asset);
     } catch (pickError) {
       setError(extractBackendMessage(pickError, 'Nao foi possivel selecionar a imagem.'));
     }
@@ -180,21 +191,38 @@ export function AdminCategoriesScreen() {
         ? await atualizarCategoriaAdmin(editingCategoria.id, payload)
         : await criarCategoriaAdmin(payload);
 
-      if (selectedImage) {
-        await uploadFotoCategoriaAdmin(savedCategoria.id, {
-          uri: selectedImage.uri,
-          fileName: selectedImage.fileName,
-          mimeType: selectedImage.mimeType,
-        });
-      }
-
       setModalVisible(false);
       setEditingCategoria(null);
       setNome('');
       setDescricao('');
+      const imageToUpload = selectedImage;
       setSelectedImage(null);
-      setSuccess(selectedImage ? 'Categoria e imagem salvas com sucesso.' : 'Categoria salva com sucesso.');
+      let imageUploadError = '';
+
+      if (imageToUpload) {
+        try {
+          await uploadFotoCategoriaAdmin(savedCategoria.id, {
+            uri: imageToUpload.uri,
+            fileName: imageToUpload.fileName,
+            mimeType: imageToUpload.mimeType,
+            fileSize: imageToUpload.fileSize,
+            file: imageToUpload.file,
+          });
+          setSuccess('Categoria e imagem salvas com sucesso.');
+        } catch (imageError) {
+          const detail = extractBackendMessage(
+            imageError,
+            'Nao foi possivel enviar a imagem.'
+          );
+          imageUploadError = `A categoria foi salva, mas a imagem nao foi enviada. ${detail}`;
+        }
+      } else {
+        setSuccess('Categoria salva com sucesso.');
+      }
       await load();
+      if (imageUploadError) {
+        setError(imageUploadError);
+      }
     } catch (saveError) {
       setError(extractBackendMessage(saveError, 'Nao foi possivel salvar a categoria.'));
     } finally {
