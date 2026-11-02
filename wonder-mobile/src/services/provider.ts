@@ -1,6 +1,7 @@
 import api from './api';
 import { ProfilePhotoAsset } from '../types/profile';
 import { adaptarPayloadPrestador, adaptarPrestador, PrestadorApiResponse } from './providerAdapter';
+import { appendImageFile } from './profileService';
 import {
   Agendamento,
   FotoEstabelecimento,
@@ -119,6 +120,22 @@ export async function atualizarServico(prestadorId: number, servicoId: number, p
     `/catalogo/prestadores/${prestadorId}/servicos/${servicoId}`,
     payload
   );
+  return response.data;
+}
+
+export async function uploadFotoServico(
+  prestadorId: number,
+  servicoId: number,
+  asset: ProfilePhotoAsset
+): Promise<Servico> {
+  const formData = new FormData();
+  appendImageFile(formData, 'file', asset, `servico-${servicoId}`);
+
+  const response = await api.post<Servico>(
+    `/catalogo/prestadores/${prestadorId}/servicos/${servicoId}/foto`,
+    formData
+  );
+
   return response.data;
 }
 

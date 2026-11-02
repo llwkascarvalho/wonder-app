@@ -5,7 +5,6 @@ import { ProfilePhotoAsset } from '../types/profile';
 import { appendProfilePhoto } from './profileService';
 import { adaptarPrestador, PrestadorApiResponse } from './providerAdapter';
 import {
-  ProviderCategoryLink,
   ProviderOnboardingCategory,
   ProviderOnboardingProfile,
   ProviderOnboardingProfilePayload,
@@ -112,12 +111,12 @@ export async function listarCategoriasAtivas(): Promise<ProviderOnboardingCatego
   return response.data;
 }
 
-export async function listarMinhasCategoriasPrestador(): Promise<ProviderCategoryLink[]> {
-  const response = await api.get<ProviderCategoryLink[]>('/catalogo/prestadores/me/categorias');
+export async function listarMinhasCategoriasPrestador(): Promise<ProviderOnboardingCategory[]> {
+  const response = await api.get<ProviderOnboardingCategory[]>('/catalogo/prestadores/me/categorias');
   return response.data;
 }
 
-export async function listarMinhasCategoriasPrestadorSeguro(): Promise<ProviderCategoryLink[]> {
+export async function listarMinhasCategoriasPrestadorSeguro(): Promise<ProviderOnboardingCategory[]> {
   try {
     return await listarMinhasCategoriasPrestador();
   } catch (error) {
@@ -127,17 +126,6 @@ export async function listarMinhasCategoriasPrestadorSeguro(): Promise<ProviderC
 
     throw error;
   }
-}
-
-export async function associarMinhasCategoriasPrestador(categoriaIds: number[]): Promise<ProviderCategoryLink[]> {
-  const response = await api.post<ProviderCategoryLink[]>('/catalogo/prestadores/me/categorias', {
-    categoria_ids: categoriaIds,
-  });
-  return response.data;
-}
-
-export async function removerMinhaCategoriaPrestador(categoriaId: number): Promise<void> {
-  await api.delete(`/catalogo/prestadores/me/categorias/${categoriaId}`);
 }
 
 export async function listarServicosPrestadorOnboarding(prestadorId: number): Promise<ProviderOnboardingService[]> {

@@ -33,11 +33,6 @@ export type ProviderOnboardingCategory = {
   status?: string;
 };
 
-export type ProviderCategoryLink = {
-  prestador_id: number;
-  categoria: ProviderOnboardingCategory;
-};
-
 export type ProviderOnboardingService = {
   id: number;
   prestador_id: number;
