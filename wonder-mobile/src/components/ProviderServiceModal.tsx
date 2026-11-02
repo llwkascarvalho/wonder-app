@@ -1,7 +1,11 @@
+import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { CatalogImage } from './catalog/CatalogImage';
+import { validateProfilePhoto } from '../services/profileService';
 import { theme } from '../styles/theme';
+import { ProfilePhotoAsset } from '../types/profile';
 import { Button } from './Button';
 import { Input } from './Input';
 
@@ -20,8 +24,12 @@ type ProviderServiceModalProps = {
     preco: number;
     duracao_min: number;
     categoria_id?: number | null;
+    foto_url?: string | null;
   } | null;
-  onSave: (payload: { nome: string; preco: number; duracao_min: number; categoria_id?: number }) => Promise<void>;
+  onSave: (
+    payload: { nome: string; preco: number; duracao_min: number; categoria_id?: number },
+    photo?: ProfilePhotoAsset
+  ) => Promise<void>;
 };
 
 export function ProviderServiceModal({
@@ -36,6 +44,8 @@ export function ProviderServiceModal({
   const [preco, setPreco] = useState('');
   const [duracao, setDuracao] = useState('');
   const [categoriaId, setCategoriaId] = useState<number | null>(null);
+  const [photo, setPhoto] = useState<ProfilePhotoAsset>();
+  const [pickingPhoto, setPickingPhoto] = useState(false);
   const [error, setError] = useState('');
   const shouldSelectCategory = Boolean(categories?.length);
 
@@ -48,6 +58,7 @@ export function ProviderServiceModal({
     setPreco(initialService ? String(initialService.preco) : '');
     setDuracao(initialService ? String(initialService.duracao_min) : '');
     setCategoriaId(initialService?.categoria_id || null);
+    setPhoto(undefined);
     setError('');
   }, [initialService, visible]);
 
@@ -65,23 +76,75 @@ export function ProviderServiceModal({
       return;
     }
 
-    await onSave({
-      nome: nome.trim(),
-      preco: precoNumber,
-      duracao_min: duracaoNumber,
-      categoria_id: categoriaId || undefined,
-    });
-    setNome('');
-    setPreco('');
-    setDuracao('');
-    setCategoriaId(null);
+    try {
+      await onSave({
+        nome: nome.trim(),
+        preco: precoNumber,
+        duracao_min: duracaoNumber,
+        categoria_id: categoriaId || undefined,
+      }, photo);
+      setNome('');
+      setPreco('');
+      setDuracao('');
+      setCategoriaId(null);
+      setPhoto(undefined);
+      setError('');
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Nao foi possivel salvar o servico.');
+    }
+  }
+
+  async function handlePickPhoto() {
+    if (loading || pickingPhoto) {
+      return;
+    }
+
+    setPickingPhoto(true);
     setError('');
+    try {
+      if (Platform.OS !== 'web') {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          setError('Permita o acesso a galeria para selecionar a foto do servico.');
+          return;
+        }
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        mediaTypes: ['images'],
+        quality: 0.85,
+      });
+      if (result.canceled || !result.assets.length) {
+        return;
+      }
+
+      const image = result.assets[0];
+      const selectedPhoto = {
+        uri: image.uri,
+        fileName: image.fileName,
+        mimeType: image.mimeType,
+        fileSize: image.fileSize,
+        file: image.file,
+      };
+      validateProfilePhoto(selectedPhoto);
+      setPhoto(selectedPhoto);
+    } catch (photoError) {
+      setError(photoError instanceof Error ? photoError.message : 'Nao foi possivel selecionar a foto.');
+    } finally {
+      setPickingPhoto(false);
+    }
   }
 
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.content}>
+        <View style={styles.modalCard}>
+          <ScrollView
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
           <Text style={styles.title}>{initialService ? 'Editar servico' : 'Cadastro de servico'}</Text>
 
           <Input label="Nome do servico" placeholder="Corte degradado" value={nome} onChangeText={setNome} />
@@ -123,8 +186,27 @@ export function ProviderServiceModal({
             </View>
           ) : null}
 
-          <View style={styles.imagePlaceholder}>
-            <Text style={styles.imageText}>Imagem opcional fora do escopo</Text>
+          <View style={styles.imageSection}>
+            {photo ? (
+              <Image source={{ uri: photo.uri }} resizeMode="cover" style={styles.imagePreview} />
+            ) : initialService?.foto_url ? (
+              <CatalogImage fotoUrl={initialService.foto_url} kind="service" style={styles.imagePreview} />
+            ) : null}
+            <View style={styles.imageContent}>
+              <Text style={styles.imageLabel}>Foto do servico (opcional)</Text>
+              <Text style={styles.imageText}>JPEG, PNG ou WebP de ate 5 MiB.</Text>
+              <Button
+                title={photo || initialService?.foto_url ? 'Alterar foto' : 'Selecionar foto'}
+                size="sm"
+                variant="outline"
+                onPress={handlePickPhoto}
+                loading={pickingPhoto}
+                disabled={loading}
+              />
+              {photo ? (
+                <Button title="Remover selecao" size="sm" variant="secondary" onPress={() => setPhoto(undefined)} disabled={loading} />
+              ) : null}
+            </View>
           </View>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -133,6 +215,7 @@ export function ProviderServiceModal({
             <Button title="Cancelar" variant="secondary" onPress={onClose} disabled={loading} />
             <Button title="Salvar" onPress={handleSave} loading={loading} />
           </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -147,13 +230,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: theme.spacing.lg,
   },
-  content: {
+  modalCard: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.lg,
-    gap: theme.spacing.md,
+    maxHeight: '90%',
     maxWidth: 420,
-    padding: theme.spacing.lg,
+    overflow: 'hidden',
     width: '100%',
+  },
+  content: {
+    gap: theme.spacing.md,
+    padding: theme.spacing.lg,
   },
   title: {
     color: theme.colors.text,
@@ -162,14 +249,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     textTransform: 'uppercase',
   },
-  imagePlaceholder: {
+  imageSection: {
     alignItems: 'center',
-    borderColor: theme.colors.textMuted,
+    backgroundColor: theme.colors.surfaceMuted,
     borderRadius: theme.borderRadius.sm,
-    borderStyle: 'dashed',
-    borderWidth: 1,
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+    padding: theme.spacing.sm,
+  },
+  imagePreview: {
+    borderRadius: theme.borderRadius.md,
     height: 96,
-    justifyContent: 'center',
+    width: 96,
+  },
+  imageContent: {
+    flex: 1,
+    gap: theme.spacing.xs,
+  },
+  imageLabel: {
+    color: theme.colors.text,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.bold,
   },
   imageText: {
     color: theme.colors.textMuted,

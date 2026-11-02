@@ -26,16 +26,16 @@ import {
   removerHorario,
   removerServico,
   uploadFotoPrestador,
+  uploadFotoServico,
 } from '../services/provider';
 import {
-  associarMinhasCategoriasPrestador,
   listarCategoriasAtivas,
   listarMinhasCategoriasPrestadorSeguro,
-  removerMinhaCategoriaPrestador,
 } from '../services/providerOnboarding';
 import { theme } from '../styles/theme';
 import { Categoria } from '../types/catalogo';
 import { FotoEstabelecimento, Horario, Prestador, PrestadorPayload, Servico } from '../types/provider';
+import { ProfilePhotoAsset } from '../types/profile';
 
 const MAX_FOTOS_GALERIA = 8;
 
@@ -43,6 +43,14 @@ const dayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 
 function normalizeOptionalText(value: string) {
   return value.trim();
+}
+
+function withImageVersion(url: string | null | undefined, version: number | undefined) {
+  if (!url || !version) {
+    return url;
+  }
+
+  return `${url}${url.includes('?') ? '&' : '?'}v=${version}`;
 }
 
 export function ProviderProfileScreen() {
@@ -62,7 +70,6 @@ export function ProviderProfileScreen() {
   const [complemento, setComplemento] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [savingCategoryId, setSavingCategoryId] = useState<number | null>(null);
   const [uploadingProviderPhoto, setUploadingProviderPhoto] = useState(false);
   const [fotos, setFotos] = useState<FotoEstabelecimento[]>([]);
   const [uploadingFoto, setUploadingFoto] = useState(false);
@@ -71,6 +78,7 @@ export function ProviderProfileScreen() {
   const [editingEstablishment, setEditingEstablishment] = useState(false);
   const [serviceModalVisible, setServiceModalVisible] = useState(false);
   const [editingService, setEditingService] = useState<Servico | null>(null);
+  const [servicePhotoVersions, setServicePhotoVersions] = useState<Record<number, number>>({});
   const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
 
   const horariosResumo = useMemo(() => {
@@ -110,7 +118,7 @@ export function ProviderProfileScreen() {
           listarHorarios(foundPrestador.id),
           listarFotosEstabelecimento(foundPrestador.id),
         ]);
-        setCategorias(nextCategorias.map((item) => item.categoria));
+        setCategorias(nextCategorias);
         setServicos(nextServicos);
         setHorarios(nextHorarios);
         setFotos(nextFotos);
@@ -289,7 +297,10 @@ export function ProviderProfileScreen() {
     setError('');
   }
 
-  async function handleSaveService(payload: { nome: string; preco: number; duracao_min: number; categoria_id?: number }) {
+  async function handleSaveService(
+    payload: { nome: string; preco: number; duracao_min: number; categoria_id?: number },
+    photo?: ProfilePhotoAsset
+  ) {
     if (!prestador) {
       return;
     }
@@ -297,16 +308,43 @@ export function ProviderProfileScreen() {
     setSaving(true);
     setError('');
     try {
-      if (editingService) {
-        await atualizarServico(prestador.id, editingService.id, payload);
-      } else {
-        await criarServico(prestador.id, payload);
+      const savedService = editingService
+        ? await atualizarServico(prestador.id, editingService.id, payload)
+        : await criarServico(prestador.id, payload);
+      let finalService = savedService;
+      let photoError = '';
+
+      if (photo) {
+        try {
+          finalService = await uploadFotoServico(prestador.id, savedService.id, photo);
+          setServicePhotoVersions((current) => ({
+            ...current,
+            [savedService.id]: (current[savedService.id] || 0) + 1,
+          }));
+        } catch (uploadError) {
+          photoError = uploadError instanceof Error ? uploadError.message : 'Nao foi possivel enviar a foto.';
+        }
       }
+
       setServiceModalVisible(false);
       setEditingService(null);
-      setServicos(await listarServicos(prestador.id));
+      setServicos((current) => editingService
+        ? current.map((item) => item.id === finalService.id ? finalService : item)
+        : [...current, finalService].sort((left, right) => left.nome.localeCompare(right.nome)));
+
+      try {
+        const nextCategories = await listarMinhasCategoriasPrestadorSeguro();
+        setCategorias(nextCategories);
+      } catch {
+        setError('O servico foi salvo, mas nao foi possivel atualizar as categorias na tela. Recarregue o perfil.');
+      }
+      if (photoError) {
+        setError(`O servico foi salvo, mas a foto nao foi enviada. ${photoError}`);
+      }
     } catch {
-      setError(editingService ? 'Nao foi possivel atualizar o servico.' : 'Nao foi possivel cadastrar o servico.');
+      const message = editingService ? 'Nao foi possivel atualizar o servico.' : 'Nao foi possivel cadastrar o servico.';
+      setError(message);
+      throw new Error(message);
     } finally {
       setSaving(false);
     }
@@ -336,7 +374,12 @@ export function ProviderProfileScreen() {
     setError('');
     try {
       await removerServico(prestador.id, servicoId);
-      setServicos(await listarServicos(prestador.id));
+      const [nextServices, nextCategories] = await Promise.all([
+        listarServicos(prestador.id),
+        listarMinhasCategoriasPrestadorSeguro(),
+      ]);
+      setServicos(nextServices);
+      setCategorias(nextCategories);
     } catch {
       setError('Nao foi possivel remover o servico.');
     } finally {
@@ -376,33 +419,6 @@ export function ProviderProfileScreen() {
       setError('Nao foi possivel remover o horario.');
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function handleAddCategory(categoriaId: number) {
-    setSavingCategoryId(categoriaId);
-    setError('');
-    try {
-      const updated = await associarMinhasCategoriasPrestador([categoriaId]);
-      setCategorias(updated.map((item) => item.categoria));
-    } catch {
-      setError('Nao foi possivel associar a categoria.');
-    } finally {
-      setSavingCategoryId(null);
-    }
-  }
-
-  async function handleRemoveCategory(categoriaId: number) {
-    setSavingCategoryId(categoriaId);
-    setError('');
-    try {
-      await removerMinhaCategoriaPrestador(categoriaId);
-      const updated = await listarMinhasCategoriasPrestadorSeguro();
-      setCategorias(updated.map((item) => item.categoria));
-    } catch {
-      setError('Nao foi possivel remover a categoria.');
-    } finally {
-      setSavingCategoryId(null);
     }
   }
 
@@ -551,44 +567,14 @@ export function ProviderProfileScreen() {
               {categorias.map((categoria) => (
                 <View key={categoria.id} style={styles.chip}>
                   <Text style={styles.chipText}>{categoria.nome}</Text>
-                  <Button
-                    title="Remover"
-                    size="sm"
-                    variant="outline"
-                    loading={savingCategoryId === categoria.id}
-                    disabled={savingCategoryId !== null}
-                    onPress={() => handleRemoveCategory(categoria.id)}
-                  />
                 </View>
               ))}
             </View>
           ) : (
             <Card>
-              <Text style={styles.cardText}>Nenhuma categoria associada.</Text>
+              <Text style={styles.cardText}>As categorias aparecerao aqui conforme os servicos cadastrados.</Text>
             </Card>
           )}
-
-          <Card style={styles.detailsCard}>
-            <Text style={styles.cardSectionTitle}>Associar categoria ativa</Text>
-            <View style={styles.chips}>
-              {categoriasAtivas
-                .filter((categoria) => !categorias.some((item) => item.id === categoria.id))
-                .map((categoria) => (
-                  <Button
-                    key={categoria.id}
-                    title={categoria.nome}
-                    size="sm"
-                    variant="secondary"
-                    loading={savingCategoryId === categoria.id}
-                    disabled={savingCategoryId !== null}
-                    onPress={() => handleAddCategory(categoria.id)}
-                  />
-                ))}
-              {categoriasAtivas.every((categoria) => categorias.some((item) => item.id === categoria.id)) ? (
-                <Text style={styles.cardText}>Todas as categorias ativas ja estao associadas.</Text>
-              ) : null}
-            </View>
-          </Card>
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Horarios cadastrados</Text>
@@ -621,6 +607,11 @@ export function ProviderProfileScreen() {
           {servicos.map((servico) => (
             <Card key={servico.id} style={styles.listCard}>
               <View style={styles.serviceRow}>
+                <CatalogImage
+                  fotoUrl={withImageVersion(servico.foto_url, servicePhotoVersions[servico.id])}
+                  kind="service"
+                  style={styles.servicePhoto}
+                />
                 <View style={styles.serviceInfo}>
                   <Text style={styles.cardTitle}>{servico.nome}</Text>
                   <Text style={styles.cardText}>
@@ -640,7 +631,7 @@ export function ProviderProfileScreen() {
       <ProviderServiceModal
         visible={serviceModalVisible}
         loading={saving}
-        categories={categorias}
+        categories={categoriasAtivas}
         initialService={editingService}
         onClose={handleCloseServiceModal}
         onSave={handleSaveService}
@@ -815,8 +806,13 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: theme.spacing.xs,
   },
+  servicePhoto: {
+    borderRadius: theme.borderRadius.md,
+    height: 72,
+    width: 72,
+  },
   serviceActions: {
-    flexDirection: 'row',
+    alignItems: 'stretch',
     gap: theme.spacing.xs,
   },
   cardTitle: {
