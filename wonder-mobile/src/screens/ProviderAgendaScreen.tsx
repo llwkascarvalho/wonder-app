@@ -42,8 +42,8 @@ const tabs: Array<{ key: AgendaTab; label: string }> = [
 const openStatuses = ['pendente', 'confirmado'];
 const doneStatuses = ['concluido', 'finalizado'];
 const statusLabels: Record<string, string> = {
-  pendente: 'Agendado',
-  confirmado: 'Agendado',
+  pendente: 'Pendente',
+  confirmado: 'Confirmado',
   cancelado: 'Cancelado',
   concluido: 'Concluido',
   finalizado: 'Finalizado',
@@ -255,6 +255,7 @@ export function ProviderAgendaScreen() {
             servico={servicosById[agendamento.servico_id]}
             saving={savingId === agendamento.id}
             showActions={activeTab === 'abertos'}
+            onConfirm={() => handleStatus(agendamento.id, 'confirmado')}
             onFinish={() => handleStatus(agendamento.id, 'concluido')}
             onCancel={() => openCancelModal(agendamento)}
           />
@@ -310,6 +311,7 @@ function AppointmentCard({
   servico,
   saving,
   showActions,
+  onConfirm,
   onFinish,
   onCancel,
 }: {
@@ -317,6 +319,7 @@ function AppointmentCard({
   servico?: Servico;
   saving: boolean;
   showActions: boolean;
+  onConfirm: () => void;
   onFinish: () => void;
   onCancel: () => void;
 }) {
@@ -337,10 +340,15 @@ function AppointmentCard({
         <Text style={styles.cardTitle}>{servico?.nome || `Servico ${agendamento.servico_id}`}</Text>
         <Text style={styles.cardText}>{agendamento.cliente_nome || `Cliente ${agendamento.cliente_id}`}</Text>
         <Text style={styles.cardText}>{dateLabel}</Text>
+        {showActions ? <Text style={styles.cardText}>{statusLabels[agendamento.status]}</Text> : null}
       </View>
-      {showActions ? (
+      {showActions && openStatuses.includes(agendamento.status) ? (
         <View style={styles.actions}>
-          <Button title="Finalizar" size="sm" variant="outline" loading={saving} onPress={onFinish} />
+          {agendamento.status === 'pendente' ? (
+            <Button title="Confirmar" size="sm" variant="outline" loading={saving} onPress={onConfirm} />
+          ) : (
+            <Button title="Concluir" size="sm" variant="outline" loading={saving} onPress={onFinish} />
+          )}
           <Button title="Cancelar" size="sm" variant="danger" disabled={saving} onPress={onCancel} />
         </View>
       ) : (

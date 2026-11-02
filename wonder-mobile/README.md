@@ -165,6 +165,18 @@ recarregamento do app. Os testes de onboarding verificam a navegação, o payloa
 multipart com e sem foto, permissão da galeria, cancelamento, falhas e proteção
 contra envio duplicado usando API simulada.
 
+## Ações da agenda do prestador
+
+A agenda oferece **Confirmar** e **Cancelar** para agendamentos pendentes;
+para confirmados, oferece **Concluir** e **Cancelar**. Estados finais não
+oferecem alterações. Após sucesso, a tela recarrega os agendamentos do dia.
+O cancelamento mantém o motivo obrigatório e envia `status` e `motivo` ao Core.
+
+`node --test tests/agenda-prestador.test.cjs` verifica o fluxo de confirmação
+e conclusão, os payloads, falha na confirmação, cancelamento com motivo e
+ausência de ações nos estados finais. Executa tela e serviço reais com hooks,
+componentes nativos e HTTP simulados; não substitui teste em aparelho com a API real.
+
 ## Rollback
 
 Este frontend exige Core que aceite tokens Keycloak e implemente `/perfis/eu` com o DTO acima. Para rollback, restaure em conjunto a versão anterior do frontend, sua configuração Google/redirect e o backend/gateway antigo compatível com `/auth/google/login` e `/auth/me`. Não combine o frontend novo com a autenticação legada. O descarte do JWT antigo exige novo login após rollback; os tokens novos não substituem o armazenamento antigo.
