@@ -1,15 +1,15 @@
 import { ProviderOnboardingProfilePayload, ProviderRegistrationDraft } from '../types/providerOnboarding';
 
 export const registrationFields = {
-  nomeEstab: { label: 'Nome do estabelecimento', maxLength: 255 },
-  documento: { label: 'CPF/CNPJ (opcional)', maxLength: 20 },
-  endereco: { label: 'Endereço', maxLength: 255 },
-  numero: { label: 'Número', maxLength: 30 },
-  bairro: { label: 'Bairro', maxLength: 120 },
-  cidade: { label: 'Cidade', maxLength: 120 },
-  estado: { label: 'UF', maxLength: 2 },
-  complemento: { label: 'Complemento', maxLength: 255 },
-} satisfies Record<keyof ProviderRegistrationDraft, { label: string; maxLength: number }>;
+  nomeEstab: { label: 'Nome do estabelecimento', maxLength: 255, required: true },
+  documento: { label: 'CPF/CNPJ (opcional)', maxLength: 20, required: false },
+  endereco: { label: 'Endereço', maxLength: 255, required: true },
+  numero: { label: 'Número', maxLength: 30, required: true },
+  bairro: { label: 'Bairro', maxLength: 120, required: true },
+  cidade: { label: 'Cidade', maxLength: 120, required: true },
+  estado: { label: 'UF', maxLength: 2, required: true },
+  complemento: { label: 'Complemento (opcional)', maxLength: 255, required: false },
+} satisfies Record<keyof ProviderRegistrationDraft, { label: string; maxLength: number; required: boolean }>;
 
 export const emptyProviderDraft: ProviderRegistrationDraft = {
   nomeEstab: '', documento: '', endereco: '', numero: '', bairro: '', cidade: '',
@@ -18,9 +18,9 @@ export const emptyProviderDraft: ProviderRegistrationDraft = {
 
 export function validateProviderRegistration(draft: ProviderRegistrationDraft) {
   const errors: Partial<Record<keyof ProviderRegistrationDraft, string>> = {};
-  if (!draft.nomeEstab.trim()) errors.nomeEstab = 'Informe o nome do estabelecimento.';
   for (const key of Object.keys(registrationFields) as Array<keyof ProviderRegistrationDraft>) {
     const field = registrationFields[key];
+    if (field.required && !draft[key].trim()) errors[key] = `Informe ${field.label.toLowerCase()}.`;
     if (draft[key].trim().length > field.maxLength) errors[key] = `${field.label}: use até ${field.maxLength} caracteres.`;
   }
   return errors;

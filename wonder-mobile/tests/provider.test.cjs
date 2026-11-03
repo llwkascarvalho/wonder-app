@@ -112,3 +112,13 @@ test('cadastro de servico permite foto e categorias seguem os servicos', () => {
   assert.match(onboarding, /get<ProviderOnboardingCategory\[]>\('\/catalogo\/prestadores\/me\/categorias'\)/);
   assert.doesNotMatch(onboarding, /api\.(post|delete).*\/me\/categorias/);
 });
+
+test('falha ao consultar cadastro profissional permite tentar novamente sem iniciar outro cadastro', () => {
+  const profile = fs.readFileSync(
+    path.resolve(__dirname, '../src/screens/ProfileScreen.tsx'),
+    'utf8'
+  );
+
+  assert.match(profile, /title=\{error \? 'Tentar novamente' : providerButtonTitle\}/);
+  assert.match(profile, /error\s*\?\s*loadProviderProfile\s*:\s*\(\) => navigation\.navigate\('ProviderOnboarding'\)/);
+});

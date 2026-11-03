@@ -16,8 +16,9 @@ export function ProviderApplicationStatus({ profile, onContinue }: ProviderAppli
       <Card style={styles.card}>
         <Text style={styles.title}>Cadastro em análise</Text>
         <Text style={styles.text}>
-          Seu cadastro profissional foi enviado para avaliação. A edição fica indisponível enquanto a análise estiver pendente.
+          Seu cadastro profissional está em avaliação. Você ainda pode completar ou revisar os serviços e horários enviados.
         </Text>
+        {onContinue ? <Button title="Revisar serviços e horários" onPress={onContinue} /> : null}
       </Card>
     );
   }
@@ -43,12 +44,21 @@ export function ProviderApplicationStatus({ profile, onContinue }: ProviderAppli
     );
   }
 
+  if (profile.status === 'rascunho') {
+    return (
+      <Card style={styles.card}>
+        <Text style={styles.title}>Correção solicitada</Text>
+        <Text style={styles.text}>{profile.motivo_rejeicao || 'Revise os dados antes de enviar novamente.'}</Text>
+        {onContinue ? <Button title="Continuar correção" onPress={onContinue} /> : null}
+      </Card>
+    );
+  }
+
   if (profile.status === 'suspenso') {
     return (
       <Card style={styles.card}>
         <Text style={styles.title}>Cadastro suspenso</Text>
-        <Text style={styles.text}>Este cadastro esta suspenso. Revise os dados antes de reenviar.</Text>
-        {onContinue ? <Button title="Revisar cadastro" onPress={onContinue} /> : null}
+        <Text style={styles.text}>Este cadastro precisa ser reativado pelo administrador antes de novas alterações.</Text>
       </Card>
     );
   }

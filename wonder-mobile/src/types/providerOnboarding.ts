@@ -5,6 +5,12 @@ export type ProviderOnboardingProfile = {
   usuario_id: string | number;
   nome_estab: string;
   documento: string;
+  endereco?: string | null;
+  numero?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  estado?: string | null;
+  complemento?: string | null;
   status: ProviderOnboardingStatus | string;
   foto_url?: string | null;
   enviado_em?: string | null;
@@ -40,6 +46,8 @@ export type ProviderOnboardingService = {
   preco: number;
   duracao_min: number;
   categoria_id?: number | null;
+  foto_url?: string | null;
+  status?: string;
 };
 
 export type ProviderOnboardingServicePayload = {

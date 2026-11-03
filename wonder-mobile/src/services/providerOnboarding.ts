@@ -2,8 +2,8 @@ import { AxiosError } from 'axios';
 
 import { api } from './api';
 import { ProfilePhotoAsset } from '../types/profile';
-import { appendProfilePhoto } from './profileService';
-import { adaptarPrestador, PrestadorApiResponse } from './providerAdapter';
+import { appendImageFile, appendProfilePhoto } from './profileService';
+import { adaptarPrestadorProprio, PrestadorProprioApiResponse } from './providerAdapter';
 import {
   ProviderOnboardingCategory,
   ProviderOnboardingProfile,
@@ -47,8 +47,8 @@ export function getBackendMessage(error: unknown, fallback: string): string {
 
 export async function obterMeuPrestador(): Promise<ProviderOnboardingProfile | null> {
   try {
-    const response = await api.get<PrestadorApiResponse>('/catalogo/prestadores/me');
-    return adaptarPrestador(response.data);
+    const response = await api.get<PrestadorProprioApiResponse>('/catalogo/prestadores/me');
+    return adaptarPrestadorProprio(response.data);
   } catch (error) {
     if (isNotFoundError(error)) {
       return null;
@@ -67,16 +67,16 @@ export async function criarPerfilPrestador(
     if (value != null) form.append(key, value);
   }
   if (arquivo) appendProfilePhoto(form, arquivo);
-  const response = await api.post<PrestadorApiResponse>('/catalogo/prestadores', form);
-  return adaptarPrestador(response.data);
+  const response = await api.post<PrestadorProprioApiResponse>('/catalogo/prestadores', form);
+  return adaptarPrestadorProprio(response.data);
 }
 
 export async function atualizarPerfilPrestador(
   prestadorId: number,
   payload: Partial<ProviderOnboardingProfilePayload>
 ): Promise<ProviderOnboardingProfile> {
-  const response = await api.put<PrestadorApiResponse>(`/catalogo/prestadores/${prestadorId}`, payload);
-  return adaptarPrestador(response.data);
+  const response = await api.put<PrestadorProprioApiResponse>(`/catalogo/prestadores/${prestadorId}`, payload);
+  return adaptarPrestadorProprio(response.data);
 }
 
 export async function uploadFotoPrestadorOnboarding(
@@ -84,26 +84,14 @@ export async function uploadFotoPrestadorOnboarding(
   asset: ProfilePhotoAsset
 ): Promise<ProviderOnboardingProfile> {
   const formData = new FormData();
-  const fileName = asset.fileName || `prestador-${Date.now()}.jpg`;
-  const mimeType = asset.mimeType || 'image/jpeg';
+  appendImageFile(formData, 'file', asset, `prestador-${prestadorId}`);
 
-  formData.append('file', {
-    uri: asset.uri,
-    name: fileName,
-    type: mimeType,
-  } as unknown as Blob);
-
-  const response = await api.post<PrestadorApiResponse>(
+  const response = await api.post<PrestadorProprioApiResponse>(
     `/catalogo/prestadores/${prestadorId}/foto`,
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    }
+    formData
   );
 
-  return adaptarPrestador(response.data);
+  return adaptarPrestadorProprio(response.data);
 }
 
 export async function listarCategoriasAtivas(): Promise<ProviderOnboardingCategory[]> {
@@ -128,63 +116,45 @@ export async function listarMinhasCategoriasPrestadorSeguro(): Promise<ProviderO
   }
 }
 
-export async function listarServicosPrestadorOnboarding(prestadorId: number): Promise<ProviderOnboardingService[]> {
-  const response = await api.get<ProviderOnboardingService[]>(`/catalogo/prestadores/${prestadorId}/servicos`);
+export async function listarMeusServicosPrestador(): Promise<ProviderOnboardingService[]> {
+  const response = await api.get<ProviderOnboardingService[]>('/catalogo/prestadores/me/servicos');
   return response.data;
-}
-
-export async function listarServicosPrestadorOnboardingSeguro(
-  prestadorId: number
-): Promise<ProviderOnboardingService[]> {
-  try {
-    return await listarServicosPrestadorOnboarding(prestadorId);
-  } catch (error) {
-    if (isNotFoundError(error)) {
-      return [];
-    }
-
-    throw error;
-  }
 }
 
 export async function criarServicoPrestadorOnboarding(
   prestadorId: number,
   payload: ProviderOnboardingServicePayload
 ): Promise<ProviderOnboardingService> {
-  const response = await api.post<ProviderOnboardingService>(
-    `/catalogo/prestadores/${prestadorId}/servicos`,
+  const response = await api.post<ProviderOnboardingService>(`/catalogo/prestadores/${prestadorId}/servicos`, payload);
+  return response.data;
+}
+
+export async function atualizarServicoPrestadorOnboarding(
+  prestadorId: number,
+  servicoId: number,
+  payload: ProviderOnboardingServicePayload
+): Promise<ProviderOnboardingService> {
+  const response = await api.put<ProviderOnboardingService>(
+    `/catalogo/prestadores/${prestadorId}/servicos/${servicoId}`,
     payload
   );
   return response.data;
 }
 
-export async function listarHorariosPrestadorOnboarding(prestadorId: number): Promise<ProviderOnboardingSchedule[]> {
-  const response = await api.get<ProviderOnboardingSchedule[]>(`/catalogo/prestadores/${prestadorId}/horarios`);
-  return response.data;
+export async function removerServicoPrestadorOnboarding(prestadorId: number, servicoId: number): Promise<void> {
+  await api.delete(`/catalogo/prestadores/${prestadorId}/servicos/${servicoId}`);
 }
 
-export async function listarHorariosPrestadorOnboardingSeguro(
-  prestadorId: number
-): Promise<ProviderOnboardingSchedule[]> {
-  try {
-    return await listarHorariosPrestadorOnboarding(prestadorId);
-  } catch (error) {
-    if (isNotFoundError(error)) {
-      return [];
-    }
-
-    throw error;
-  }
+export async function listarMeusHorariosPrestador(): Promise<ProviderOnboardingSchedule[]> {
+  const response = await api.get<ProviderOnboardingSchedule[]>('/catalogo/prestadores/me/horarios');
+  return response.data;
 }
 
 export async function criarHorarioPrestadorOnboarding(
   prestadorId: number,
   payload: ProviderOnboardingSchedulePayload
 ): Promise<ProviderOnboardingSchedule> {
-  const response = await api.post<ProviderOnboardingSchedule>(
-    `/catalogo/prestadores/${prestadorId}/horarios`,
-    payload
-  );
+  const response = await api.post<ProviderOnboardingSchedule>(`/catalogo/prestadores/${prestadorId}/horarios`, payload);
   return response.data;
 }
 
@@ -193,8 +163,8 @@ export async function removerHorarioPrestadorOnboarding(prestadorId: number, hor
 }
 
 export async function enviarPrestadorParaAprovacao(prestadorId: number): Promise<ProviderOnboardingProfile> {
-  const response = await api.post<PrestadorApiResponse>(
+  const response = await api.post<PrestadorProprioApiResponse>(
     `/catalogo/prestadores/${prestadorId}/enviar-aprovacao`
   );
-  return adaptarPrestador(response.data);
+  return adaptarPrestadorProprio(response.data);
 }

@@ -37,6 +37,12 @@ function formatDate(value?: string | null): string {
   return formatBackendDateTime(value, '-');
 }
 
+function formatAddress(prestador: AdminPrestadorDetalhe): string {
+  const street = [prestador.endereco, prestador.numero].filter(Boolean).join(', ');
+  const city = [prestador.cidade, prestador.estado].filter(Boolean).join(' - ');
+  return [street, prestador.complemento, prestador.bairro, city].filter(Boolean).join('\n') || 'Não informado';
+}
+
 function extractBackendMessage(error: unknown, fallback: string): string {
   const responseData = (error as { response?: { data?: unknown } })?.response?.data;
 
@@ -216,13 +222,14 @@ export function AdminProviderDetailsScreen() {
           <Text style={styles.statusBadge}>{prestador.status}</Text>
         </View>
 
-        <CatalogImage fotoUrl={prestador.foto_url || prestador.solicitante_foto_url} kind="provider" style={styles.avatar} />
+        <CatalogImage authenticated fotoUrl={prestador.foto_url || prestador.solicitante_foto_url} kind="provider" style={styles.avatar} />
 
         <Text style={styles.title}>{prestador.nome_estab}</Text>
 
         <Card style={styles.detailsCard}>
           <InfoRow label="Usuario vinculado" value={String(prestador.usuario_id)} />
-          <InfoRow label="Documento" value={prestador.documento} />
+          <InfoRow label="Documento" value={prestador.documento || 'Não informado'} />
+          <InfoRow label="Endereço do estabelecimento" value={formatAddress(prestador)} />
           <InfoRow label="Enviado em" value={formatDate(prestador.enviado_em)} />
           <InfoRow label="Aprovado em" value={formatDate(prestador.aprovado_em)} />
           <InfoRow label="Aprovado por" value={prestador.aprovado_por || '-'} />

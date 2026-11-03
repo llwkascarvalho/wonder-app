@@ -6,9 +6,22 @@ export type PrestadorApiResponse = Omit<Prestador, 'usuario_id' | 'nome_estab' |
   fotoUrl: string | null;
 };
 
+export type PrestadorProprioApiResponse = PrestadorApiResponse & {
+  motivo_rejeicao: string | null;
+};
+
+export type PrestadorProprio = Prestador & {
+  motivo_rejeicao?: string | null;
+};
+
 export function adaptarPrestador(prestador: PrestadorApiResponse): Prestador {
   const { perfilUsuarioId, nomeEstab, fotoUrl, ...dados } = prestador;
   return { ...dados, usuario_id: perfilUsuarioId, nome_estab: nomeEstab, foto_url: fotoUrl };
+}
+
+export function adaptarPrestadorProprio(prestador: PrestadorProprioApiResponse): PrestadorProprio {
+  const { motivo_rejeicao, ...dadosPublicos } = prestador;
+  return { ...adaptarPrestador(dadosPublicos), motivo_rejeicao };
 }
 
 export function adaptarPayloadPrestador(payload: Partial<PrestadorPayload>) {

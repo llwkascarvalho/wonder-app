@@ -84,13 +84,14 @@ export function AdminProvidersScreen() {
         renderItem={({ item }) => (
           <Card style={styles.providerCard}>
             <CatalogImage
+              authenticated
               fotoUrl={item.foto_url || item.solicitante_foto_url}
               kind="provider"
               style={styles.providerAvatar}
             />
             <View style={styles.providerInfo}>
               <Text style={styles.cardTitle}>{item.nome_estab}</Text>
-              <Text style={styles.cardText}>Documento: {item.documento}</Text>
+              <Text style={styles.cardText}>Documento: {item.documento || 'Não informado'}</Text>
               <Text style={styles.cardText}>Enviado: {formatDate(item.enviado_em)}</Text>
             </View>
             <Button
