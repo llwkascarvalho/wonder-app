@@ -10,11 +10,11 @@ export function ProviderAddressStep({ values, onChange, errors, disabled }: Prov
   return (
     <Card style={styles.card}>
       <Text style={styles.title}>Endereço do estabelecimento</Text>
-      <Text style={styles.text}>Os campos de endereço são opcionais.</Text>
+      <Text style={styles.text}>Preencha os campos obrigatórios indicados com *.</Text>
       {(['endereco', 'numero', 'bairro', 'cidade', 'estado', 'complemento'] as const).map((key) => (
         <Input
           key={key}
-          label={registrationFields[key].label}
+          label={`${registrationFields[key].label}${registrationFields[key].required ? ' *' : ''}`}
           value={values[key]}
           maxLength={registrationFields[key].maxLength}
           editable={!disabled}

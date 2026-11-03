@@ -7,6 +7,7 @@ import { theme } from '../../styles/theme';
 import { ProviderRegistrationDraft } from '../../types/providerOnboarding';
 import { ProfilePhotoAsset } from '../../types/profile';
 import { registrationFields } from '../../utils/providerRegistration';
+import { CatalogImage } from '../catalog/CatalogImage';
 
 export type ProviderRegistrationFieldsProps = {
   values: ProviderRegistrationDraft;
@@ -20,16 +21,17 @@ type ProviderDataStepProps = ProviderRegistrationFieldsProps & {
   picking: boolean;
   onSelectPhoto: () => Promise<void>;
   onRemovePhoto: () => void;
+  existingPhotoUrl?: string | null;
 };
 
-export function ProviderDataStep({ values, onChange, errors, disabled, photo, picking, onSelectPhoto, onRemovePhoto }: ProviderDataStepProps) {
+export function ProviderDataStep({ values, onChange, errors, disabled, photo, picking, onSelectPhoto, onRemovePhoto, existingPhotoUrl }: ProviderDataStepProps) {
   return (
     <Card style={styles.card}>
       <Text style={styles.title}>Dados do estabelecimento</Text>
       {(['nomeEstab', 'documento'] as const).map((key) => (
         <Input
           key={key}
-          label={registrationFields[key].label}
+          label={`${registrationFields[key].label}${registrationFields[key].required ? ' *' : ''}`}
           value={values[key]}
           maxLength={registrationFields[key].maxLength}
           editable={!disabled}
@@ -38,10 +40,11 @@ export function ProviderDataStep({ values, onChange, errors, disabled, photo, pi
         />
       ))}
       <Text style={styles.text}>Foto do estabelecimento (opcional)</Text>
-      {photo ? <Image source={{ uri: photo.uri }} accessibilityLabel="Foto selecionada do estabelecimento" style={styles.photo} /> : null}
-      <Button title={photo ? 'Trocar foto' : 'Selecionar foto'} variant="secondary" loading={picking} disabled={disabled} onPress={onSelectPhoto} />
-      <Text style={styles.text}>{photo ? photo.fileName || 'Foto selecionada' : 'JPEG, PNG ou WebP de até 5 MiB.'}</Text>
-      {photo ? <Button title="Remover foto" variant="outline" disabled={disabled} onPress={onRemovePhoto} /> : null}
+      {photo ? <Image source={{ uri: photo.uri }} accessibilityLabel="Nova foto selecionada do estabelecimento" style={styles.photo} />
+        : existingPhotoUrl ? <CatalogImage authenticated fotoUrl={existingPhotoUrl} kind="provider" style={styles.photo} /> : null}
+      <Button title={photo || existingPhotoUrl ? 'Trocar foto' : 'Selecionar foto'} variant="secondary" loading={picking} disabled={disabled} onPress={onSelectPhoto} />
+      <Text style={styles.text}>{photo ? photo.fileName || 'Nova foto selecionada' : existingPhotoUrl ? 'Foto atual mantida.' : 'JPEG, PNG ou WebP de até 5 MiB.'}</Text>
+      {photo ? <Button title="Descartar nova foto" variant="outline" disabled={disabled} onPress={onRemovePhoto} /> : null}
     </Card>
   );
 }

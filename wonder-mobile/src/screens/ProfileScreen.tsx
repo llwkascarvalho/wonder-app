@@ -40,21 +40,42 @@ export function ProfileScreen() {
   );
 
   const providerButtonTitle = getProviderButtonTitle(providerProfile);
+  const providerMessage = getProviderMessage(providerProfile);
+  const handleProviderAction = error
+    ? loadProviderProfile
+    : () => navigation.navigate('ProviderOnboarding');
 
   return (
     <ProfileScreenContent onSignOut={signOut}>
       <Card style={styles.providerCard}>
         <Text style={styles.providerTitle}>Prestador Wonder</Text>
-        <Text style={styles.providerText}>Cadastre seu estabelecimento para oferecer servicos na plataforma.</Text>
+        <Text style={providerProfile?.status === 'rejeitado' || providerProfile?.status === 'rascunho'
+          ? styles.providerWarning : styles.providerText}>{providerMessage}</Text>
+        {providerProfile?.motivo_rejeicao ? (
+          <Text accessibilityRole="alert" style={styles.providerWarning}>Motivo: {providerProfile.motivo_rejeicao}</Text>
+        ) : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <Button
-          title={providerButtonTitle}
+          title={error ? 'Tentar novamente' : providerButtonTitle}
           loading={loadingProviderProfile}
-          onPress={() => navigation.navigate('ProviderOnboarding')}
+          disabled={loadingProviderProfile}
+          onPress={handleProviderAction}
         />
       </Card>
     </ProfileScreenContent>
   );
+}
+
+function getProviderMessage(profile: ProviderOnboardingProfile | null): string {
+  if (!profile) return 'Cadastre seu estabelecimento para oferecer serviços na plataforma.';
+  if (profile.status === 'pendente') return 'Seu cadastro foi enviado e está aguardando análise do administrador.';
+  if (profile.status === 'rejeitado') return 'Seu cadastro foi rejeitado. Revise o motivo informado e envie novamente.';
+  if (profile.status === 'rascunho') return profile.motivo_rejeicao
+    ? 'O administrador solicitou correções no seu cadastro.'
+    : 'Seu cadastro ainda não foi enviado. Continue para cadastrar serviços e horários.';
+  if (profile.status === 'ativo') return 'Seu cadastro profissional está aprovado e ativo.';
+  if (profile.status === 'suspenso') return 'Seu cadastro profissional está suspenso.';
+  return 'Acompanhe aqui seu cadastro profissional.';
 }
 
 function getProviderButtonTitle(profile: ProviderOnboardingProfile | null): string {
@@ -98,5 +119,11 @@ const styles = StyleSheet.create({
   error: {
     color: theme.colors.error,
     fontSize: theme.fontSize.sm,
+  },
+  providerWarning: {
+    color: theme.colors.warning,
+    fontSize: theme.fontSize.md,
+    fontWeight: theme.fontWeight.semibold,
+    lineHeight: 22,
   },
 });
