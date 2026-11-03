@@ -70,8 +70,12 @@ export function ProviderScheduleModal({
           </View>
 
           <View style={styles.row}>
-            <Input label="Horario de inicio" value={horaInicio} onChangeText={setHoraInicio} />
-            <Input label="Horario final" value={horaFim} onChangeText={setHoraFim} />
+            <View style={styles.timeField}>
+              <Input label="Horário de início" value={horaInicio} onChangeText={setHoraInicio} />
+            </View>
+            <View style={styles.timeField}>
+              <Input label="Horário final" value={horaFim} onChangeText={setHoraFim} />
+            </View>
           </View>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -135,6 +139,11 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: theme.spacing.sm,
+    width: '100%',
+  },
+  timeField: {
+    flex: 1,
+    minWidth: 0,
   },
   error: {
     color: theme.colors.error,

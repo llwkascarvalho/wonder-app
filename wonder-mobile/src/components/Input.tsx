@@ -16,7 +16,7 @@ export function Input({ label, value, onChangeText, error, style, ...textInputPr
 
       <TextInput
         placeholderTextColor={theme.colors.textMuted}
-        style={[styles.input, error ? styles.inputError : null, style]}
+        style={[styles.input, textInputProps.multiline ? styles.multiline : null, error ? styles.inputError : null, style]}
         value={value}
         onChangeText={onChangeText}
         {...textInputProps}
@@ -48,6 +48,12 @@ const styles = StyleSheet.create({
   },
   inputError: {
     borderColor: theme.colors.error,
+  },
+  multiline: {
+    minHeight: 112,
+    paddingTop: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    textAlignVertical: 'top',
   },
   error: {
     color: theme.colors.error,

@@ -190,7 +190,7 @@ export function ProviderServiceModal({
             {photo ? (
               <Image source={{ uri: photo.uri }} resizeMode="cover" style={styles.imagePreview} />
             ) : initialService?.foto_url ? (
-              <CatalogImage fotoUrl={initialService.foto_url} kind="service" style={styles.imagePreview} />
+              <CatalogImage authenticated fotoUrl={initialService.foto_url} kind="service" style={styles.imagePreview} />
             ) : null}
             <View style={styles.imageContent}>
               <Text style={styles.imageLabel}>Foto do servico (opcional)</Text>
