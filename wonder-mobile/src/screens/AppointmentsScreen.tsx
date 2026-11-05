@@ -13,16 +13,20 @@ import {
 
 import { Card } from '../components/Card';
 import { CatalogImage } from '../components/catalog/CatalogImage';
+import { RatingStars } from '../components/catalog/RatingStars';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import {
   atualizarStatusAgendamento,
   extrairMensagemErro,
   listarAgendamentos,
 } from '../services/agendamentos';
+import { criarAvaliacaoPrestador, listarAvaliacoesPrestador } from '../services/avaliacoes';
 import { listarServicosPrestador, obterPrestador } from '../services/catalogo';
 import { theme } from '../styles/theme';
 import { Agendamento } from '../types/agendamento';
+import { Avaliacao } from '../types/avaliacao';
 import { Prestador, Servico } from '../types/catalogo';
+import { podeAvaliarAgendamento } from '../utils/avaliacoes';
 
 type AgendaTab = 'agendados' | 'finalizados' | 'cancelados';
 
@@ -30,6 +34,8 @@ type AgendamentoEnriquecido = {
   agendamento: Agendamento;
   prestador?: Prestador;
   servico?: Servico;
+  avaliacao?: Avaliacao;
+  avaliacoesCarregadas: boolean;
 };
 
 const tabs: Array<{ key: AgendaTab; label: string }> = [
@@ -82,6 +88,8 @@ async function enriquecerAgendamentos(agendamentos: Agendamento[]) {
   const prestadorIds = Array.from(new Set(agendamentos.map((item) => item.prestador_id)));
   const prestadores = new Map<number, Prestador>();
   const servicos = new Map<number, Servico>();
+  const avaliacoes = new Map<number, Avaliacao>();
+  const avaliacoesCarregadas = new Set<number>();
 
   const prestadoresResults = await Promise.allSettled(
     prestadorIds.map(async (prestadorId) => {
@@ -111,10 +119,28 @@ async function enriquecerAgendamentos(agendamentos: Agendamento[]) {
     }
   });
 
+  const avaliacoesResults = await Promise.allSettled(
+    prestadorIds.map(async (prestadorId) => {
+      const lista = await listarAvaliacoesPrestador(prestadorId);
+      return { prestadorId, lista };
+    })
+  );
+
+  avaliacoesResults.forEach((result) => {
+    if (result.status === 'fulfilled') {
+      avaliacoesCarregadas.add(result.value.prestadorId);
+      result.value.lista.forEach((avaliacao) => {
+        avaliacoes.set(avaliacao.agendamento_id, avaliacao);
+      });
+    }
+  });
+
   return agendamentos.map<AgendamentoEnriquecido>((agendamento) => ({
     agendamento,
     prestador: prestadores.get(agendamento.prestador_id),
     servico: servicos.get(agendamento.servico_id),
+    avaliacao: avaliacoes.get(agendamento.id),
+    avaliacoesCarregadas: avaliacoesCarregadas.has(agendamento.prestador_id),
   }));
 }
 
@@ -141,6 +167,9 @@ export function AppointmentsScreen() {
   const [cancelandoId, setCancelandoId] = useState<number | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Agendamento | null>(null);
   const [cancelMotivo, setCancelMotivo] = useState('');
+  const [avaliacaoTarget, setAvaliacaoTarget] = useState<AgendamentoEnriquecido | null>(null);
+  const [notaAvaliacao, setNotaAvaliacao] = useState(0);
+  const [avaliandoId, setAvaliandoId] = useState<number | null>(null);
 
   const carregarAgendamentos = useCallback(async () => {
     setErro(null);
@@ -216,6 +245,48 @@ export function AppointmentsScreen() {
     }
   }
 
+  function abrirAvaliacao(item: AgendamentoEnriquecido) {
+    setAvaliacaoTarget(item);
+    setNotaAvaliacao(0);
+  }
+
+  function fecharAvaliacao() {
+    if (avaliandoId !== null) return;
+    setAvaliacaoTarget(null);
+    setNotaAvaliacao(0);
+  }
+
+  async function enviarAvaliacao() {
+    if (!avaliacaoTarget) return;
+
+    if (notaAvaliacao < 1 || notaAvaliacao > 5) {
+      Alert.alert('Escolha uma nota', 'Selecione de 1 a 5 estrelas para continuar.');
+      return;
+    }
+
+    const { agendamento } = avaliacaoTarget;
+    setAvaliandoId(agendamento.id);
+
+    try {
+      await criarAvaliacaoPrestador(agendamento.prestador_id, {
+        agendamento_id: agendamento.id,
+        nota: notaAvaliacao,
+      });
+      setAvaliacaoTarget(null);
+      setNotaAvaliacao(0);
+      await carregarAgendamentos();
+      setActiveTab('finalizados');
+      Alert.alert('Avaliação enviada', 'Obrigado por avaliar este atendimento.');
+    } catch (error) {
+      Alert.alert(
+        'Não foi possível avaliar',
+        extrairMensagemErro(error, 'Tente novamente em instantes.')
+      );
+    } finally {
+      setAvaliandoId(null);
+    }
+  }
+
   if (carregando) {
     return <LoadingIndicator text="Carregando agendamentos..." />;
   }
@@ -267,8 +338,9 @@ export function AppointmentsScreen() {
             <AppointmentCard
               item={item}
               cancelando={cancelandoId === item.agendamento.id}
-              disabled={cancelandoId !== null}
+              disabled={cancelandoId !== null || avaliandoId !== null}
               onCancel={() => confirmarCancelamento(item.agendamento)}
+              onEvaluate={() => abrirAvaliacao(item)}
             />
           )}
         />
@@ -314,6 +386,53 @@ export function AppointmentsScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        transparent
+        visible={avaliacaoTarget !== null}
+        animationType="fade"
+        onRequestClose={fecharAvaliacao}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Avaliar atendimento</Text>
+            <Text style={styles.modalText}>
+              Como foi seu atendimento com {avaliacaoTarget?.prestador?.nome_estab ?? 'este prestador'}?
+            </Text>
+            <View style={styles.ratingSelector}>
+              <RatingStars
+                value={notaAvaliacao}
+                onChange={setNotaAvaliacao}
+                disabled={avaliandoId !== null}
+                size={38}
+              />
+              <Text style={styles.ratingHint}>
+                {notaAvaliacao > 0 ? `${notaAvaliacao} de 5 estrelas` : 'Selecione uma nota'}
+              </Text>
+            </View>
+            <View style={styles.modalActions}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={avaliandoId !== null}
+                onPress={fecharAvaliacao}
+                style={[styles.modalButton, styles.modalButtonSecondary, avaliandoId !== null && styles.cancelButtonDisabled]}
+              >
+                <Text style={styles.modalButtonSecondaryText}>Voltar</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={avaliandoId !== null}
+                onPress={enviarAvaliacao}
+                style={[styles.modalButton, styles.modalButtonPrimary, avaliandoId !== null && styles.cancelButtonDisabled]}
+              >
+                <Text style={styles.modalButtonPrimaryText}>
+                  {avaliandoId !== null ? 'Enviando...' : 'Enviar avaliação'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -323,18 +442,21 @@ function AppointmentCard({
   cancelando,
   disabled,
   onCancel,
+  onEvaluate,
 }: {
   item: AgendamentoEnriquecido;
   cancelando: boolean;
   disabled: boolean;
   onCancel: () => void;
+  onEvaluate: () => void;
 }) {
-  const { agendamento, prestador, servico } = item;
+  const { agendamento, prestador, servico, avaliacao, avaliacoesCarregadas } = item;
   const { data, horario } = formatarData(agendamento.inicio);
   const cancelavel = cancelaveisStatuses.has(agendamento.status);
   const statusLabel = STATUS_LABEL[agendamento.status] ?? agendamento.status;
   const providerName = prestador?.nome_estab ?? `Prestador ${agendamento.prestador_id}`;
   const serviceName = servico?.nome ?? `Servico ${agendamento.servico_id}`;
+  const avaliavel = podeAvaliarAgendamento(agendamento.status, avaliacoesCarregadas, avaliacao);
 
   return (
     <Card style={styles.agendamentoCard}>
@@ -367,6 +489,26 @@ function AppointmentCard({
             ]}
           >
             <Text style={styles.cancelButtonText}>{cancelando ? 'Cancelando...' : 'Cancelar'}</Text>
+          </Pressable>
+        ) : null}
+        {avaliacao ? (
+          <View style={styles.completedRating}>
+            <RatingStars value={avaliacao.nota} size={17} />
+            <Text style={styles.completedRatingText}>Avaliado</Text>
+          </View>
+        ) : null}
+        {avaliavel ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={disabled}
+            onPress={onEvaluate}
+            style={({ pressed }) => [
+              styles.evaluateButton,
+              pressed && styles.pressed,
+              disabled && styles.cancelButtonDisabled,
+            ]}
+          >
+            <Text style={styles.evaluateButtonText}>Avaliar</Text>
           </Pressable>
         ) : null}
       </View>
@@ -497,6 +639,28 @@ const styles = StyleSheet.create({
   cancelButtonDisabled: {
     opacity: 0.56,
   },
+  evaluateButton: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.pill,
+    justifyContent: 'center',
+    minHeight: 30,
+    minWidth: 84,
+    paddingHorizontal: theme.spacing.sm,
+  },
+  evaluateButtonText: {
+    color: theme.colors.white,
+    fontSize: theme.fontSize.xs,
+    fontWeight: theme.fontWeight.bold,
+  },
+  completedRating: {
+    alignItems: 'flex-end',
+    gap: 0,
+  },
+  completedRatingText: {
+    color: theme.colors.textSecondary,
+    fontSize: theme.fontSize.xs,
+  },
   statusOpen: {
     backgroundColor: theme.colors.primary,
   },
@@ -570,6 +734,9 @@ const styles = StyleSheet.create({
   modalButtonDanger: {
     backgroundColor: theme.colors.error,
   },
+  modalButtonPrimary: {
+    backgroundColor: theme.colors.primary,
+  },
   modalButtonSecondaryText: {
     color: theme.colors.primary,
     fontSize: theme.fontSize.sm,
@@ -579,5 +746,19 @@ const styles = StyleSheet.create({
     color: theme.colors.white,
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.bold,
+  },
+  modalButtonPrimaryText: {
+    color: theme.colors.white,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.bold,
+  },
+  ratingSelector: {
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    paddingVertical: theme.spacing.sm,
+  },
+  ratingHint: {
+    color: theme.colors.textSecondary,
+    fontSize: theme.fontSize.sm,
   },
 });
