@@ -6,6 +6,7 @@ import { FlatList, Linking, ScrollView, StyleSheet, Text, View } from 'react-nat
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { CatalogImage } from '../components/catalog/CatalogImage';
+import { RatingStars } from '../components/catalog/RatingStars';
 import { ServiceCard } from '../components/catalog/ServiceCard';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { SearchStackParamList } from '../navigation/SearchStack';
@@ -16,7 +17,10 @@ import {
   listarServicosPrestador,
   obterPrestador,
 } from '../services/catalogo';
+import { listarAvaliacoesPrestador } from '../services/avaliacoes';
 import { theme } from '../styles/theme';
+import { Avaliacao } from '../types/avaliacao';
+import { calcularMediaAvaliacoes } from '../utils/avaliacoes';
 import {
   Categoria,
   DIAS_SEMANA,
@@ -47,6 +51,7 @@ export function PrestadorProfileScreen() {
   const [horarios, setHorarios] = useState<Horario[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [fotos, setFotos] = useState<FotoEstabelecimento[]>([]);
+  const [avaliacoes, setAvaliacoes] = useState<Avaliacao[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -58,13 +63,14 @@ export function PrestadorProfileScreen() {
       setErro(null);
 
       try {
-        const [prestadorData, servicosData, horariosData, categoriasData, fotosData] =
+        const [prestadorData, servicosData, horariosData, categoriasData, fotosData, avaliacoesData] =
           await Promise.all([
             obterPrestador(prestadorId),
             listarServicosPrestador(prestadorId),
             listarHorariosPrestador(prestadorId),
             listarCategoriasPrestador(prestadorId),
             listarFotosEstabelecimento(prestadorId),
+            listarAvaliacoesPrestador(prestadorId).catch(() => []),
           ]);
 
         if (!ativo) return;
@@ -74,6 +80,7 @@ export function PrestadorProfileScreen() {
         setHorarios(horariosData);
         setCategorias(categoriasData);
         setFotos(fotosData);
+        setAvaliacoes(avaliacoesData);
       } catch {
         if (ativo) setErro('Nao foi possivel carregar os dados do prestador.');
       } finally {
@@ -103,6 +110,7 @@ export function PrestadorProfileScreen() {
 
   const enderecoFormatado = formatAddress(prestador);
   const temEndereco = hasAddress(prestador);
+  const mediaAvaliacoes = calcularMediaAvaliacoes(avaliacoes);
 
   function openMaps() {
     if (!temEndereco) {
@@ -159,6 +167,23 @@ export function PrestadorProfileScreen() {
         size="lg"
         onPress={() => navigation.navigate('Agendamento', { prestadorId: prestador.id })}
       />
+
+      <Text style={styles.sectionTitle}>Avaliações</Text>
+      <Card style={styles.ratingCard}>
+        {avaliacoes.length > 0 ? (
+          <View style={styles.ratingSummary}>
+            <Text style={styles.ratingValue}>{mediaAvaliacoes.toFixed(1)}</Text>
+            <View style={styles.ratingDetails}>
+              <RatingStars value={mediaAvaliacoes} size={24} />
+              <Text style={styles.cardText}>
+                {avaliacoes.length} {avaliacoes.length === 1 ? 'avaliação' : 'avaliações'}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.cardText}>Este prestador ainda não possui avaliações.</Text>
+        )}
+      </Card>
 
       <Text style={styles.sectionTitle}>Localizacao</Text>
       <Card style={styles.locationCard}>
@@ -282,6 +307,22 @@ const styles = StyleSheet.create({
   },
   locationCard: {
     gap: theme.spacing.sm,
+  },
+  ratingCard: {
+    gap: theme.spacing.sm,
+  },
+  ratingSummary: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+  },
+  ratingValue: {
+    color: theme.colors.text,
+    fontSize: 36,
+    fontWeight: theme.fontWeight.bold,
+  },
+  ratingDetails: {
+    gap: theme.spacing.xs,
   },
   cardTitle: {
     color: theme.colors.text,
