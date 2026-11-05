@@ -68,6 +68,34 @@ test('listas vazias e erros 404 não são convertidos em dados fictícios', asyn
   await assert.rejects(catalogo.obterPrestador(99), (recebido) => recebido === erro);
 });
 
+test('galeria legada ausente não impede consultar os dados essenciais do prestador', async () => {
+  const erro = Object.assign(new Error('Não encontrado'), { response: { status: 404 } });
+  const catalogo = carregarModulos({ get: async (rota) => {
+    if (rota.endsWith('/fotos') || rota.endsWith('/99')) throw erro;
+    return { data: prestadorApi };
+  } })('services/catalogo.ts');
+  const [prestador, fotos] = await Promise.all([
+    catalogo.obterPrestador(7), catalogo.listarFotosEstabelecimento(7),
+  ]);
+  assert.equal(prestador.nome_estab, 'Studio teste');
+  assert.deepEqual(fotos, []);
+  await assert.rejects(catalogo.obterPrestador(99), recebido => recebido === erro);
+});
+
+test('galeria disponível preserva as fotos recebidas', async () => {
+  const fotos = [{ id: 1, prestador_id: 7, foto_url: 'https://example.test/foto.jpg' }];
+  const catalogo = carregarModulos({ get: async () => ({ data: fotos }) })('services/catalogo.ts');
+  assert.deepEqual(await catalogo.listarFotosEstabelecimento(7), fotos);
+});
+
+for (const status of [401, 403, 500, 503, undefined]) {
+  test(`falha de galeria ${status ?? 'de rede'} continua sendo informada`, async () => {
+    const erro = Object.assign(new Error('Falha na galeria'), { response: status ? { status } : undefined });
+    const catalogo = carregarModulos({ get: async () => { throw erro; } })('services/catalogo.ts');
+    await assert.rejects(catalogo.listarFotosEstabelecimento(7), recebido => recebido === erro);
+  });
+}
+
 test('expediente considera Fortaleza, domingo, fim do atendimento e janelas futuras do dia', () => {
   const { atendeHoje } = carregarModulos({})('utils/catalogPresentation.ts');
   const janela = (dia_semana, hora_inicio, hora_fim) => ({ id: 1, prestador_id: 7, dia_semana, hora_inicio, hora_fim });
@@ -140,6 +168,7 @@ test('consultas públicas funcionam com a API Spring real e respeitam conflitos 
   const prestador = prestadores[0];
   assert.match(prestador.usuario_id, /^[\da-f-]{36}$/i);
   assert.deepEqual(await catalogo.obterPrestador(prestador.id), prestador);
+  assert.deepEqual(await catalogo.listarFotosEstabelecimento(prestador.id), []);
   const servicos = await catalogo.listarServicosPrestador(prestador.id);
   const servico = servicos.find((item) => item.nome === 'Corte de cabelo');
   assert.ok(servico);
