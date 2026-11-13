@@ -18,7 +18,7 @@ function mensagemErro(error: unknown): string {
   if (status === 400) return 'Confira o nome e o e-mail informados.';
   if (status === 404) return 'Usuário não encontrado. Atualize a lista.';
   if (status === 403) return 'Apenas administradores podem gerenciar usuários.';
-  if (status === 503) return 'Autenticação indisponível. Consulte novamente o usuário antes de repetir a operação.';
+  if (status === 503) return 'Não foi possível concluir a operação agora. Atualize os dados do usuário antes de tentar novamente.';
   return 'Não foi possível concluir a operação. Tente novamente.';
 }
 

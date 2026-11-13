@@ -146,7 +146,7 @@ test('reativação envia ativo true e auto desativação não é oferecida', asy
 test('falha parcial ou Keycloak indisponível não exibe sucesso nem inativa a linha localmente', async () => {
   const app = preparar({ falha: 503 }); await app.estabilizar(); await app.clicar('Ver e editar');
   await app.clicar('Desativar conta'); await app.clicar('Confirmar desativação');
-  assert.ok(app.textos().some(t => typeof t === 'string' && t.includes('Consulte novamente')));
+  assert.ok(app.textos().some(t => typeof t === 'string' && t.includes('antes de tentar novamente')));
   assert.ok(!app.textos().includes('Conta desativada e sessões encerradas.'));
   assert.ok(app.textos().includes('Ativo'));
 });
