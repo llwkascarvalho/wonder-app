@@ -7,12 +7,14 @@ import { AdminCategoriesScreen } from '../screens/admin/AdminCategoriesScreen';
 import { AdminHomeScreen } from '../screens/admin/AdminHomeScreen';
 import { AdminMonitoringScreen } from '../screens/admin/AdminMonitoringScreen';
 import { AdminProfileScreen } from '../screens/admin/AdminProfileScreen';
+import { AdminUsersScreen } from '../screens/admin/AdminUsersScreen';
 import { theme } from '../styles/theme';
 import { AdminProvidersStack } from './AdminProvidersStack';
 
 export type AdminHomeStackParamList = {
   AdminHomeHub: undefined;
   AdminAudit: undefined;
+  AdminUsers: undefined;
 };
 
 export type AdminTabsParamList = {
@@ -56,6 +58,7 @@ function AdminHomeStack() {
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
       <HomeStack.Screen name="AdminHomeHub" component={AdminHomeScreen} />
       <HomeStack.Screen name="AdminAudit" component={AdminAuditScreen} />
+      <HomeStack.Screen name="AdminUsers" component={AdminUsersScreen} />
     </HomeStack.Navigator>
   );
 }

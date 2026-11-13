@@ -76,6 +76,14 @@ export function AdminHomeScreen() {
         <IconCircle name="groups" />
       </Card>
 
+      <Card style={styles.hubCard} onPress={() => navigation.navigate('AdminUsers')}>
+        <View style={styles.cardContent}>
+          <Text style={styles.cardTitle}>Usuários</Text>
+          <Text style={styles.cardText}>Consulte, edite e ative ou desative contas.</Text>
+        </View>
+        <IconCircle name="person" />
+      </Card>
+
       <Card style={styles.hubCard} onPress={() => navigation.navigate('AdminCategories')}>
         <View style={styles.cardContent}>
           <Text style={styles.cardTitle}>Categorias</Text>

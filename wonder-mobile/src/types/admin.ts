@@ -1,6 +1,24 @@
 export type AdminPrestadorStatus = 'rascunho' | 'pendente' | 'ativo' | 'rejeitado' | 'suspenso';
 export type AdminCategoriaStatus = 'ativa' | 'inativa';
 
+export type AdminUsuario = {
+  id: string;
+  username: string;
+  nome: string | null;
+  sobrenome: string | null;
+  email: string | null;
+  ativo: boolean;
+};
+
+export type AdminUsuariosPagina = {
+  usuarios: AdminUsuario[];
+  inicio: number;
+  limite: number;
+  temProxima: boolean;
+};
+
+export type AdminUsuarioPayload = { nome: string; sobrenome: string; email: string };
+
 export type AdminPrestador = {
   id: number;
   usuario_id: number | string;
