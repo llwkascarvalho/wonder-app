@@ -11,7 +11,32 @@ import {
   AdminPrestadorDetalhe,
   AdminResumoAuditoria,
   AdminStatusPayload,
+  AdminUsuario,
+  AdminUsuariosPagina,
+  AdminUsuarioPayload,
 } from '../types/admin';
+
+export async function listarUsuariosAdmin(busca = '', inicio = 0): Promise<AdminUsuariosPagina> {
+  const response = await api.get<AdminUsuariosPagina>('/admin/usuarios', {
+    params: { busca, inicio, limite: 20 },
+  });
+  return response.data;
+}
+
+export async function obterUsuarioAdmin(id: string): Promise<AdminUsuario> {
+  const response = await api.get<AdminUsuario>(`/admin/usuarios/${encodeURIComponent(id)}`);
+  return response.data;
+}
+
+export async function atualizarUsuarioAdmin(id: string, payload: AdminUsuarioPayload): Promise<AdminUsuario> {
+  const response = await api.put<AdminUsuario>(`/admin/usuarios/${encodeURIComponent(id)}`, payload);
+  return response.data;
+}
+
+export async function atualizarStatusUsuarioAdmin(id: string, ativo: boolean): Promise<AdminUsuario> {
+  const response = await api.patch<AdminUsuario>(`/admin/usuarios/${encodeURIComponent(id)}/status`, { ativo });
+  return response.data;
+}
 
 export async function listarPrestadoresPendentes(): Promise<AdminPrestador[]> {
   const response = await api.get<AdminPrestador[]>('/admin/prestadores/pendentes');

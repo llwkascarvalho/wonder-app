@@ -177,6 +177,14 @@ e conclusão, os payloads, falha na confirmação, cancelamento com motivo e
 ausência de ações nos estados finais. Executa tela e serviço reais com hooks,
 componentes nativos e HTTP simulados; não substitui teste em aparelho com a API real.
 
+## Administração de usuários
+
+No início da área administrativa, o card **Usuários** abre busca e paginação de contas, detalhe e edição de nome/sobrenome/e-mail. Ativar ou desativar exige confirmação; a própria conta não pode ser desativada. O cadastro continua no autorregistro do Keycloak. A tela usa `/admin/usuarios` do Core e não recebe credenciais administrativas do Keycloak.
+
+A desativação preserva o histórico e encerra as sessões no Keycloak. O aplicativo detecta o bloqueio na próxima requisição protegida: um `401` seguido de refresh revogado limpa a sessão e retorna ao login. Não há logout por push enquanto a tela permanece ociosa. Um `503` de indisponibilidade preserva a sessão para nova tentativa.
+
+`tests/admin-usuarios.test.cjs` executa a tela e os serviços com HTTP simulado; `tests/sessao-revogacao.test.cjs` verifica a limpeza da sessão revogada e sua preservação em `403`/`503`. Para validar o fluxo completo, o Core precisa incluir a API administrativa e a introspecção no Spring Security.
+
 ## Rollback
 
 Este frontend exige Core que aceite tokens Keycloak e implemente `/perfis/eu` com o DTO acima. Para rollback, restaure em conjunto a versão anterior do frontend, sua configuração Google/redirect e o backend/gateway antigo compatível com `/auth/google/login` e `/auth/me`. Não combine o frontend novo com a autenticação legada. O descarte do JWT antigo exige novo login após rollback; os tokens novos não substituem o armazenamento antigo.
