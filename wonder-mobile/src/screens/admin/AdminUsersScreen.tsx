@@ -18,7 +18,7 @@ function mensagemErro(error: unknown): string {
   if (status === 400) return 'Confira o nome e o e-mail informados.';
   if (status === 404) return 'Usuário não encontrado. Atualize a lista.';
   if (status === 403) return 'Apenas administradores podem gerenciar usuários.';
-  if (status === 503) return 'Keycloak indisponível. Consulte novamente o usuário antes de repetir a operação.';
+  if (status === 503) return 'Autenticação indisponível. Consulte novamente o usuário antes de repetir a operação.';
   return 'Não foi possível concluir a operação. Tente novamente.';
 }
 
@@ -129,7 +129,7 @@ export function AdminUsersScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <Button title="Voltar" variant="outline" onPress={() => navigation.goBack()} disabled={ocupado} />
       <Text style={styles.title}>Usuários</Text>
-      <Text style={styles.text}>Gerencie as contas do Wonder. O cadastro continua na tela de registro do Keycloak.</Text>
+      <Text style={styles.text}>Gerencie as contas do Wonder. Novas contas são criadas pela opção de cadastro na tela de login.</Text>
       <Input label="Buscar por nome, usuário ou e-mail" accessibilityLabel="Buscar usuários" value={busca}
         onChangeText={setBusca} maxLength={255} editable={!ocupado} />
       <Button title="Buscar" disabled={ocupado || carregando} onPress={() => {
