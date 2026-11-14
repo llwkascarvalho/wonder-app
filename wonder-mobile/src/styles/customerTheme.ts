@@ -19,7 +19,7 @@ export const customerTheme = {
     input: 18,
     pill: 999,
   },
-  shadow: Platform.OS === 'web'
+  shadow: Platform?.OS === 'web'
     ? {
       boxShadow: '0 1px 3px rgba(36,16,46,0.05), 0 6px 20px rgba(36,16,46,0.08)',
     }
