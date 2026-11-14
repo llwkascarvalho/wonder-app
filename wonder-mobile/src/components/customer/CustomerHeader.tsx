@@ -1,13 +1,12 @@
-import { MaterialIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { getProfilePhoto } from '../../services/profileService';
 import { customerTheme } from '../../styles/customerTheme';
 
 export function CustomerHeader() {
-  const { usuario, signOut } = useAuth();
+  const { usuario } = useAuth();
   const [photo, setPhoto] = useState<string>();
   const name = usuario?.nome?.trim() || 'Cliente';
   const firstName = name.split(/\s+/)[0];
@@ -39,15 +38,6 @@ export function CustomerHeader() {
           <Text style={styles.role}>Cliente Wonder</Text>
         </View>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Sair da conta"
-        onPress={() => void signOut()}
-        style={({ pressed }) => [styles.signOut, pressed && styles.pressed]}
-      >
-        <MaterialIcons name="logout" size={18} color={customerTheme.colors.danger} />
-        <Text style={styles.signOutText}>Sair</Text>
-      </Pressable>
     </View>
   );
 }
@@ -63,10 +53,4 @@ const styles = StyleSheet.create({
   initial: { color: customerTheme.colors.textOnBrand, fontSize: 16, fontWeight: '700' },
   greeting: { color: customerTheme.colors.text, fontSize: 16, fontWeight: '700' },
   role: { color: customerTheme.colors.textSecondary, fontSize: 11 },
-  signOut: {
-    alignItems: 'center', backgroundColor: customerTheme.colors.dangerSurface, borderRadius: 20,
-    flexDirection: 'row', gap: 6, height: 40, paddingHorizontal: 10,
-  },
-  signOutText: { color: customerTheme.colors.danger, fontSize: 13, fontWeight: '600' },
-  pressed: { opacity: 0.82 },
 });
