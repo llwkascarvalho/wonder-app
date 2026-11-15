@@ -1,28 +1,37 @@
 import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 
 import { theme } from '../styles/theme';
+import { customerTheme } from '../styles/customerTheme';
 
 type InputProps = TextInputProps & {
   label?: string;
   value: string;
   onChangeText: (text: string) => void;
   error?: string;
+  appearance?: 'default' | 'customer';
 };
 
-export function Input({ label, value, onChangeText, error, style, ...textInputProps }: InputProps) {
+export function Input({ label, value, onChangeText, error, appearance = 'default', style, ...textInputProps }: InputProps) {
+  const customer = appearance === 'customer';
   return (
     <View style={styles.container}>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
+      {label ? <Text style={[styles.label, customer && styles.customerLabel]}>{label}</Text> : null}
 
       <TextInput
         placeholderTextColor={theme.colors.textMuted}
-        style={[styles.input, textInputProps.multiline ? styles.multiline : null, error ? styles.inputError : null, style]}
+        style={[
+          styles.input,
+          customer && styles.customerInput,
+          textInputProps.multiline ? styles.multiline : null,
+          error ? styles.inputError : null,
+          style,
+        ]}
         value={value}
         onChangeText={onChangeText}
         {...textInputProps}
       />
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={[styles.error, customer && styles.customerError]}>{error}</Text> : null}
     </View>
   );
 }
@@ -58,5 +67,22 @@ const styles = StyleSheet.create({
   error: {
     color: theme.colors.error,
     fontSize: theme.fontSize.sm,
+  },
+  customerLabel: {
+    color: customerTheme.colors.text,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  customerInput: {
+    backgroundColor: '#EEE9F4',
+    borderColor: 'transparent',
+    borderRadius: customerTheme.radius.input,
+    color: customerTheme.colors.text,
+    fontSize: 14,
+    minHeight: 52,
+  },
+  customerError: {
+    color: customerTheme.colors.danger,
+    fontSize: 11,
   },
 });

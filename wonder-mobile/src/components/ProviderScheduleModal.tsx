@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { theme } from '../styles/theme';
+import { customerTheme } from '../styles/customerTheme';
 import { Button } from './Button';
 import { Input } from './Input';
 
@@ -18,6 +19,7 @@ const weekDays = [
 type ProviderScheduleModalProps = {
   visible: boolean;
   loading?: boolean;
+  appearance?: 'default' | 'customer';
   onClose: () => void;
   onSave: (payload: { dia_semana: number; hora_inicio: string; hora_fim: string }) => Promise<void>;
 };
@@ -25,9 +27,11 @@ type ProviderScheduleModalProps = {
 export function ProviderScheduleModal({
   visible,
   loading = false,
+  appearance = 'default',
   onClose,
   onSave,
 }: ProviderScheduleModalProps) {
+  const customer = appearance === 'customer';
   const [diaSemana, setDiaSemana] = useState(1);
   const [horaInicio, setHoraInicio] = useState('08:00');
   const [horaFim, setHoraFim] = useState('18:00');
@@ -50,8 +54,9 @@ export function ProviderScheduleModal({
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.content}>
-          <Text style={styles.title}>Selecionar dias e horarios</Text>
+        <View style={[styles.content, customer && styles.customerContent]}>
+          <Text style={[styles.title, customer && styles.customerTitle]}>Adicionar horário</Text>
+          {customer ? <Text style={styles.customerSubtitle}>Escolha o dia e informe o intervalo em que você atende.</Text> : null}
 
           <View style={styles.days}>
             {weekDays.map((day, index) => {
@@ -61,7 +66,7 @@ export function ProviderScheduleModal({
                   key={`${day.label}-${index}`}
                   accessibilityRole="button"
                   onPress={() => setDiaSemana(day.value)}
-                  style={[styles.dayButton, selected && styles.dayButtonSelected]}
+                  style={[styles.dayButton, customer && styles.customerDayButton, selected && styles.dayButtonSelected]}
                 >
                   <Text style={[styles.dayText, selected && styles.dayTextSelected]}>{day.label}</Text>
                 </Pressable>
@@ -71,10 +76,10 @@ export function ProviderScheduleModal({
 
           <View style={styles.row}>
             <View style={styles.timeField}>
-              <Input label="Horário de início" value={horaInicio} onChangeText={setHoraInicio} />
+              <Input appearance={appearance} label="Horário de início" value={horaInicio} onChangeText={setHoraInicio} />
             </View>
             <View style={styles.timeField}>
-              <Input label="Horário final" value={horaFim} onChangeText={setHoraFim} />
+              <Input appearance={appearance} label="Horário final" value={horaFim} onChangeText={setHoraFim} />
             </View>
           </View>
 
@@ -106,11 +111,28 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
     width: '100%',
   },
+  customerContent: {
+    backgroundColor: customerTheme.colors.surface,
+    borderRadius: customerTheme.radius.card,
+    ...customerTheme.shadow,
+  },
   title: {
     color: theme.colors.text,
     fontSize: theme.fontSize.lg,
     fontWeight: theme.fontWeight.bold,
     textAlign: 'center',
+  },
+  customerTitle: {
+    color: customerTheme.colors.text,
+    fontSize: 22,
+    letterSpacing: -0.3,
+    textAlign: 'left',
+  },
+  customerSubtitle: {
+    color: customerTheme.colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: -8,
   },
   days: {
     flexDirection: 'row',
@@ -124,6 +146,12 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: 'center',
     width: 32,
+  },
+  customerDayButton: {
+    backgroundColor: customerTheme.colors.surface,
+    borderColor: '#E7E0EF',
+    height: 36,
+    width: 36,
   },
   dayButtonSelected: {
     backgroundColor: theme.colors.primary,

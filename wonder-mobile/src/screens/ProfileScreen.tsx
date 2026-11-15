@@ -1,15 +1,15 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../components/Button';
-import { Card } from '../components/Card';
 import { ProfileScreenContent } from '../components/profile/ProfileScreenContent';
 import { useAuth } from '../contexts/AuthContext';
 import { ProfileStackParamList } from '../navigation/ProfileStack';
 import { getBackendMessage, obterMeuPrestador } from '../services/providerOnboarding';
-import { theme } from '../styles/theme';
+import { customerTheme } from '../styles/customerTheme';
 import { ProviderOnboardingProfile } from '../types/providerOnboarding';
 
 type Navigation = NativeStackNavigationProp<ProfileStackParamList, 'ClientProfile'>;
@@ -47,8 +47,14 @@ export function ProfileScreen() {
 
   return (
     <ProfileScreenContent appearance="customer" title="Meu perfil" subtitle="Gerencie seus dados pessoais." onSignOut={signOut}>
-      <Card style={styles.providerCard}>
-        <Text style={styles.providerTitle}>Prestador Wonder</Text>
+      <View style={styles.providerCard}>
+        <View style={styles.providerHeading}>
+          <View style={styles.providerIcon}><MaterialIcons name="storefront" size={22} color={customerTheme.colors.brandDark} /></View>
+          <View style={styles.providerHeadingText}>
+            <Text style={styles.providerTitle}>Prestador Wonder</Text>
+            <Text style={styles.providerCaption}>Ofereça seus serviços na plataforma</Text>
+          </View>
+        </View>
         <Text style={providerProfile?.status === 'rejeitado' || providerProfile?.status === 'rascunho'
           ? styles.providerWarning : styles.providerText}>{providerMessage}</Text>
         {providerProfile?.motivo_rejeicao ? (
@@ -61,13 +67,16 @@ export function ProfileScreen() {
           disabled={loadingProviderProfile}
           onPress={handleProviderAction}
         />
-      </Card>
+      </View>
     </ProfileScreenContent>
   );
 }
 
 function getProviderMessage(profile: ProviderOnboardingProfile | null): string {
   if (!profile) return 'Cadastre seu estabelecimento para oferecer serviços na plataforma.';
+  if (profile.status === 'pendente' && !profile.enviado_em) {
+    return 'Seu cadastro ainda não foi enviado. Complete os serviços e horários para finalizar.';
+  }
   if (profile.status === 'pendente') return 'Seu cadastro foi enviado e está aguardando análise do administrador.';
   if (profile.status === 'rejeitado') return 'Seu cadastro foi rejeitado. Revise o motivo informado e envie novamente.';
   if (profile.status === 'rascunho') return profile.motivo_rejeicao
@@ -88,7 +97,7 @@ function getProviderButtonTitle(profile: ProviderOnboardingProfile | null): stri
   }
 
   if (profile.status === 'pendente') {
-    return 'Cadastro em analise';
+    return profile.enviado_em ? 'Visualizar solicitação' : 'Continuar cadastro profissional';
   }
 
   if (profile.status === 'rejeitado') {
@@ -104,26 +113,23 @@ function getProviderButtonTitle(profile: ProviderOnboardingProfile | null): stri
 
 const styles = StyleSheet.create({
   providerCard: {
-    gap: theme.spacing.sm,
+    backgroundColor: customerTheme.colors.surface, borderRadius: customerTheme.radius.card,
+    gap: 12, padding: 18, ...customerTheme.shadow,
   },
+  providerHeading: { alignItems: 'center', flexDirection: 'row', gap: 12 },
+  providerHeadingText: { flex: 1, gap: 2 },
+  providerIcon: { alignItems: 'center', backgroundColor: '#EFE3FA', borderRadius: 14, height: 44, justifyContent: 'center', width: 44 },
   providerTitle: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.bold,
+    color: customerTheme.colors.text, fontSize: 16, fontWeight: '800',
   },
+  providerCaption: { color: customerTheme.colors.textSecondary, fontSize: 11 },
   providerText: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.md,
-    lineHeight: 22,
+    color: customerTheme.colors.textSecondary, fontSize: 13, lineHeight: 19,
   },
   error: {
-    color: theme.colors.error,
-    fontSize: theme.fontSize.sm,
+    color: customerTheme.colors.danger, fontSize: 12,
   },
   providerWarning: {
-    color: theme.colors.warning,
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.semibold,
-    lineHeight: 22,
+    color: '#9A6700', fontSize: 13, fontWeight: '600', lineHeight: 19,
   },
 });

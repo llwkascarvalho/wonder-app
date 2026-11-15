@@ -7,6 +7,7 @@ export type PrestadorApiResponse = Omit<Prestador, 'usuario_id' | 'nome_estab' |
 };
 
 export type PrestadorProprioApiResponse = PrestadorApiResponse & {
+  enviado_em?: string | null;
   motivo_rejeicao: string | null;
 };
 
