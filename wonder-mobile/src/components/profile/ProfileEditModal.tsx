@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
-import { Modal, Platform, StyleSheet, Text, View } from 'react-native';
+import { Modal, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { theme } from '../../styles/theme';
 import { customerTheme } from '../../styles/customerTheme';
@@ -22,6 +22,9 @@ export function ProfileEditModal({
   visible, loading = false, profile, onClose, onSave, appearance = 'default',
 }: ProfileEditModalProps) {
   const [telefone, setTelefone] = useState(profile.telefone || '');
+  const [nome, setNome] = useState(profile.primeiroNome || '');
+  const [sobrenome, setSobrenome] = useState(profile.sobrenome || '');
+  const [email, setEmail] = useState(profile.email || '');
   const [foto, setFoto] = useState<ProfilePhotoAsset>();
   const [picking, setPicking] = useState(false);
   const busy = useRef(false);
@@ -31,6 +34,9 @@ export function ProfileEditModal({
   useEffect(() => {
     if (visible) {
       setTelefone(profile.telefone || '');
+      setNome(profile.primeiroNome || '');
+      setSobrenome(profile.sobrenome || '');
+      setEmail(profile.email || '');
       setFoto(undefined);
       setError('');
     }
@@ -38,6 +44,8 @@ export function ProfileEditModal({
   }, [visible]);
 
   const phoneChanged = Boolean(telefone.trim()) && telefone !== (profile.telefone || '');
+  const identityChanged = nome.trim() !== (profile.primeiroNome || '') ||
+    sobrenome.trim() !== (profile.sobrenome || '') || email.trim() !== (profile.email || '');
 
   async function selectPhoto() {
     if (busy.current || loading || picking) return;
@@ -68,11 +76,15 @@ export function ProfileEditModal({
   }
 
   async function handleSave() {
-    if (busy.current || loading || picking || (!phoneChanged && !foto)) return;
+    if (busy.current || loading || picking || (!phoneChanged && !foto && !identityChanged)) return;
     busy.current = true;
     setError('');
     try {
-      await onSave({ telefone: phoneChanged ? telefone : undefined, foto });
+      if (identityChanged && (!nome.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))) {
+        throw new Error('Informe um nome e um e-mail válidos.');
+      }
+      await onSave({ telefone: phoneChanged ? telefone : undefined, foto,
+        identidade: identityChanged ? { nome: nome.trim(), sobrenome: sobrenome.trim(), email: email.trim() } : undefined });
     } catch (err) {
       setError(getProfileErrorMessage(err, 'Não foi possível atualizar o perfil. Verifique a conexão e tente novamente.'));
     } finally {
@@ -84,31 +96,37 @@ export function ProfileEditModal({
     <Modal transparent animationType="fade" visible={visible} onRequestClose={() => { if (!loading && !busy.current) onClose(); }}>
       <View style={[styles.overlay, appearance === 'customer' && styles.customerOverlay]}>
         <View style={[styles.content, appearance === 'customer' && styles.customerContent]}>
-          <Text style={[styles.title, appearance === 'customer' && styles.customerTitle]}>Editar perfil</Text>
-          {appearance === 'customer' ? (
-            <Text style={styles.customerSubtitle}>Atualize seu telefone ou escolha uma nova foto.</Text>
-          ) : null}
-          <Input
-            label="Telefone"
-            value={telefone}
-            onChangeText={setTelefone}
-            keyboardType="phone-pad"
-            maxLength={20}
-            editable={!loading}
-            placeholder="(00) 00000-0000"
-          />
-          <Text style={appearance === 'customer' ? styles.customerHelper : undefined}>
-            Deixe o telefone em branco para manter o atual.
-          </Text>
-          <Button title={foto ? 'Trocar foto selecionada' : 'Selecionar foto'} variant="secondary" onPress={selectPhoto} loading={picking} disabled={loading} />
-          <Text style={appearance === 'customer' ? styles.customerHelper : undefined}>
-            {foto ? `Foto selecionada: ${foto.fileName || 'imagem'}` : 'JPEG, PNG ou WebP de até 5 MiB.'}
-          </Text>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          <View style={styles.actions}>
-            <Button title="Cancelar" variant="secondary" onPress={onClose} disabled={loading} />
-            <Button title="Salvar" onPress={handleSave} loading={loading} disabled={picking || (!phoneChanged && !foto)} />
-          </View>
+          <ScrollView contentContainerStyle={styles.fields} keyboardShouldPersistTaps="handled">
+            <Text style={[styles.title, appearance === 'customer' && styles.customerTitle]}>Editar perfil</Text>
+            {appearance === 'customer' ? (
+              <Text style={styles.customerSubtitle}>Atualize seus dados pessoais ou escolha uma nova foto.</Text>
+            ) : null}
+            <Input label="Nome" value={nome} onChangeText={setNome} maxLength={255} editable={!loading} />
+            <Input label="Sobrenome" value={sobrenome} onChangeText={setSobrenome} maxLength={255} editable={!loading} />
+            <Input label="E-mail" value={email} onChangeText={setEmail} maxLength={254}
+              keyboardType="email-address" autoCapitalize="none" editable={!loading} />
+            <Input
+              label="Telefone"
+              value={telefone}
+              onChangeText={setTelefone}
+              keyboardType="phone-pad"
+              maxLength={20}
+              editable={!loading}
+              placeholder="(00) 00000-0000"
+            />
+            <Text style={appearance === 'customer' ? styles.customerHelper : undefined}>
+              Deixe o telefone em branco para manter o atual.
+            </Text>
+            <Button title={foto ? 'Trocar foto selecionada' : 'Selecionar foto'} variant="secondary" onPress={selectPhoto} loading={picking} disabled={loading} />
+            <Text style={appearance === 'customer' ? styles.customerHelper : undefined}>
+              {foto ? `Foto selecionada: ${foto.fileName || 'imagem'}` : 'JPEG, PNG ou WebP de até 5 MiB.'}
+            </Text>
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <View style={styles.actions}>
+              <Button title="Cancelar" variant="secondary" onPress={onClose} disabled={loading} />
+              <Button title="Salvar" onPress={handleSave} loading={loading} disabled={picking || (!phoneChanged && !foto && !identityChanged)} />
+            </View>
+            </ScrollView>
         </View>
       </View>
     </Modal>
@@ -130,7 +148,9 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     padding: theme.spacing.lg,
     width: '100%',
+    maxHeight: '90%',
   },
+  fields: { gap: theme.spacing.md },
   title: {
     color: theme.colors.text,
     fontSize: theme.fontSize.xl,

@@ -25,6 +25,11 @@ export function normalizeProfile(profile: PerfilUsuarioResponse, token: string):
   if (!claims?.sub || profile.keycloakId !== claims.sub) {
     throw new Error('Inconsistência de identidade entre Keycloak e Core.');
   }
+  const identidade = profile.identidade;
+  if (identidade && (identidade.id !== profile.keycloakId ||
+      ![identidade.nome, identidade.sobrenome, identidade.email].every(value => value === null || typeof value === 'string'))) {
+    throw new Error('Resposta de identidade incompatível com o perfil.');
+  }
   const roles = claims.realm_access?.roles;
   if (!Array.isArray(roles) || !roles.every((role) => typeof role === 'string')) {
     throw new Error('A conta não possui papéis reconhecidos no Keycloak.');
@@ -34,7 +39,9 @@ export function normalizeProfile(profile: PerfilUsuarioResponse, token: string):
   if (!tipo) throw new Error('A conta não possui papéis reconhecidos no Keycloak.');
   return {
     id: profile.id, profileId: profile.id, keycloakId: profile.keycloakId,
-    nome: claims.name || claims.preferred_username || '', email: claims.email ?? null,
+    nome: identidade ? [identidade.nome, identidade.sobrenome].filter(Boolean).join(' ') : claims.name || claims.preferred_username || '',
+    primeiroNome: identidade?.nome ?? '', sobrenome: identidade?.sobrenome ?? '',
+    email: identidade ? identidade.email : claims.email ?? null,
     tipo_usuario: tipo, roles, foto_url: profile.fotoUrl, telefone: profile.numeroTelefone,
   };
 }
