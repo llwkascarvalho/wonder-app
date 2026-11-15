@@ -8,12 +8,12 @@ const axios = require('axios');
 
 function setup({ existing = null, initialServices = [], initialSchedules = [], picker, navigation } = {}) {
   const states = [], calls = [], effects = [];
-  let cursor = 0, mounted = false, nextService = 10, nextSchedule = 20;
+  let cursor = 0, mounted = false, nextService = 10, nextSchedule = 20, currentProfile = existing;
   const api = {
     get: async (url) => {
       calls.push({ method: 'GET', url });
       if (url === '/catalogo/prestadores/me') {
-        if (existing) return { data: existing };
+        if (currentProfile) return { data: currentProfile };
         throw new axios.AxiosError('Não encontrado', undefined, undefined, undefined, { status: 404 });
       }
       if (url === '/catalogo/categorias') return { data: [{ id: 1, nome: 'Barba', status: 'ativa' }] };
@@ -23,24 +23,36 @@ function setup({ existing = null, initialServices = [], initialSchedules = [], p
     },
     post: async (url, payload) => {
       calls.push({ method: 'POST', url, payload });
-      if (url === '/catalogo/prestadores') return { data: {
+      if (url === '/catalogo/prestadores') {
+        currentProfile = {
         id: 7, perfilUsuarioId: 'user', status: 'pendente', ativo: false,
-        fotoUrl: '/catalogo/prestadores/7/foto', ...Object.fromEntries(payload.entries()),
-      } };
+        fotoUrl: '/catalogo/prestadores/7/foto', enviado_em: null,
+        motivo_rejeicao: null, ...Object.fromEntries(payload.entries()),
+        };
+        return { data: currentProfile };
+      }
       if (url.endsWith('/servicos')) return { data: { id: nextService++, prestador_id: 7, ...payload } };
       if (url.endsWith('/horarios')) return { data: { id: nextSchedule++, prestador_id: 7, ...payload } };
-      if (url.endsWith('/enviar-aprovacao')) return { data: { ...existing, status: 'pendente', motivo_rejeicao: null } };
-      if (url.endsWith('/foto')) return { data: { ...existing, fotoUrl: url } };
+      if (url.endsWith('/enviar-aprovacao')) {
+        currentProfile = { ...currentProfile, status: 'pendente', enviado_em: '2026-11-15T12:00:00', motivo_rejeicao: null };
+        return { data: currentProfile };
+      }
+      if (url.endsWith('/foto')) {
+        currentProfile = { ...currentProfile, fotoUrl: url };
+        return { data: currentProfile };
+      }
       throw new Error(`POST inesperado: ${url}`);
     },
     put: async (url, payload) => {
       calls.push({ method: 'PUT', url, payload });
       if (url.includes('/servicos/')) return { data: { id: Number(url.split('/').at(-1)), prestador_id: 7, ...payload } };
-      return { data: { ...existing, ...payload, status: existing?.status || 'rascunho' } };
+      currentProfile = { ...currentProfile, ...payload, status: currentProfile?.status || 'rascunho' };
+      return { data: currentProfile };
     },
     delete: async (url) => { calls.push({ method: 'DELETE', url }); return { data: null }; },
   };
   const mocks = {
+    '@expo/vector-icons': { MaterialIcons: 'MaterialIcons' },
     react: {
       useState: (initial) => { const i = cursor++; if (!(i in states)) states[i] = initial; return [states[i], (v) => { states[i] = typeof v === 'function' ? v(states[i]) : v; }]; },
       useRef: (initial) => { const i = cursor++; if (!(i in states)) states[i] = { current: initial }; return states[i]; },
@@ -50,7 +62,7 @@ function setup({ existing = null, initialServices = [], initialSchedules = [], p
       requestMediaLibraryPermissionsAsync: async () => ({ granted: true }),
       launchImageLibraryAsync: picker || (async () => ({ canceled: true, assets: [] })),
     },
-    'react-native': { Platform: { OS: 'web' }, ScrollView: 'ScrollView', View: 'View', Text: 'Text', StyleSheet: { create: (v) => v } },
+    'react-native': { Modal: 'Modal', Platform: { OS: 'web' }, ScrollView: 'ScrollView', View: 'View', Text: 'Text', StyleSheet: { create: (v) => v } },
   };
   const cache = new Map();
   function load(filename) {
@@ -107,6 +119,18 @@ test('documento é opcional e endereço obrigatório é validado', () => {
   assert.equal(errors.complemento, undefined);
 });
 
+test('não exibe erros da próxima etapa antes da tentativa de avançar', async () => {
+  const app = setup();
+  let ui = await app.init();
+  assert.deepEqual(ui.find('ProviderDataStep').errors, {});
+
+  ui.find('ProviderDataStep').onChange({ nomeEstab: complete.nomeEstab, documento: '' });
+  await app.render().button('Avançar').onPress();
+
+  ui = app.render();
+  assert.deepEqual(ui.find('ProviderAddressStep').errors, {});
+});
+
 test('cadastro inicial permanece pendente e recebe serviço e horário antes da revisão', async () => {
   const app = setup(); await fillIdentity(app);
   assert.ok(app.calls.find((call) => call.url === '/catalogo/prestadores'));
@@ -115,8 +139,10 @@ test('cadastro inicial permanece pendente e recebe serviço e horário antes da 
   const review = app.render().find('ProviderReviewStep');
   assert.deepEqual(review.validationErrors, []);
   await review.onSubmit();
-  assert.equal(app.calls.some((call) => call.url.endsWith('/enviar-aprovacao')), false);
+  await app.render().button('Confirmar envio').onPress();
+  assert.equal(app.calls.some((call) => call.url.endsWith('/enviar-aprovacao')), true);
   assert.equal(app.render().find('ProviderApplicationStatus').profile.status, 'pendente');
+  assert.ok(app.render().find('ProviderApplicationStatus').profile.enviado_em);
 });
 
 test('não avança sem serviço nem horário', async () => {
@@ -140,6 +166,7 @@ test('correção preserva foto e dados, carrega recursos e reenvia sem novo cada
   ui.find('ProviderDataStep').onChange({ nomeEstab: 'Studio corrigido' });
   for (let i = 0; i < 4; i++) await app.render().button('Avançar').onPress();
   await app.render().find('ProviderReviewStep').onSubmit();
+  await app.render().button('Reenviar').onPress();
   assert.deepEqual(app.calls.filter((call) => call.method !== 'GET').map((call) => call.url), ['/catalogo/prestadores/7', '/catalogo/prestadores/7/enviar-aprovacao']);
 });
 
@@ -159,15 +186,29 @@ test('é possível voltar ao perfil', async () => {
   (await app.init()).button('Voltar ao perfil').onPress(); assert.equal(returns, 1);
 });
 
-test('cadastro pendente pode retomar serviços e horários sem mudar o status', async () => {
+test('cadastro pendente ainda não enviado retoma serviços e horários', async () => {
   const existing = { id: 7, perfilUsuarioId: 'user', nomeEstab: 'Studio', documento: null,
     endereco: 'Rua', numero: '1', bairro: 'Centro', cidade: 'Natal', estado: 'RN',
     status: 'pendente', fotoUrl: '/catalogo/prestadores/7/foto' };
   const app = setup({ existing });
   let ui = await app.init();
-  assert.equal(ui.find('ProviderApplicationStatus').profile.status, 'pendente');
-  await ui.find('ProviderApplicationStatus').onContinue();
-  ui = app.render();
   assert.ok(ui.find('ProviderServicesStep'));
   assert.equal(ui.find('ProviderDataStep'), undefined);
+});
+
+test('cadastro pendente enviado permite somente visualizar a solicitação', async () => {
+  const existing = { id: 7, perfilUsuarioId: 'user', nomeEstab: 'Studio', documento: null,
+    endereco: 'Rua', numero: '1', bairro: 'Centro', cidade: 'Natal', estado: 'RN',
+    status: 'pendente', enviado_em: '2026-11-15T12:00:00', fotoUrl: '/catalogo/prestadores/7/foto' };
+  const app = setup({ existing,
+    initialServices: [{ id: 10, prestador_id: 7, nome: 'Corte', preco: 30, duracao_min: 30, categoria_id: 1 }],
+    initialSchedules: [{ id: 20, prestador_id: 7, dia_semana: 1, hora_inicio: '08:00', hora_fim: '12:00' }] });
+
+  let ui = await app.init();
+  assert.equal(ui.find('ProviderApplicationStatus').profile.enviado_em, '2026-11-15T12:00:00');
+  await ui.find('ProviderApplicationStatus').onContinue();
+  ui = app.render();
+  assert.equal(ui.find('ProviderReviewStep').readOnly, true);
+  assert.equal(ui.find('ProviderServicesStep'), undefined);
+  assert.equal(ui.find('ProviderSchedulesStep'), undefined);
 });
