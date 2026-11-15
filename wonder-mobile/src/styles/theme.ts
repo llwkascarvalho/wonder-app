@@ -18,6 +18,8 @@ export const theme = {
 
     success: '#16A34A',
     error: '#DC2626',
+    danger: '#C62828',
+    dangerSurface: '#FDE3E5',
     warning: '#F59E0B',
 
     white: '#FFFFFF',

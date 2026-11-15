@@ -48,7 +48,9 @@ export function Button({
       {...pressableProps}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'outline' ? theme.colors.primary : theme.colors.white} />
+        <ActivityIndicator
+          color={variant === 'outline' ? theme.colors.primary : variant === 'danger' ? theme.colors.danger : theme.colors.white}
+        />
       ) : (
         <Text style={[styles.text, styles[`${variant}Text`]]}>{title}</Text>
       )}
@@ -75,7 +77,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   danger: {
-    backgroundColor: theme.colors.error,
+    backgroundColor: theme.colors.dangerSurface,
   },
   sm: {
     minHeight: 40,
@@ -103,7 +105,7 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
   },
   dangerText: {
-    color: theme.colors.white,
+    color: theme.colors.danger,
   },
   pressed: {
     opacity: 0.86,
