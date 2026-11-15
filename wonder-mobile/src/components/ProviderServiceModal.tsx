@@ -5,6 +5,7 @@ import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View }
 import { CatalogImage } from './catalog/CatalogImage';
 import { validateProfilePhoto } from '../services/profileService';
 import { theme } from '../styles/theme';
+import { customerTheme } from '../styles/customerTheme';
 import { ProfilePhotoAsset } from '../types/profile';
 import { Button } from './Button';
 import { Input } from './Input';
@@ -18,6 +19,7 @@ type ProviderServiceModalProps = {
   visible: boolean;
   loading?: boolean;
   onClose: () => void;
+  appearance?: 'default' | 'customer';
   categories?: ServiceCategoryOption[];
   initialService?: {
     nome: string;
@@ -36,10 +38,12 @@ export function ProviderServiceModal({
   visible,
   loading = false,
   onClose,
+  appearance = 'default',
   categories,
   initialService,
   onSave,
 }: ProviderServiceModalProps) {
+  const customer = appearance === 'customer';
   const [nome, setNome] = useState('');
   const [preco, setPreco] = useState('');
   const [duracao, setDuracao] = useState('');
@@ -139,24 +143,27 @@ export function ProviderServiceModal({
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.modalCard}>
+        <View style={[styles.modalCard, customer && styles.customerModalCard]}>
           <ScrollView
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-          <Text style={styles.title}>{initialService ? 'Editar servico' : 'Cadastro de servico'}</Text>
+          <Text style={[styles.title, customer && styles.customerTitle]}>{initialService ? 'Editar serviço' : 'Cadastrar serviço'}</Text>
+          {customer ? <Text style={styles.customerSubtitle}>Apresente o serviço, defina sua duração e escolha uma categoria.</Text> : null}
 
-          <Input label="Nome do servico" placeholder="Corte degradado" value={nome} onChangeText={setNome} />
+          <Input appearance={appearance} label="Nome do serviço" placeholder="Corte degradado" value={nome} onChangeText={setNome} />
           <Input
-            label="Preco"
+            appearance={appearance}
+            label="Preço"
             keyboardType="decimal-pad"
             placeholder="45.00"
             value={preco}
             onChangeText={setPreco}
           />
           <Input
-            label="Duracao em minutos"
+            appearance={appearance}
+            label="Duração em minutos"
             keyboardType="number-pad"
             placeholder="30"
             value={duracao}
@@ -165,7 +172,7 @@ export function ProviderServiceModal({
 
           {categories?.length ? (
             <View style={styles.categorySection}>
-              <Text style={styles.categoryLabel}>Categoria do servico</Text>
+              <Text style={[styles.categoryLabel, customer && styles.customerCategoryLabel]}>Categoria do serviço</Text>
               <View style={styles.categoryList}>
                 {categories.map((categoria) => {
                   const selected = categoriaId === categoria.id;
@@ -174,7 +181,7 @@ export function ProviderServiceModal({
                       key={categoria.id}
                       accessibilityRole="button"
                       onPress={() => setCategoriaId(categoria.id)}
-                      style={[styles.categoryChip, selected && styles.categoryChipSelected]}
+                      style={[styles.categoryChip, customer && styles.customerCategoryChip, selected && styles.categoryChipSelected]}
                     >
                       <Text style={[styles.categoryChipText, selected && styles.categoryChipTextSelected]}>
                         {categoria.nome}
@@ -186,15 +193,15 @@ export function ProviderServiceModal({
             </View>
           ) : null}
 
-          <View style={styles.imageSection}>
+          <View style={[styles.imageSection, customer && styles.customerImageSection]}>
             {photo ? (
               <Image source={{ uri: photo.uri }} resizeMode="cover" style={styles.imagePreview} />
             ) : initialService?.foto_url ? (
               <CatalogImage authenticated fotoUrl={initialService.foto_url} kind="service" style={styles.imagePreview} />
             ) : null}
             <View style={styles.imageContent}>
-              <Text style={styles.imageLabel}>Foto do servico (opcional)</Text>
-              <Text style={styles.imageText}>JPEG, PNG ou WebP de ate 5 MiB.</Text>
+              <Text style={[styles.imageLabel, customer && styles.customerImageLabel]}>Foto do serviço</Text>
+              <Text style={styles.imageText}>Opcional · JPEG, PNG ou WebP de até 5 MiB.</Text>
               <Button
                 title={photo || initialService?.foto_url ? 'Alterar foto' : 'Selecionar foto'}
                 size="sm"
@@ -238,6 +245,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     width: '100%',
   },
+  customerModalCard: {
+    backgroundColor: customerTheme.colors.surface,
+    borderRadius: customerTheme.radius.card,
+    ...customerTheme.shadow,
+  },
   content: {
     gap: theme.spacing.md,
     padding: theme.spacing.lg,
@@ -249,6 +261,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     textTransform: 'uppercase',
   },
+  customerTitle: {
+    color: customerTheme.colors.text,
+    fontSize: 22,
+    letterSpacing: -0.3,
+    textAlign: 'left',
+    textTransform: 'none',
+  },
+  customerSubtitle: {
+    color: customerTheme.colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: -8,
+  },
   imageSection: {
     alignItems: 'center',
     backgroundColor: theme.colors.surfaceMuted,
@@ -256,6 +281,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.spacing.md,
     padding: theme.spacing.sm,
+  },
+  customerImageSection: {
+    backgroundColor: '#F4F1F8',
+    borderRadius: 18,
   },
   imagePreview: {
     borderRadius: theme.borderRadius.md,
@@ -271,6 +300,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.bold,
   },
+  customerImageLabel: { color: customerTheme.colors.text },
   imageText: {
     color: theme.colors.textMuted,
     fontSize: theme.fontSize.sm,
@@ -283,6 +313,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.medium,
   },
+  customerCategoryLabel: { color: customerTheme.colors.text, fontWeight: '600' },
   categoryList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -294,6 +325,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
+  },
+  customerCategoryChip: {
+    backgroundColor: customerTheme.colors.surface,
+    borderColor: '#E7E0EF',
+    minHeight: 38,
   },
   categoryChipSelected: {
     backgroundColor: theme.colors.primary,
