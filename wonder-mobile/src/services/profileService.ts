@@ -1,15 +1,16 @@
 import { Platform } from 'react-native';
 import api from './api';
-import type { PerfilUsuarioResponse, ProfilePhotoAsset, UserProfileUpdate } from '../types/profile';
+import type { IdentidadeUsuario, PerfilUsuarioResponse, ProfilePhotoAsset, UserProfileUpdate } from '../types/profile';
 
 export function getProfileErrorMessage(error: unknown, fallback: string): string {
   const status = (error as { response?: { status?: number } })?.response?.status;
   if (status === 403) return 'Sua conta não tem permissão para acessar o perfil.';
   if (status === 401) return 'Sessão expirada. Entre novamente.';
-  if (status === 400) return 'Verifique os dados. A foto deve ser JPEG, PNG ou WebP.';
+  if (status === 400) return 'Verifique os dados informados. A foto deve ser JPEG, PNG ou WebP.';
+  if (status === 409) return 'Este e-mail já está em uso. Escolha outro e tente novamente.';
   if (status === 413) return 'A foto deve ter até 5 MiB e o envio completo até 6 MiB.';
   if (status === 415) return 'Não foi possível enviar o formulário do perfil. Tente novamente.';
-  if (status === 503) return 'O armazenamento está indisponível. Tente novamente mais tarde.';
+  if (status === 503) return 'Não foi possível concluir a operação agora. Confira os dados antes de tentar novamente.';
   return error instanceof Error && !status ? error.message : fallback;
 }
 
@@ -46,7 +47,9 @@ export function appendImageFile(
   }
 }
 
-export async function updateMyProfile(payload: UserProfileUpdate): Promise<PerfilUsuarioResponse> {
+export async function updateMyProfile(
+  payload: UserProfileUpdate, checkSession: () => void = () => {},
+): Promise<PerfilUsuarioResponse> {
   if (payload.telefone && payload.telefone.length > 20) {
     throw new Error('O telefone deve ter até 20 caracteres.');
   }
@@ -55,9 +58,34 @@ export async function updateMyProfile(payload: UserProfileUpdate): Promise<Perfi
   if (payload.foto) {
     appendProfilePhoto(form, payload.foto);
   }
-  if (!payload.telefone?.trim() && !payload.foto) throw new Error('Nenhuma alteração para salvar.');
-  const response = await api.put<PerfilUsuarioResponse>('/perfis/eu', form);
-  return response.data;
+  const identidade = payload.identidade && {
+    nome: payload.identidade.nome.trim(), sobrenome: payload.identidade.sobrenome.trim(), email: payload.identidade.email.trim(),
+  };
+  if (identidade && (!identidade.nome || identidade.nome.length > 255 || identidade.sobrenome.length > 255 ||
+      identidade.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identidade.email))) {
+    throw new Error('Informe um nome e um e-mail válidos.');
+  }
+  const perfilChanged = Boolean(payload.telefone?.trim() || payload.foto);
+  if (!identidade && !perfilChanged) throw new Error('Nenhuma alteração para salvar.');
+  let identidadeSalva = false;
+  try {
+    checkSession();
+    if (identidade) {
+      await api.put('/perfis/eu/identidade', identidade);
+      identidadeSalva = true;
+    }
+    checkSession();
+    if (perfilChanged) await api.put('/perfis/eu', form);
+    checkSession();
+    const perfil = await getMyProfile();
+    checkSession();
+    return perfil;
+  } catch (error) {
+    if (identidadeSalva) {
+      throw new Error('Nome e e-mail foram salvos, mas não foi possível concluir a atualização do perfil. Confira os dados antes de tentar novamente.');
+    }
+    throw error;
+  }
 }
 
 export async function getProfilePhoto(fotoUrl: string): Promise<string> {
@@ -78,6 +106,8 @@ export function resolveProfilePhotoUrl(fotoUrl?: string | null): string | undefi
 }
 
 export async function getMyProfile(): Promise<PerfilUsuarioResponse> {
-  const response = await api.get<PerfilUsuarioResponse>('/perfis/eu');
-  return response.data;
+  const [perfil, identidade] = await Promise.all([
+    api.get<PerfilUsuarioResponse>('/perfis/eu'), api.get<IdentidadeUsuario>('/perfis/eu/identidade'),
+  ]);
+  return { ...perfil.data, identidade: identidade.data };
 }

@@ -46,7 +46,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     // Invalida leituras iniciadas antes e durante o salvamento.
     profileRequest.current += 1;
     try {
-      const profile = await updateMyProfile(payload);
+      const profile = await updateMyProfile(payload, () => {
+        if (!isCurrentSession(expected)) throw new Error('Sessão encerrada. Entre novamente.');
+      });
       const current = getSession();
       if (!isCurrentSession(expected) || !current) throw new Error('Sessão encerrada.');
       const next = normalizeProfile(profile, current.accessToken);
