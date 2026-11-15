@@ -1,18 +1,21 @@
 import { useNavigation } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Card } from '../components/Card';
 import { CategoryCard } from '../components/catalog/CategoryCard';
 import { ProviderCard } from '../components/catalog/ProviderCard';
-import { LoadingIndicator } from '../components/LoadingIndicator';
+import { CustomerHeader } from '../components/customer/CustomerHeader';
+import { CustomerHomeSkeleton } from '../components/customer/CustomerHomeSkeleton';
 import { listarCategorias, listarPrestadores } from '../services/catalogo';
-import { theme } from '../styles/theme';
+import { customerTheme } from '../styles/customerTheme';
 import { Categoria } from '../types/catalogo';
 import { carregarCardsPrestadores, ProviderCardModel } from '../utils/catalogPresentation';
 
 export function HomeScreen() {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
 
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [categoriaSelecionada, setCategoriaSelecionada] = useState<number | null>(null);
@@ -81,11 +84,22 @@ export function HomeScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.sectionTitle}>Categorias</Text>
-      {carregandoCategorias ? (
-        <LoadingIndicator text="Carregando categorias..." />
-      ) : erroCategorias ? (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.scrollContent}>
+      <View style={[styles.container, { paddingTop: Math.max(insets.top, 20) + 6 }]}>
+        <CustomerHeader />
+        <View style={styles.intro}>
+          <Text style={styles.title}>Sua beleza em boas mãos!</Text>
+          <Text style={styles.description}>Serviços perto de você.</Text>
+        </View>
+
+        {carregandoCategorias && carregandoPrestadores ? <CustomerHomeSkeleton /> : <>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Categorias</Text>
+          <Pressable accessibilityRole="button" onPress={() => navigation.navigate('Search')}>
+            <Text style={styles.seeAll}>Ver todas</Text>
+          </Pressable>
+        </View>
+        {erroCategorias ? (
         <Card>
           <Text style={styles.cardText}>{erroCategorias}</Text>
         </Card>
@@ -113,10 +127,8 @@ export function HomeScreen() {
         />
       )}
 
-      <Text style={styles.subtitle}>Para voce</Text>
-      {carregandoPrestadores ? (
-        <LoadingIndicator text="Carregando prestadores..." />
-      ) : erroPrestadores ? (
+        <Text style={styles.sectionTitle}>Para você</Text>
+        {erroPrestadores ? (
         <Card>
           <Text style={styles.cardText}>{erroPrestadores}</Text>
         </Card>
@@ -135,41 +147,54 @@ export function HomeScreen() {
           ))}
         </View>
       )}
+        </>}
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { backgroundColor: customerTheme.colors.background, flex: 1 },
+  scrollContent: { flexGrow: 1 },
   container: {
-    backgroundColor: theme.colors.background,
     flexGrow: 1,
-    gap: theme.spacing.md,
-    padding: theme.spacing.lg,
-    paddingTop: theme.spacing.xxl,
+    gap: 14,
+    maxWidth: 560,
+    paddingBottom: 110,
+    paddingHorizontal: 20,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  intro: { gap: 2, marginTop: 2 },
+  title: {
+    color: customerTheme.colors.text,
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  description: { color: customerTheme.colors.textSecondary, fontSize: 13 },
+  sectionHeader: {
+    alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: 2,
   },
   sectionTitle: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.xxl,
-    fontWeight: theme.fontWeight.bold,
+    color: customerTheme.colors.text,
+    fontSize: 18,
+    fontWeight: '800',
   },
-  subtitle: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.bold,
-  },
+  seeAll: { color: customerTheme.colors.brand, fontSize: 12, fontWeight: '600' },
   categoriesList: {
-    gap: theme.spacing.md,
-    paddingRight: theme.spacing.lg,
+    gap: 10,
+    paddingRight: 20,
   },
   categoriesScroller: {
     flexGrow: 0,
-    maxHeight: 124,
+    maxHeight: 96,
   },
   providersList: {
-    gap: theme.spacing.sm,
+    gap: 14,
   },
   cardText: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.md,
+    color: customerTheme.colors.textSecondary,
+    fontSize: 13,
   },
 });

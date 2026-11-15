@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { theme } from '../../styles/theme';
+import { customerTheme } from '../../styles/customerTheme';
 import { Categoria } from '../../types/catalogo';
 import { CatalogImage } from './CatalogImage';
 
@@ -30,22 +30,20 @@ export function CategoryCard({ categoria, selected = false, onPress }: CategoryC
 const styles = StyleSheet.create({
   card: {
     alignItems: 'center',
-    gap: theme.spacing.xs,
-    width: 96,
+    gap: 6,
+    width: 72,
   },
   pressed: {
     opacity: 0.86,
   },
   imageFrame: {
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    height: 96,
+    borderRadius: customerTheme.radius.image,
+    height: 72,
     overflow: 'hidden',
-    width: 96,
+    width: 72,
   },
   selected: {
-    borderColor: theme.colors.primary,
+    borderColor: customerTheme.colors.brand,
     borderWidth: 2,
   },
   image: {
@@ -53,9 +51,9 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   name: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.semibold,
+    color: customerTheme.colors.text,
+    fontSize: 12,
+    fontWeight: '600',
     textAlign: 'center',
     width: '100%',
   },

@@ -1,7 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Card } from '../Card';
-import { theme } from '../../styles/theme';
+import { customerTheme } from '../../styles/customerTheme';
 import { ProviderCardModel } from '../../utils/catalogPresentation';
 import { CatalogImage } from './CatalogImage';
 
@@ -16,8 +16,10 @@ export function ProviderCard({ provider, onPress }: ProviderCardProps) {
       ? provider.categorias.map((categoria) => categoria.nome).join(', ')
       : 'Categorias nao informadas';
 
+  const localidade = [provider.prestador.cidade, provider.prestador.estado].filter(Boolean).join('/') || 'Local não informado';
+
   return (
-    <Card onPress={onPress} style={styles.card}>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       <CatalogImage
         fotoUrl={provider.prestador.foto_url}
         kind="provider"
@@ -29,56 +31,57 @@ export function ProviderCard({ provider, onPress }: ProviderCardProps) {
           {provider.prestador.nome_estab}
         </Text>
         <Text style={styles.categories} numberOfLines={1}>
-          {categoriasTexto}
+          {categoriasTexto} · {localidade}
+        </Text>
+        <Text style={[styles.status, provider.atendeHoje ? styles.available : styles.unknown]}>
+          {provider.atendeHoje === null
+            ? 'Horários indisponíveis'
+            : provider.atendeHoje ? 'Disponível hoje' : 'Sem mais atendimento hoje'}
         </Text>
       </View>
-
-      <Text style={[styles.status, provider.atendeHoje ? styles.available : styles.unknown]}>
-        {provider.atendeHoje === null
-          ? 'Horarios indisponiveis'
-          : provider.atendeHoje ? 'Atende hoje' : 'Sem mais atendimento hoje'}
-      </Text>
-    </Card>
+      <MaterialIcons name="chevron-right" size={26} color={customerTheme.colors.brandDark} />
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
     alignItems: 'center',
+    backgroundColor: customerTheme.colors.surface,
+    borderRadius: customerTheme.radius.card,
     flexDirection: 'row',
-    gap: theme.spacing.md,
-    minHeight: 86,
+    gap: 12,
+    height: 86,
+    padding: 12,
+    ...customerTheme.shadow,
   },
   image: {
-    borderRadius: theme.borderRadius.md,
-    height: 62,
-    width: 62,
+    borderRadius: 18,
+    height: 58,
+    width: 58,
   },
   content: {
     flex: 1,
-    gap: 2,
+    gap: 3,
   },
   title: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.semibold,
+    color: customerTheme.colors.text,
+    fontSize: 15,
+    fontWeight: '600',
   },
   categories: {
-    color: theme.colors.primary,
-    fontSize: theme.fontSize.xs,
-    fontWeight: theme.fontWeight.medium,
+    color: customerTheme.colors.textSecondary,
+    fontSize: 12,
   },
   status: {
-    flexShrink: 1,
-    maxWidth: 110,
-    fontSize: theme.fontSize.xs,
-    fontWeight: theme.fontWeight.bold,
-    textAlign: 'right',
+    fontSize: 11,
+    fontWeight: '600',
   },
   available: {
-    color: theme.colors.success,
+    color: customerTheme.colors.brand,
   },
   unknown: {
-    color: theme.colors.textSecondary,
+    color: customerTheme.colors.textSecondary,
   },
+  pressed: { opacity: 0.84 },
 });

@@ -14,8 +14,9 @@ function prepararTela() {
   let alterou = false;
   let desmontada = false;
   let escritasAposDesmontar = 0;
+  const destinos = [];
   const rota = { params: { prestadorId: 7 } };
-  const navegacao = { navigate() {} };
+  const navegacao = { goBack() {}, navigate(destino) { destinos.push(destino); } };
   const iguais = (a, b) => a && b && a.length === b.length && a.every((valor, i) => Object.is(valor, b[i]));
   const react = {
     useState(inicial) {
@@ -74,8 +75,9 @@ function prepararTela() {
     modulo.require = id => {
       if (id === 'react') return react;
       if (id === '@react-navigation/native') return { useNavigation: () => navegacao, useRoute: () => rota };
+      if (id === '@expo/vector-icons') return { MaterialIcons: 'MaterialIcons' };
       if (id === 'react-native') return {
-        Alert: { alert() {} }, ScrollView: 'ScrollView', Text: 'Text', View: 'View', StyleSheet: { create: valor => valor },
+        Modal: 'Modal', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View', StyleSheet: { create: valor => valor },
       };
       if (id === './api') return { api };
       if (id.startsWith('../components/')) {
@@ -113,18 +115,31 @@ function prepararTela() {
     return {
       calendario: buscar('MonthlyAvailabilityCalendar')[0],
       confirmar: buscar('Button').find(botao => botao.title === 'Confirmar agendamento'),
+      continuar: buscar('Button').find(botao => botao.title === 'Continuar'),
+      verHorarios: buscar('Button').find(botao => botao.title === 'Ver horários'),
+      voltar: buscar('Pressable').find(botao => botao.accessibilityLabel === 'Voltar'),
       servico: id => buscar('ServiceCard').find(card => card.servico.id === id),
       horarios: buscar('Card').filter(card => card.onPress),
+      modalSucesso: buscar('Modal').find(modal => modal.visible),
+      verAgendamentos: buscar('Button').find(botao => botao.title === 'Ver agendamentos'),
+      confirmarSucesso: buscar('Pressable').find(botao => botao.children?.props?.children === 'OK'),
       textos: buscar('Text').flatMap(no => no.children).filter(valor => typeof valor === 'string'),
       carregando: buscar('LoadingIndicator').map(no => no.text),
     };
   }
   const app = {
-    requisicoes, renderizar,
+    requisicoes, destinos, renderizar,
     async estabilizar() { await new Promise(resolve => setImmediate(resolve)); return renderizar(); },
     async iniciar() { renderizar(); return app.estabilizar(); },
     async selecionarServico(id = 1) {
-      renderizar().servico(id).onPress();
+      let tela = renderizar();
+      while (!tela.servico(id)) {
+        tela.voltar.onPress();
+        tela = await app.estabilizar();
+      }
+      tela.servico(id).onPress();
+      tela = await app.estabilizar();
+      tela.continuar.onPress();
       return app.estabilizar();
     },
     async liberarDias(datas = ['2030-01-07', '2030-01-08']) {
@@ -132,7 +147,23 @@ function prepararTela() {
       return app.estabilizar();
     },
     async selecionarData(data) {
-      renderizar().calendario.onSelectDate(data);
+      let tela = renderizar();
+      if (!tela.calendario) {
+        tela.voltar.onPress();
+        tela = await app.estabilizar();
+      }
+      tela.calendario.onSelectDate(data);
+      tela = await app.estabilizar();
+      tela.verHorarios.onPress();
+      return app.estabilizar();
+    },
+    async trocarMes(mes) {
+      let tela = renderizar();
+      if (!tela.calendario) {
+        tela.voltar.onPress();
+        tela = await app.estabilizar();
+      }
+      tela.calendario.onChangeMes(mes);
       return app.estabilizar();
     },
     ultimaConsulta: () => requisicoes.at(-1),
@@ -163,7 +194,7 @@ test('resposta da data antiga não aparece nem encerra o carregamento da data at
   let tela = await app.estabilizar();
   assert.equal(tela.horarios.length, 0);
   assert.ok(tela.carregando.includes('Carregando horarios...'));
-  assert.equal(tela.confirmar.disabled, true);
+  assert.equal(tela.confirmar?.disabled ?? true, true);
   atual.resolver(respostaHorario('2030-01-08T10:00:00'));
   tela = await app.estabilizar();
   assert.equal(tela.horarios.length, 1);
@@ -183,7 +214,7 @@ test('erro atrasado é ignorado e a seleção do serviço anterior é descartada
   assert.equal(tela.calendario.dataSelecionada, null);
   assert.deepEqual(tela.calendario.diasDisponiveis, []);
   assert.equal(tela.horarios.length, 0);
-  assert.equal(tela.confirmar.disabled, true);
+  assert.equal(tela.confirmar?.disabled ?? true, true);
   assert.equal(tela.textos.some(texto => texto.includes('Nao foi possivel')), false);
 });
 
@@ -191,11 +222,9 @@ test('troca de mês cancela consultas e não reutiliza dias nem horários do mê
   const app = await iniciarSelecao();
   await app.selecionarData('2030-01-07');
   const horariosAntigos = app.ultimaConsulta();
-  app.renderizar().calendario.onChangeMes('2030-02');
-  await app.estabilizar();
+  await app.trocarMes('2030-02');
   const diasAntigos = app.ultimaConsulta();
-  app.renderizar().calendario.onChangeMes('2030-03');
-  await app.estabilizar();
+  await app.trocarMes('2030-03');
   const diasAtuais = app.ultimaConsulta();
   assert.equal(horariosAntigos.signal.aborted, true);
   assert.equal(diasAntigos.signal.aborted, true);
@@ -204,7 +233,7 @@ test('troca de mês cancela consultas e não reutiliza dias nem horários do mê
   let tela = await app.estabilizar();
   assert.equal(tela.calendario.mes, '2030-03');
   assert.deepEqual(tela.calendario.diasDisponiveis, []);
-  assert.ok(tela.carregando.includes('Carregando dias disponiveis...'));
+  assert.ok(tela.carregando.includes('Carregando dias disponíveis...'));
   diasAtuais.resolver({ dias: [] });
   tela = await app.estabilizar();
   assert.deepEqual(tela.calendario.diasDisponiveis, []);
@@ -224,12 +253,12 @@ test('lista vazia e falha de rede são diferenciadas e não habilitam confirmaç
   await app.selecionarData('2030-01-07');
   app.ultimaConsulta().resolver({ horarios: [] });
   let tela = await app.estabilizar();
-  assert.ok(tela.textos.includes('Nenhum horario disponivel para esta data.'));
+  assert.ok(tela.textos.includes('Nenhum horário disponível para esta data.'));
   assert.equal(tela.confirmar.disabled, true);
   await app.selecionarData('2030-01-08');
   app.ultimaConsulta().rejeitar(new Error('Sem conexão'));
   tela = await app.estabilizar();
-  assert.ok(tela.textos.includes('Nao foi possivel carregar os horarios disponiveis.'));
+  assert.ok(tela.textos.includes('Não foi possível carregar os horários disponíveis.'));
   assert.equal(tela.confirmar.disabled, true);
 });
 
@@ -243,15 +272,35 @@ test('conflito 409 recarrega a seleção atual, mantém o aviso e descarta o hor
   assert.equal(envio.dados.inicio, '2030-01-07T09:00:00');
   envio.rejeitar({ response: { status: 409 } });
   let tela = await app.estabilizar();
-  assert.ok(tela.textos.includes('Este horario foi ocupado. Escolha outro horario disponivel.'));
+  assert.ok(tela.textos.includes('Este horário foi ocupado. Escolha outro horário disponível.'));
   assert.equal(tela.confirmar.disabled, true);
   assert.equal(app.ultimaConsulta().params.data, '2030-01-07');
   app.ultimaConsulta().resolver(respostaHorario('2030-01-07T10:00:00'));
   await confirmacao;
   tela = await app.estabilizar();
-  assert.ok(tela.textos.includes('Este horario foi ocupado. Escolha outro horario disponivel.'));
+  assert.ok(tela.textos.includes('Este horário foi ocupado. Escolha outro horário disponível.'));
   assert.equal(tela.confirmar.disabled, true);
   assert.equal(tela.horarios.length, 1);
+});
+
+test('sucesso exibe confirmação e permite abrir os agendamentos sem repetir o envio', async () => {
+  const app = await iniciarSelecao();
+  await app.selecionarData('2030-01-07');
+  app.ultimaConsulta().resolver(respostaHorario('2030-01-07T09:00:00'));
+  (await app.estabilizar()).horarios[0].onPress();
+  const confirmacao = app.renderizar().confirmar.onPress();
+  const envio = app.ultimaConsulta();
+  envio.resolver({ id: 99, inicio: '2030-01-07T09:00:00' });
+  await confirmacao;
+  const tela = await app.estabilizar();
+  assert.equal(tela.modalSucesso.visible, true);
+  assert.ok(tela.textos.includes('Agendamento confirmado!'));
+  assert.equal(tela.confirmar.disabled, true);
+  const quantidadeRequisicoes = app.requisicoes.length;
+  await tela.confirmar.onPress();
+  assert.equal(app.requisicoes.length, quantidadeRequisicoes);
+  tela.verAgendamentos.onPress();
+  assert.equal(app.destinos.at(-1), 'Appointments');
 });
 
 test('conflito de um envio antigo não dispara consulta para a nova data', async () => {
@@ -274,8 +323,7 @@ test('desmontar a tela aborta as consultas e ignora respostas e erros pendentes'
   const app = await iniciarSelecao();
   await app.selecionarData('2030-01-07');
   const horario = app.ultimaConsulta();
-  app.renderizar().calendario.onChangeMes('2030-02');
-  await app.estabilizar();
+  await app.trocarMes('2030-02');
   const dias = app.ultimaConsulta();
   app.desmontar();
   assert.equal(horario.signal.aborted, true);

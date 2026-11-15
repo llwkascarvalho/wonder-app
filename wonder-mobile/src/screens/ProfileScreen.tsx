@@ -46,7 +46,7 @@ export function ProfileScreen() {
     : () => navigation.navigate('ProviderOnboarding');
 
   return (
-    <ProfileScreenContent onSignOut={signOut}>
+    <ProfileScreenContent appearance="customer" title="Meu perfil" subtitle="Gerencie seus dados pessoais." onSignOut={signOut}>
       <Card style={styles.providerCard}>
         <Text style={styles.providerTitle}>Prestador Wonder</Text>
         <Text style={providerProfile?.status === 'rejeitado' || providerProfile?.status === 'rascunho'

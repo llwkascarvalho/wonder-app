@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { customerTheme } from '../styles/customerTheme';
 import { theme } from '../styles/theme';
 
 type MonthlyAvailabilityCalendarProps = {
@@ -7,6 +8,7 @@ type MonthlyAvailabilityCalendarProps = {
   diasDisponiveis: string[];
   dataSelecionada: string | null;
   allowUnavailableSelection?: boolean;
+  variant?: 'default' | 'customer';
   onChangeMes: (mes: string) => void;
   onSelectDate: (data: string) => void;
 };
@@ -54,9 +56,11 @@ export function MonthlyAvailabilityCalendar({
   diasDisponiveis,
   dataSelecionada,
   allowUnavailableSelection = false,
+  variant = 'default',
   onChangeMes,
   onSelectDate,
 }: MonthlyAvailabilityCalendarProps) {
+  const customer = variant === 'customer';
   const { year, month } = parseMonth(mes);
   const availableSet = new Set(diasDisponiveis);
   const today = todayKey();
@@ -68,31 +72,31 @@ export function MonthlyAvailabilityCalendar({
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, customer && styles.customerContainer]}>
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
           onPress={() => onChangeMes(shiftMonth(mes, -1))}
-          style={styles.monthButton}
+          style={[styles.monthButton, customer && styles.customerMonthButton]}
         >
-          <Text style={styles.monthButtonText}>{'<'}</Text>
+          <Text style={[styles.monthButtonText, customer && styles.customerMonthButtonText]}>{'‹'}</Text>
         </Pressable>
 
-        <Text style={styles.monthTitle}>{monthLabel(mes)}</Text>
+        <Text style={[styles.monthTitle, customer && styles.customerMonthTitle]}>{monthLabel(mes)}</Text>
 
         <Pressable
           accessibilityRole="button"
           onPress={() => onChangeMes(shiftMonth(mes, 1))}
-          style={styles.monthButton}
+          style={[styles.monthButton, customer && styles.customerMonthButton]}
         >
-          <Text style={styles.monthButtonText}>{'>'}</Text>
+          <Text style={[styles.monthButtonText, customer && styles.customerMonthButtonText]}>{'›'}</Text>
         </Pressable>
       </View>
 
       <View style={styles.weekGrid}>
         {WEEK_DAYS.map((day) => (
-          <Text key={day} style={styles.weekDay}>
-            {day}
+          <Text key={day} style={[styles.weekDay, customer && styles.customerWeekDay]}>
+            {customer ? day.slice(0, 1) : day}
           </Text>
         ))}
       </View>
@@ -100,7 +104,7 @@ export function MonthlyAvailabilityCalendar({
       <View style={styles.daysGrid}>
         {cells.map((day, index) => {
           if (day === null) {
-            return <View key={`empty-${index}`} style={styles.dayCell} />;
+            return <View key={`empty-${index}`} style={[styles.dayCell, customer && styles.customerDayCell]} />;
           }
 
           const dateKey = formatDate(year, month, day);
@@ -117,16 +121,23 @@ export function MonthlyAvailabilityCalendar({
               onPress={() => onSelectDate(dateKey)}
               style={[
                 styles.dayCell,
+                customer && styles.customerDayCell,
                 styles.dayButton,
+                customer && styles.customerDayButton,
                 isAvailable && styles.dayAvailable,
+                customer && isAvailable && styles.customerDayAvailable,
                 disabled && styles.dayDisabled,
+                customer && disabled && styles.customerDayDisabled,
                 isSelected && styles.daySelected,
+                customer && isSelected && styles.customerDaySelected,
               ]}
             >
               <Text
                 style={[
                   styles.dayText,
+                  customer && styles.customerDayText,
                   isAvailable && styles.dayAvailableText,
+                  customer && isAvailable && styles.customerDayAvailableText,
                   disabled && styles.dayDisabledText,
                   isSelected && styles.daySelectedText,
                 ]}
@@ -144,6 +155,16 @@ export function MonthlyAvailabilityCalendar({
 const styles = StyleSheet.create({
   container: {
     gap: theme.spacing.md,
+  },
+  customerContainer: {
+    alignSelf: 'center',
+    backgroundColor: customerTheme.colors.surface,
+    borderRadius: customerTheme.radius.card,
+    gap: 10,
+    maxWidth: 335,
+    padding: 14,
+    width: '100%',
+    ...customerTheme.shadow,
   },
   header: {
     alignItems: 'center',
@@ -163,11 +184,25 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.lg,
     fontWeight: theme.fontWeight.bold,
   },
+  customerMonthButton: {
+    backgroundColor: 'transparent',
+    height: 28,
+    width: 28,
+  },
+  customerMonthButtonText: {
+    color: customerTheme.colors.brandDark,
+    fontSize: 24,
+  },
   monthTitle: {
     color: theme.colors.text,
     fontSize: theme.fontSize.lg,
     fontWeight: theme.fontWeight.semibold,
     textTransform: 'capitalize',
+  },
+  customerMonthTitle: {
+    color: customerTheme.colors.text,
+    fontSize: 15,
+    fontWeight: '800',
   },
   weekGrid: {
     flexDirection: 'row',
@@ -178,6 +213,10 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.xs,
     fontWeight: theme.fontWeight.semibold,
     textAlign: 'center',
+  },
+  customerWeekDay: {
+    color: customerTheme.colors.textSecondary,
+    fontSize: 11,
   },
   daysGrid: {
     flexDirection: 'row',
@@ -190,26 +229,51 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: `${100 / 7}%`,
   },
+  customerDayCell: {
+    aspectRatio: undefined,
+    height: 36,
+  },
   dayButton: {
     borderRadius: theme.borderRadius.pill,
   },
+  customerDayButton: {
+    borderRadius: customerTheme.radius.pill,
+  },
   dayAvailable: {
     backgroundColor: '#F3E8FF',
+  },
+  customerDayAvailable: {
+    backgroundColor: 'transparent',
   },
   dayDisabled: {
     backgroundColor: theme.colors.surfaceMuted,
     opacity: 0.58,
   },
+  customerDayDisabled: {
+    backgroundColor: 'transparent',
+    opacity: 0.28,
+  },
   daySelected: {
     backgroundColor: theme.colors.primary,
+  },
+  customerDaySelected: {
+    backgroundColor: customerTheme.colors.brandDark,
   },
   dayText: {
     color: theme.colors.text,
     fontSize: theme.fontSize.md,
     fontWeight: theme.fontWeight.medium,
   },
+  customerDayText: {
+    color: customerTheme.colors.text,
+    fontSize: 12,
+    fontWeight: '600',
+  },
   dayAvailableText: {
     color: theme.colors.primary,
+  },
+  customerDayAvailableText: {
+    color: customerTheme.colors.text,
   },
   dayDisabledText: {
     color: theme.colors.textMuted,
