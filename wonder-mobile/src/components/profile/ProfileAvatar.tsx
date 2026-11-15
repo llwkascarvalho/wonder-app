@@ -12,9 +12,12 @@ type ProfileAvatarProps = {
   loading?: boolean;
   onPress?: () => void;
   revision?: number;
+  size?: number;
 };
 
-export function ProfileAvatar({ nome, fotoUrl, loading = false, onPress, revision = 0 }: ProfileAvatarProps) {
+export function ProfileAvatar({
+  nome, fotoUrl, loading = false, onPress, revision = 0, size = 128,
+}: ProfileAvatarProps) {
   const [photoSource, setPhotoSource] = useState<string>();
   useEffect(() => {
     let active = true;
@@ -48,12 +51,21 @@ export function ProfileAvatar({ nome, fotoUrl, loading = false, onPress, revisio
       accessibilityRole="button"
       disabled={loading || !onPress}
       onPress={onPress}
-      style={({ pressed }) => [styles.avatar, pressed && styles.pressed, loading && styles.loading]}
+      style={({ pressed }) => [
+        styles.avatar,
+        { borderRadius: size / 2, height: size, width: size },
+        pressed && styles.pressed,
+        loading && styles.loading,
+      ]}
     >
       {photoSource ? (
-        <Image source={{ uri: photoSource }} style={styles.image} onError={() => setPhotoSource(undefined)} />
+        <Image
+          source={{ uri: photoSource }}
+          style={[styles.image, { borderRadius: size / 2, height: size, width: size }]}
+          onError={() => setPhotoSource(undefined)}
+        />
       ) : (
-        <Text style={styles.initial}>{initial}</Text>
+        <Text style={[styles.initial, { fontSize: Math.round(size * 0.38) }]}>{initial}</Text>
       )}
       {onPress ? <View style={styles.cameraBadge}>
         <MaterialIcons name="photo-camera" color={theme.colors.white} size={18} />

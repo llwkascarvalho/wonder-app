@@ -3,6 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Modal, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { theme } from '../../styles/theme';
+import { customerTheme } from '../../styles/customerTheme';
 import { ProfilePhotoAsset, UserProfile, UserProfileUpdate } from '../../types/profile';
 import { getProfileErrorMessage, validateProfilePhoto } from '../../services/profileService';
 import { Button } from '../Button';
@@ -14,9 +15,12 @@ type ProfileEditModalProps = {
   profile: UserProfile;
   onClose: () => void;
   onSave: (payload: UserProfileUpdate) => Promise<void>;
+  appearance?: 'default' | 'customer';
 };
 
-export function ProfileEditModal({ visible, loading = false, profile, onClose, onSave }: ProfileEditModalProps) {
+export function ProfileEditModal({
+  visible, loading = false, profile, onClose, onSave, appearance = 'default',
+}: ProfileEditModalProps) {
   const [telefone, setTelefone] = useState(profile.telefone || '');
   const [foto, setFoto] = useState<ProfilePhotoAsset>();
   const [picking, setPicking] = useState(false);
@@ -78,9 +82,12 @@ export function ProfileEditModal({ visible, loading = false, profile, onClose, o
 
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={() => { if (!loading && !busy.current) onClose(); }}>
-      <View style={styles.overlay}>
-        <View style={styles.content}>
-          <Text style={styles.title}>Editar perfil</Text>
+      <View style={[styles.overlay, appearance === 'customer' && styles.customerOverlay]}>
+        <View style={[styles.content, appearance === 'customer' && styles.customerContent]}>
+          <Text style={[styles.title, appearance === 'customer' && styles.customerTitle]}>Editar perfil</Text>
+          {appearance === 'customer' ? (
+            <Text style={styles.customerSubtitle}>Atualize seu telefone ou escolha uma nova foto.</Text>
+          ) : null}
           <Input
             label="Telefone"
             value={telefone}
@@ -90,9 +97,13 @@ export function ProfileEditModal({ visible, loading = false, profile, onClose, o
             editable={!loading}
             placeholder="(00) 00000-0000"
           />
-          <Text>Deixe o telefone em branco para manter o atual.</Text>
+          <Text style={appearance === 'customer' ? styles.customerHelper : undefined}>
+            Deixe o telefone em branco para manter o atual.
+          </Text>
           <Button title={foto ? 'Trocar foto selecionada' : 'Selecionar foto'} variant="secondary" onPress={selectPhoto} loading={picking} disabled={loading} />
-          <Text>{foto ? `Foto selecionada: ${foto.fileName || 'imagem'}` : 'JPEG, PNG ou WebP de até 5 MiB.'}</Text>
+          <Text style={appearance === 'customer' ? styles.customerHelper : undefined}>
+            {foto ? `Foto selecionada: ${foto.fileName || 'imagem'}` : 'JPEG, PNG ou WebP de até 5 MiB.'}
+          </Text>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <View style={styles.actions}>
             <Button title="Cancelar" variant="secondary" onPress={onClose} disabled={loading} />
@@ -135,4 +146,14 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
     justifyContent: 'flex-end',
   },
+  customerOverlay: { backgroundColor: 'rgba(36, 16, 46, 0.52)', paddingHorizontal: 20 },
+  customerContent: {
+    borderRadius: 24, gap: 14, maxWidth: 335, padding: 24,
+    ...customerTheme.shadow,
+  },
+  customerTitle: {
+    color: customerTheme.colors.text, fontSize: 24, fontWeight: '800', lineHeight: 29, textAlign: 'left',
+  },
+  customerSubtitle: { color: customerTheme.colors.textSecondary, fontSize: 13, lineHeight: 18 },
+  customerHelper: { color: customerTheme.colors.textSecondary, fontSize: 12, lineHeight: 17 },
 });
