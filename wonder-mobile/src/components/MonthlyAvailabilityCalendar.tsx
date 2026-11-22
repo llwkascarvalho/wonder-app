@@ -158,11 +158,11 @@ const styles = StyleSheet.create({
   },
   customerContainer: {
     alignSelf: 'center',
-    backgroundColor: customerTheme.colors.surface,
-    borderRadius: customerTheme.radius.card,
-    gap: 10,
-    maxWidth: 335,
-    padding: 14,
+    backgroundColor: customerTheme.v4.surface,
+    borderRadius: 24,
+    gap: 14,
+    maxWidth: 560,
+    padding: 16,
     width: '100%',
     ...customerTheme.shadow,
   },
@@ -185,12 +185,12 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeight.bold,
   },
   customerMonthButton: {
-    backgroundColor: 'transparent',
-    height: 28,
-    width: 28,
+    backgroundColor: customerTheme.v4.lilac,
+    height: 40,
+    width: 40,
   },
   customerMonthButtonText: {
-    color: customerTheme.colors.brandDark,
+    color: customerTheme.v4.primary,
     fontSize: 24,
   },
   monthTitle: {
@@ -200,9 +200,8 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   customerMonthTitle: {
-    color: customerTheme.colors.text,
-    fontSize: 15,
-    fontWeight: '800',
+    color: customerTheme.v4.text,
+    fontFamily: customerTheme.v4.fontDisplay, fontSize: 20,
   },
   weekGrid: {
     flexDirection: 'row',
@@ -215,8 +214,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   customerWeekDay: {
-    color: customerTheme.colors.textSecondary,
-    fontSize: 11,
+    color: customerTheme.v4.textMuted,
+    fontFamily: customerTheme.v4.fontBodySemi, fontSize: 14,
   },
   daysGrid: {
     flexDirection: 'row',
@@ -231,7 +230,7 @@ const styles = StyleSheet.create({
   },
   customerDayCell: {
     aspectRatio: undefined,
-    height: 36,
+    height: 44,
   },
   dayButton: {
     borderRadius: theme.borderRadius.pill,
@@ -251,13 +250,13 @@ const styles = StyleSheet.create({
   },
   customerDayDisabled: {
     backgroundColor: 'transparent',
-    opacity: 0.28,
+    opacity: 0.3,
   },
   daySelected: {
     backgroundColor: theme.colors.primary,
   },
   customerDaySelected: {
-    backgroundColor: customerTheme.colors.brandDark,
+    backgroundColor: customerTheme.v4.primary,
   },
   dayText: {
     color: theme.colors.text,
@@ -265,9 +264,8 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeight.medium,
   },
   customerDayText: {
-    color: customerTheme.colors.text,
-    fontSize: 12,
-    fontWeight: '600',
+    color: customerTheme.v4.text,
+    fontFamily: customerTheme.v4.fontBodySemi, fontSize: 16,
   },
   dayAvailableText: {
     color: theme.colors.primary,

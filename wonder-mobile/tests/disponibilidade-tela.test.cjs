@@ -77,8 +77,10 @@ function prepararTela() {
       if (id === '@react-navigation/native') return { useNavigation: () => navegacao, useRoute: () => rota };
       if (id === '@expo/vector-icons') return { MaterialIcons: 'MaterialIcons' };
       if (id === 'react-native') return {
-        Modal: 'Modal', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View', StyleSheet: { create: valor => valor },
+        Image: 'Image', Modal: 'Modal', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View', StyleSheet: { create: valor => valor }, useWindowDimensions: () => ({ width: 336, height: 812 }),
       };
+      if (id === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
+      if (id.endsWith('.png')) return id;
       if (id === './api') return { api };
       if (id.startsWith('../components/')) {
         const nome = id.split('/').at(-1);
@@ -121,7 +123,8 @@ function prepararTela() {
       servico: id => buscar('ServiceCard').find(card => card.servico.id === id),
       horarios: buscar('Card').filter(card => card.onPress),
       modalSucesso: buscar('Modal').find(modal => modal.visible),
-      verAgendamentos: buscar('Button').find(botao => botao.title === 'Ver agendamentos'),
+      feedback: buscar('CustomerFeedbackCard')[0],
+      verAgendamentos: buscar('Pressable').find(botao => botao.accessibilityLabel === 'Ver agendamentos'),
       confirmarSucesso: buscar('Pressable').find(botao => botao.children?.props?.children === 'OK'),
       textos: buscar('Text').flatMap(no => no.children).filter(valor => typeof valor === 'string'),
       carregando: buscar('LoadingIndicator').map(no => no.text),
@@ -294,7 +297,7 @@ test('sucesso exibe confirmação e permite abrir os agendamentos sem repetir o 
   await confirmacao;
   const tela = await app.estabilizar();
   assert.equal(tela.modalSucesso.visible, true);
-  assert.ok(tela.textos.includes('Agendamento confirmado!'));
+  assert.equal(tela.feedback.title, 'Agendamento confirmado!');
   assert.equal(tela.confirmar.disabled, true);
   const quantidadeRequisicoes = app.requisicoes.length;
   await tela.confirmar.onPress();

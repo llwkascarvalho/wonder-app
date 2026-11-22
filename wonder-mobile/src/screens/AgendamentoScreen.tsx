@@ -4,12 +4,15 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { CatalogImage } from '../components/catalog/CatalogImage';
 import { ServiceCard } from '../components/catalog/ServiceCard';
+import { CustomerFeedbackCard } from '../components/customer/CustomerFeedbackCard';
+import { HeroGlows } from '../components/customer/HeroGlows';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import {
   getCurrentMonthKey,
@@ -71,6 +74,9 @@ export function AgendamentoScreen() {
   const navigation = useNavigation<AgendamentoNavigationProp>();
   const route = useRoute<AgendamentoRouteProp>();
   const { prestadorId } = route.params;
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const desktop = width >= 900;
 
   const [etapa, setEtapa] = useState<Etapa>('servico');
   const [prestador, setPrestador] = useState<Prestador | null>(null);
@@ -297,18 +303,23 @@ export function AgendamentoScreen() {
   }
 
   return (
-    <>
-      <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
+    <View style={styles.screen}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+      <View style={[styles.hero, { paddingTop: desktop ? 44 : Math.max(insets.top, 56), paddingHorizontal: desktop ? 76 : 20 }]}>
+      <HeroGlows desktop={desktop} />
       <View style={styles.header}>
         <Pressable accessibilityRole="button" accessibilityLabel="Voltar" onPress={voltar} style={styles.backButton}>
-          <Text style={styles.backIcon}>‹</Text>
+          <MaterialIcons name="chevron-left" size={26} color="#FFF" />
         </Pressable>
         <Text style={styles.title}>{titulo}</Text>
       </View>
+      {etapa === 'servico' ? <Text style={styles.description}>Escolha um serviço</Text> : null}
+      </View>
+      <View style={[styles.sheet, desktop && styles.sheetDesktop]}>
+      <View style={[styles.container, desktop && styles.containerDesktop]}>
 
       {etapa === 'servico' ? (
         <>
-          <Text style={styles.description}>Escolha um serviço</Text>
           <View style={styles.list}>
             {servicos.length === 0 ? (
               <View style={styles.infoCard}><Text style={styles.message}>Nenhum serviço disponível.</Text></View>
@@ -322,13 +333,6 @@ export function AgendamentoScreen() {
               />
             ))}
           </View>
-          {servicoSelecionado ? (
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>1 serviço selecionado</Text>
-              <Text style={styles.summaryValue}>{formatPrice(servicoSelecionado.preco)}</Text>
-            </View>
-          ) : null}
-          <Button title="Continuar" disabled={!servicoSelecionado} onPress={() => setEtapa('data')} style={styles.primaryButton} />
         </>
       ) : null}
 
@@ -344,13 +348,6 @@ export function AgendamentoScreen() {
             variant="customer"
           />
           {erroConfirmacao ? <View style={styles.errorCard}><Text style={styles.errorText}>{erroConfirmacao}</Text></View> : null}
-          <Button
-            title="Ver horários"
-            disabled={!dataSelecionada || carregandoDias || carregandoHorarios}
-            loading={carregandoHorarios}
-            onPress={() => setEtapa('horario')}
-            style={styles.primaryButton}
-          />
         </>
       ) : null}
 
@@ -364,11 +361,13 @@ export function AgendamentoScreen() {
             </View>
           </View>
           <Pressable onPress={() => setEtapa('data')} style={styles.dateCard}>
-            <View>
+            <View style={styles.calendarBadge}>
+              <Image source={require('../assets/icons/calendar-v4.png')} style={styles.calendarImage} />
+            </View>
+            <View style={styles.dateContent}>
               <Text style={styles.dateTitle}>{formatWeekDay(dataSelecionada)}</Text>
               <Text style={styles.dateText}>{formatDateLabel(dataSelecionada)}</Text>
             </View>
-            <Text accessibilityElementsHidden style={styles.calendarIcon}>▣</Text>
           </Pressable>
           <Text style={styles.sectionTitle}>Horários disponíveis</Text>
           {carregandoHorarios ? <LoadingIndicator text="Carregando horarios..." />
@@ -380,7 +379,7 @@ export function AgendamentoScreen() {
                   const selected = horarioSelecionado?.inicio === horario.inicio;
                   return (
                     <Card key={horario.inicio} onPress={() => setHorarioSelecionado(horario)}
-                      style={[styles.timeChip, selected && styles.timeChipSelected]}>
+                      style={[styles.timeChip, width < 375 && styles.timeChipNarrow, selected && styles.timeChipSelected]}>
                       <Text style={[styles.timeText, selected && styles.timeTextSelected]}>{formatTimeLabel(horario.inicio)}</Text>
                     </Card>
                   );
@@ -401,11 +400,25 @@ export function AgendamentoScreen() {
             </View>
           )}
           {erroConfirmacao ? <View style={styles.errorCard}><Text style={styles.errorText}>{erroConfirmacao}</Text></View> : null}
-          <Button title="Confirmar agendamento" onPress={confirmarAgendamento} loading={enviando}
-            disabled={!podeConfirmar || enviando} style={styles.primaryButton} />
         </>
       ) : null}
+      </View>
+      </View>
       </ScrollView>
+
+      <View style={[styles.footer, { marginBottom: desktop ? 0 : 86 + insets.bottom }]}>
+        <View style={[styles.footerInner, desktop && styles.footerInnerDesktop]}>
+          {etapa === 'servico' && servicoSelecionado ? <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>1 serviço selecionado</Text>
+            <Text style={styles.summaryValue}>{formatPrice(servicoSelecionado.preco)}</Text>
+          </View> : null}
+          {etapa === 'servico' ? <Button title="Continuar" disabled={!servicoSelecionado} onPress={() => setEtapa('data')} style={styles.primaryButton} /> : null}
+          {etapa === 'data' ? <Button title="Ver horários" disabled={!dataSelecionada || carregandoDias || carregandoHorarios}
+            loading={carregandoHorarios} onPress={() => setEtapa('horario')} style={styles.primaryButton} /> : null}
+          {etapa === 'horario' ? <Button title="Confirmar agendamento" onPress={confirmarAgendamento} loading={enviando}
+            disabled={!podeConfirmar || enviando} style={styles.primaryButton} /> : null}
+        </View>
+      </View>
 
       <Modal
         transparent
@@ -414,19 +427,12 @@ export function AgendamentoScreen() {
         onRequestClose={fecharConfirmacao}
       >
         <View style={styles.modalOverlay}>
-          <View accessibilityRole="alert" style={styles.successModal}>
-            <View style={styles.successIcon}>
-              <MaterialIcons name="check" size={28} color="#17805A" />
-            </View>
-            <Text style={styles.successTitle}>Agendamento confirmado!</Text>
-            <Text style={styles.successDescription}>
-              Você pode acompanhá-lo na aba Agenda.
-            </Text>
-            <Button
-              title="Ver agendamentos"
-              onPress={abrirAgendamentos}
-              style={styles.successPrimaryButton}
-            />
+          <CustomerFeedbackCard kind="success" title="Agendamento confirmado!"
+            description="Você pode acompanhá-lo na aba Agenda.">
+            <Pressable accessibilityRole="button" accessibilityLabel="Ver agendamentos"
+              onPress={abrirAgendamentos} style={styles.successPrimaryButton}>
+              <Text style={styles.successPrimaryText}>Ver agendamentos</Text>
+            </Pressable>
             <Pressable
               accessibilityRole="button"
               onPress={fecharConfirmacao}
@@ -434,89 +440,88 @@ export function AgendamentoScreen() {
             >
               <Text style={styles.successSecondaryText}>OK</Text>
             </Pressable>
-          </View>
+          </CustomerFeedbackCard>
         </View>
       </Modal>
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: customerTheme.colors.background, flex: 1 },
-  loading: { backgroundColor: customerTheme.colors.background, flex: 1, justifyContent: 'center', padding: 20 },
+  screen: { backgroundColor: customerTheme.v4.bg, flex: 1 },
+  scroll: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
+  hero: { backgroundColor: customerTheme.v4.primary, height: 179, overflow: 'hidden' },
+  sheet: { backgroundColor: customerTheme.v4.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, flex: 1, marginTop: -28, paddingTop: 28 },
+  sheetDesktop: { borderTopLeftRadius: 40, borderTopRightRadius: 40, marginTop: -40, paddingTop: 40 },
+  loading: { backgroundColor: customerTheme.v4.bg, flex: 1, justifyContent: 'center', padding: 20 },
   container: {
-    alignSelf: 'center', flexGrow: 1, gap: 12, maxWidth: 375, paddingBottom: 110,
-    paddingHorizontal: 20, paddingTop: 50, width: '100%',
+    alignSelf: 'center', flexGrow: 1, gap: 12, maxWidth: 560, paddingBottom: 160,
+    paddingHorizontal: 20, width: '100%',
   },
-  header: { alignItems: 'center', flexDirection: 'row', gap: 10, height: 52 },
+  containerDesktop: { maxWidth: 1100, paddingHorizontal: 76 },
+  header: { alignItems: 'center', flexDirection: 'row', gap: 12, height: 44 },
   backButton: {
-    alignItems: 'center', backgroundColor: customerTheme.colors.surface, borderRadius: customerTheme.radius.pill,
-    height: 40, justifyContent: 'center', width: 40, ...customerTheme.shadow,
+    alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 22,
+    height: 44, justifyContent: 'center', width: 44,
   },
-  backIcon: { color: customerTheme.colors.brandDark, fontSize: 28, fontWeight: '600', lineHeight: 30 },
-  title: { color: customerTheme.colors.text, flex: 1, fontSize: 18, fontWeight: '800' },
-  description: { color: customerTheme.colors.textSecondary, fontSize: 13 },
-  list: { gap: 10 },
+  backIcon: { color: '#FFF', fontSize: 28, fontWeight: '600', lineHeight: 30 },
+  title: { color: '#FFF', flex: 1, fontFamily: customerTheme.v4.fontDisplay, fontSize: 24 },
+  description: { color: '#FFF', fontFamily: customerTheme.v4.fontBody, fontSize: 16, marginLeft: 56, marginTop: 8 },
+  list: { gap: 12 },
   serviceInfo: { flex: 1, gap: 3 },
-  serviceName: { color: customerTheme.colors.text, fontSize: 14, fontWeight: '600' },
-  serviceMeta: { color: customerTheme.colors.textSecondary, fontSize: 12 },
+  serviceName: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontDisplay, fontSize: 18 },
+  serviceMeta: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 15 },
   summaryRow: {
-    alignItems: 'center', backgroundColor: customerTheme.colors.surface, borderRadius: customerTheme.radius.card,
-    flexDirection: 'row', justifyContent: 'space-between', minHeight: 58, padding: 14, ...customerTheme.shadow,
+    alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 40,
   },
-  summaryLabel: { color: customerTheme.colors.text, fontSize: 13, fontWeight: '600' },
-  summaryValue: { color: customerTheme.colors.brandDark, fontSize: 15, fontWeight: '700' },
-  primaryButton: { marginTop: 2 },
+  summaryLabel: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 15 },
+  summaryValue: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontDisplay, fontSize: 23 },
+  footer: { backgroundColor: '#FFF', paddingBottom: 18, paddingHorizontal: 20, paddingTop: 10, ...customerTheme.shadow },
+  footerInner: { alignSelf: 'center', gap: 8, maxWidth: 560, width: '100%' },
+  footerInnerDesktop: { maxWidth: 950 },
+  primaryButton: { backgroundColor: customerTheme.v4.primary, borderRadius: 28, height: 56, marginTop: 2, ...customerTheme.shadow },
   modalOverlay: {
-    alignItems: 'center', backgroundColor: 'rgba(36, 16, 46, 0.52)', flex: 1,
-    justifyContent: 'center', paddingHorizontal: 28,
+    alignItems: 'center', backgroundColor: 'rgba(46, 10, 87, 0.62)', flex: 1,
+    justifyContent: 'center', paddingHorizontal: 30,
   },
-  successModal: {
-    alignItems: 'center', backgroundColor: customerTheme.colors.surface,
-    borderRadius: 24, gap: 16, maxWidth: 319, padding: 24, width: '100%',
-    ...customerTheme.shadow,
+  successPrimaryButton: {
+    alignItems: 'center', backgroundColor: customerTheme.v4.primary, borderRadius: 28,
+    height: 56, justifyContent: 'center', width: '100%',
+    shadowColor: customerTheme.v4.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.32, shadowRadius: 8,
   },
-  successIcon: {
-    alignItems: 'center', backgroundColor: '#DDF3E8', borderRadius: 18,
-    height: 56, justifyContent: 'center', width: 56,
-  },
-  successTitle: {
-    color: customerTheme.colors.text, fontSize: 24, fontWeight: '800',
-    lineHeight: 29, textAlign: 'center',
-  },
-  successDescription: {
-    color: customerTheme.colors.textSecondary, fontSize: 14, lineHeight: 20,
-    textAlign: 'center',
-  },
-  successPrimaryButton: { width: '100%' },
+  successPrimaryText: { color: '#FFF', fontFamily: customerTheme.v4.fontBodySemi, fontSize: 17 },
   successSecondaryButton: {
-    alignItems: 'center', backgroundColor: '#EFE3FA', borderRadius: 24,
+    alignItems: 'center', backgroundColor: customerTheme.v4.lilac, borderRadius: 28,
     height: 48, justifyContent: 'center', width: '100%',
   },
   successSecondaryText: {
-    color: customerTheme.colors.brandDark, fontSize: 15, fontWeight: '600',
+    color: customerTheme.v4.primary, fontFamily: customerTheme.v4.fontBodySemi, fontSize: 16,
   },
   selectedService: {
-    alignItems: 'center', backgroundColor: customerTheme.colors.surface, borderRadius: customerTheme.radius.card,
-    flexDirection: 'row', gap: 10, minHeight: 76, padding: 12, ...customerTheme.shadow,
+    alignItems: 'center', backgroundColor: '#FFF', borderRadius: 24,
+    flexDirection: 'row', gap: 14, minHeight: 80, padding: 12, ...customerTheme.shadow,
   },
-  selectedServiceImage: { borderRadius: 16, height: 52, width: 52 },
+  selectedServiceImage: { borderRadius: 16, height: 56, width: 56 },
   dateCard: {
-    alignItems: 'center', backgroundColor: customerTheme.colors.surface, borderRadius: customerTheme.radius.card,
-    flexDirection: 'row', justifyContent: 'space-between', minHeight: 62, padding: 14, ...customerTheme.shadow,
+    alignItems: 'center', backgroundColor: '#FFF', borderRadius: 24,
+    flexDirection: 'row', gap: 14, minHeight: 80, padding: 16, ...customerTheme.shadow,
   },
-  dateTitle: { color: customerTheme.colors.text, fontSize: 13, fontWeight: '600' },
-  dateText: { color: customerTheme.colors.textSecondary, fontSize: 12, marginTop: 1 },
-  calendarIcon: { color: customerTheme.colors.brandDark, fontSize: 19 },
-  sectionTitle: { color: customerTheme.colors.text, fontSize: 18, fontWeight: '800' },
-  timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  calendarBadge: { alignItems: 'center', backgroundColor: customerTheme.v4.lilac, borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
+  calendarImage: { height: 24, width: 24 },
+  dateContent: { flex: 1 },
+  dateTitle: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontDisplay, fontSize: 19 },
+  dateText: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 15, marginTop: 2 },
+  sectionTitle: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontDisplay, fontSize: 22, marginTop: 8 },
+  timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
   timeChip: {
-    alignItems: 'center', backgroundColor: customerTheme.colors.surface, borderRadius: customerTheme.radius.pill,
-    borderWidth: 0, height: 42, justifyContent: 'center', padding: 0, width: '31.3%',
+    alignItems: 'center', backgroundColor: '#FFF', borderColor: customerTheme.v4.border, borderRadius: 16,
+    borderWidth: 1, height: 54, justifyContent: 'center', padding: 0, width: '30.9%',
   },
-  timeChipSelected: { backgroundColor: customerTheme.colors.brandDark },
-  timeText: { color: customerTheme.colors.text, fontSize: 12, fontWeight: '600' },
-  timeTextSelected: { color: customerTheme.colors.textOnBrand },
+  timeChipNarrow: { width: '45%' },
+  timeChipSelected: { backgroundColor: customerTheme.v4.primary, borderColor: customerTheme.v4.primary },
+  timeText: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontBodySemi, fontSize: 17 },
+  timeTextSelected: { color: '#FFF' },
   infoCard: {
     backgroundColor: customerTheme.colors.surface, borderRadius: customerTheme.radius.card,
     gap: 3, padding: 14, ...customerTheme.shadow,
