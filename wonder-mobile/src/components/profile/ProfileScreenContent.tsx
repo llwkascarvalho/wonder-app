@@ -1,6 +1,6 @@
 import { ReactNode, useRef, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,7 +8,7 @@ import { theme } from '../../styles/theme';
 import { customerTheme } from '../../styles/customerTheme';
 import { Button } from '../Button';
 import { Card } from '../Card';
-import { CustomerHeader } from '../customer/CustomerHeader';
+import { HeroGlows } from '../customer/HeroGlows';
 import { ProfileAvatar } from './ProfileAvatar';
 import { ProfileInfoCard } from './ProfileInfoCard';
 import { ProfileEditModal } from './ProfileEditModal';
@@ -31,6 +31,8 @@ export function ProfileScreenContent({
   const [photoRevision, setPhotoRevision] = useState(0);
   const savingRef = useRef(false);
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const desktop = width >= 900;
 
   async function handleSave(payload: UserProfileUpdate) {
     if (savingRef.current) return;
@@ -71,18 +73,17 @@ export function ProfileScreenContent({
     return (
       <View style={customerStyles.screen}>
         <ScrollView
-          contentContainerStyle={[
-            customerStyles.container,
-            { paddingTop: Math.max(insets.top, 20) + 6 },
-          ]}
+          contentContainerStyle={customerStyles.scroll}
           refreshControl={isDemoSession ? undefined : <RefreshControl refreshing={loading} onRefresh={retryProfile} />}
           showsVerticalScrollIndicator={false}
         >
-          <CustomerHeader onSignOut={onSignOut} />
-          <View style={customerStyles.intro}>
+          <View style={[customerStyles.hero, { paddingTop: desktop ? 44 : Math.max(insets.top, 56), paddingHorizontal: desktop ? 76 : 20 }]}>
+            <HeroGlows desktop={desktop} />
             <Text style={customerStyles.title}>{title}</Text>
             <Text style={customerStyles.subtitle}>{subtitle}</Text>
           </View>
+          <View style={[customerStyles.sheet, desktop && customerStyles.sheetDesktop]}>
+          <View style={[customerStyles.container, desktop && customerStyles.containerDesktop]}>
           <View style={customerStyles.summaryCard}>
             <ProfileAvatar
               nome={profile.nome}
@@ -125,6 +126,11 @@ export function ProfileScreenContent({
           ) : null}
           {error ? <Text style={customerStyles.error}>{error}</Text> : null}
           {children}
+          <Pressable accessibilityRole="button" onPress={onSignOut} style={customerStyles.signOut}>
+            <Text style={customerStyles.signOutText}>Sair da conta</Text>
+          </Pressable>
+          </View>
+          </View>
         </ScrollView>
       </View>
     );
@@ -155,8 +161,9 @@ export function ProfileScreenContent({
 function CustomerInfoRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={customerStyles.infoRow}>
-      <Text style={customerStyles.infoLabel}>{label}</Text>
-      <Text style={customerStyles.infoValue} numberOfLines={2}>{value}</Text>
+      <View style={customerStyles.infoIcon}><MaterialIcons name={label === 'Telefone' ? 'phone' : label === 'E-mail' ? 'email' : 'person-outline'} size={22} color={customerTheme.v4.primary} /></View>
+      <View style={customerStyles.infoBody}><Text style={customerStyles.infoLabel}>{label}</Text>
+      <Text style={customerStyles.infoValue} numberOfLines={2}>{value}</Text></View>
     </View>
   );
 }
@@ -182,39 +189,46 @@ const styles = StyleSheet.create({
 });
 
 const customerStyles = StyleSheet.create({
-  screen: { backgroundColor: customerTheme.colors.background, flex: 1 },
+  screen: { backgroundColor: customerTheme.v4.bg, flex: 1 },
+  scroll: { flexGrow: 1 },
+  hero: { backgroundColor: customerTheme.v4.primary, height: 176, overflow: 'hidden' },
+  sheet: { backgroundColor: customerTheme.v4.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, flex: 1, marginTop: -28, paddingTop: 20 },
+  sheetDesktop: { borderTopLeftRadius: 40, borderTopRightRadius: 40, marginTop: -40, paddingTop: 40 },
   container: {
-    alignSelf: 'center', flexGrow: 1, gap: 12, maxWidth: 560, paddingBottom: 110,
+    alignSelf: 'center', flexGrow: 1, gap: 14, maxWidth: 560, paddingBottom: 150,
     paddingHorizontal: 20, width: '100%',
   },
+  containerDesktop: { maxWidth: 880, paddingBottom: 72 },
   errorState: { alignSelf: 'center', flex: 1, gap: 16, maxWidth: 560, paddingHorizontal: 20, width: '100%' },
-  intro: { gap: 2, marginBottom: 8, marginTop: 2 },
-  title: { color: customerTheme.colors.text, fontSize: 28, fontWeight: '800', letterSpacing: -0.6 },
-  subtitle: { color: customerTheme.colors.textSecondary, fontSize: 13 },
+  title: { color: '#FFF', fontFamily: customerTheme.v4.fontDisplay, fontSize: 34, lineHeight: 38 },
+  subtitle: { color: '#FFF', fontFamily: customerTheme.v4.fontBody, fontSize: 17, marginTop: 6 },
   summaryCard: {
-    alignItems: 'center', backgroundColor: customerTheme.colors.surface, borderRadius: customerTheme.radius.card,
+    alignItems: 'center', backgroundColor: customerTheme.v4.surface, borderRadius: 24,
     flexDirection: 'row', gap: 14, minHeight: 108, padding: 16, ...customerTheme.shadow,
   },
   summaryText: { flex: 1, gap: 3, minWidth: 0 },
-  profileName: { color: customerTheme.colors.text, fontSize: 16, fontWeight: '600', lineHeight: 21 },
-  profileEmail: { color: customerTheme.colors.textSecondary, fontSize: 12, lineHeight: 16 },
+  profileName: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontDisplay, fontSize: 22, lineHeight: 26 },
+  profileEmail: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 15, lineHeight: 20 },
   badges: { alignItems: 'center', flexDirection: 'row', gap: 4, marginTop: 1 },
-  roleBadge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 6 },
-  roleBadgeText: { color: '#8846E6', fontSize: 12, fontWeight: '600', textTransform: 'capitalize' },
+  roleBadge: { backgroundColor: customerTheme.v4.lilac, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
+  roleBadgeText: { color: customerTheme.v4.primary, fontFamily: customerTheme.v4.fontBodySemi, fontSize: 13, textTransform: 'capitalize' },
   editButton: {
-    alignItems: 'center', backgroundColor: '#EFE3FA', borderRadius: 999, height: 36,
-    justifyContent: 'center', width: 36,
+    alignItems: 'center', backgroundColor: customerTheme.v4.lilac, borderRadius: 999, height: 44,
+    justifyContent: 'center', width: 44,
   },
   pressed: { opacity: 0.82 },
   infoCard: {
-    backgroundColor: customerTheme.colors.surface, borderRadius: customerTheme.radius.card,
-    paddingHorizontal: 14, paddingVertical: 6, ...customerTheme.shadow,
+    backgroundColor: customerTheme.v4.surface, borderRadius: 24,
+    paddingHorizontal: 16, paddingVertical: 4, ...customerTheme.shadow,
   },
-  infoRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 48 },
-  infoLabel: { color: customerTheme.colors.textSecondary, fontSize: 12 },
+  infoRow: { alignItems: 'center', flexDirection: 'row', gap: 14, minHeight: 68 },
+  infoIcon: { alignItems: 'center', backgroundColor: customerTheme.v4.lilac, borderRadius: 22, height: 44, justifyContent: 'center', width: 44 },
+  infoBody: { flex: 1, gap: 2 },
+  infoLabel: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 15 },
   infoValue: {
-    color: customerTheme.colors.text, flex: 1, fontSize: 13, fontWeight: '600',
-    marginLeft: 16, textAlign: 'right',
+    color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontBodySemi, fontSize: 16,
   },
   error: { color: customerTheme.colors.danger, fontSize: 12, lineHeight: 17 },
+  signOut: { alignItems: 'center', backgroundColor: '#FDE3E5', borderRadius: 28, height: 52, justifyContent: 'center' },
+  signOutText: { color: customerTheme.v4.danger, fontFamily: customerTheme.v4.fontBodySemi, fontSize: 16 },
 });

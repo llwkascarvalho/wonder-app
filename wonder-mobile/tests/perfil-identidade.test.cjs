@@ -127,7 +127,7 @@ function prepararFormulario(appearance, falha) {
   modulo.require = nome => {
     if (nome === 'react') return react;
     if (nome === 'react-native') return { Modal: 'Modal', ScrollView: 'ScrollView', Text: 'Text', View: 'View',
-      Platform: { OS: 'web' }, StyleSheet: { create: v => v } };
+      Platform: { OS: 'web' }, StyleSheet: { create: v => v }, useWindowDimensions: () => ({ width: 375, height: 812 }) };
     if (nome === 'expo-image-picker') return {};
     if (nome === '../Button') return { Button: 'Button' };
     if (nome === '../Input') return { Input: 'Input' };

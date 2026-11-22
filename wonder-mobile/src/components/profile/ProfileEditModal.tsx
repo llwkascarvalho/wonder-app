@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
-import { Modal, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Platform, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { theme } from '../../styles/theme';
 import { customerTheme } from '../../styles/customerTheme';
@@ -30,6 +30,7 @@ export function ProfileEditModal({
   const busy = useRef(false);
   const pickerRequest = useRef(0);
   const [error, setError] = useState('');
+  const { width } = useWindowDimensions();
 
   useEffect(() => {
     if (visible) {
@@ -96,6 +97,7 @@ export function ProfileEditModal({
     <Modal transparent animationType="fade" visible={visible} onRequestClose={() => { if (!loading && !busy.current) onClose(); }}>
       <View style={[styles.overlay, appearance === 'customer' && styles.customerOverlay]}>
         <View style={[styles.content, appearance === 'customer' && styles.customerContent]}>
+          {appearance === 'customer' && width < 640 ? <View style={styles.handle} /> : null}
           <ScrollView contentContainerStyle={styles.fields} keyboardShouldPersistTaps="handled">
             <Text style={[styles.title, appearance === 'customer' && styles.customerTitle]}>Editar perfil</Text>
             {appearance === 'customer' ? (
@@ -166,14 +168,16 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
     justifyContent: 'flex-end',
   },
-  customerOverlay: { backgroundColor: 'rgba(36, 16, 46, 0.52)', paddingHorizontal: 20 },
+  customerOverlay: { backgroundColor: 'rgba(46, 10, 87, 0.62)', justifyContent: 'flex-end', padding: 0 },
   customerContent: {
-    borderRadius: 24, gap: 14, maxWidth: 335, padding: 24,
+    alignSelf: 'center', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    gap: 14, maxHeight: '90%', maxWidth: 560, padding: 20, width: '100%',
     ...customerTheme.shadow,
   },
+  handle: { alignSelf: 'center', backgroundColor: customerTheme.v4.border, borderRadius: 3, height: 5, marginBottom: 2, width: 44 },
   customerTitle: {
-    color: customerTheme.colors.text, fontSize: 24, fontWeight: '800', lineHeight: 29, textAlign: 'left',
+    color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontDisplay, fontSize: 26, lineHeight: 30, textAlign: 'left',
   },
-  customerSubtitle: { color: customerTheme.colors.textSecondary, fontSize: 13, lineHeight: 18 },
-  customerHelper: { color: customerTheme.colors.textSecondary, fontSize: 12, lineHeight: 17 },
+  customerSubtitle: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 16, lineHeight: 22 },
+  customerHelper: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 14, lineHeight: 20 },
 });
