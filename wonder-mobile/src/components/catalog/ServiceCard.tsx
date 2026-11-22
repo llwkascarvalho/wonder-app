@@ -18,16 +18,16 @@ export function ServiceCard({ servico, onPress, selected = false, variant = 'def
   const booking = variant === 'booking';
   return (
     <Card onPress={onPress} style={[
-      styles.card, booking && styles.bookingCard, !booking && selected && styles.selected, style,
+      styles.card, booking && styles.bookingCard, booking && selected && styles.bookingSelected, !booking && selected && styles.selected, style,
     ]}>
       <CatalogImage fotoUrl={servico.foto_url} kind="service" style={[styles.image, booking && styles.bookingImage]} />
       <View style={styles.content}>
-        <Text style={[styles.title, !booking && selected && styles.selectedText]} numberOfLines={2}>
+        <Text style={[styles.title, booking && styles.bookingTitle, !booking && selected && styles.selectedText]} numberOfLines={2}>
           {servico.nome}
         </Text>
         {booking ? (
           <>
-            <Text style={styles.meta}>{servico.duracao_min} min</Text>
+            <Text style={styles.bookingMeta}>◷ {servico.duracao_min} min</Text>
             <Text style={styles.bookingPrice}>{new Intl.NumberFormat('pt-BR', {
               style: 'currency', currency: 'BRL',
             }).format(servico.preco)}</Text>
@@ -79,35 +79,37 @@ const styles = StyleSheet.create({
     color: theme.colors.white,
   },
   bookingCard: {
-    borderRadius: customerTheme.radius.card,
-    borderWidth: 0,
-    minHeight: 92,
+    backgroundColor: '#FFF', borderRadius: 24,
+    borderColor: 'transparent', borderWidth: 2,
+    minHeight: 94,
     padding: 12,
     ...customerTheme.shadow,
   },
+  bookingSelected: { backgroundColor: customerTheme.v4.lilac, borderColor: customerTheme.v4.primary },
   bookingImage: {
     borderRadius: 18,
-    height: 64,
-    width: 64,
+    height: 68,
+    width: 68,
   },
+  bookingTitle: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontDisplay, fontSize: 19 },
+  bookingMeta: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 15 },
   bookingPrice: {
-    color: customerTheme.colors.brand,
-    fontSize: 13,
-    fontWeight: '600',
+    color: customerTheme.v4.primary,
+    fontFamily: customerTheme.v4.fontBodyBold, fontSize: 17,
   },
   selection: {
     alignItems: 'center',
-    backgroundColor: '#EFE7DA',
+    backgroundColor: customerTheme.v4.lilac,
     borderRadius: customerTheme.radius.pill,
-    height: 36,
+    height: 40,
     justifyContent: 'center',
-    width: 36,
+    width: 40,
   },
   selectionActive: {
-    backgroundColor: customerTheme.colors.brandDark,
+    backgroundColor: customerTheme.v4.primary,
   },
   selectionText: {
-    color: customerTheme.colors.brand,
+    color: customerTheme.v4.primary,
     fontSize: 20,
     fontWeight: '600',
   },
