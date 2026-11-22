@@ -135,7 +135,19 @@ test('busca cancelada durante as consultas complementares não publica cards ant
   controle.abort();
   concluir();
   await assert.rejects(pendente, /cancelada/);
-  assert.deepEqual(sinais, [controle.signal, controle.signal]);
+  assert.deepEqual(sinais, [controle.signal, controle.signal, controle.signal]);
+});
+
+test('card exibe média somente quando há avaliações reais', async () => {
+  const carregar = carregarModulos({ get: async (rota) => {
+    if (rota.endsWith('/avaliacoes')) return { data: rota.includes('/7/') ? [{ nota: 4 }, { nota: 5 }] : [] };
+    return { data: [] };
+  } });
+  const cards = await carregar('utils/catalogPresentation.ts').carregarCardsPrestadores([
+    { id: 7, nome_estab: 'Avaliado' }, { id: 8, nome_estab: 'Novo' },
+  ]);
+  assert.deepEqual(cards.find((card) => card.prestador.id === 7).avaliacao, { media: 4.5, quantidade: 2 });
+  assert.equal(cards.find((card) => card.prestador.id === 8).avaliacao, null);
 });
 
 test('ordenação diferencia atendimento conhecido, sem expediente e informação indisponível', async (contexto) => {

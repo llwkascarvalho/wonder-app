@@ -1,24 +1,26 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import type { NavigatorScreenParams } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ComponentProps } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions } from 'react-native';
 
 import { useAuth } from '../contexts/AuthContext';
 import { NotificationsProvider, useNotifications } from '../contexts/NotificationsContext';
 import { AppointmentsScreen } from '../screens/AppointmentsScreen';
 import { ChatScreen } from '../screens/ChatScreen';
-import { HomeScreen } from '../screens/HomeScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { ProviderAgendaScreen } from '../screens/ProviderAgendaScreen';
 import { ProviderProfileScreen } from '../screens/ProviderProfileScreen';
 import { theme } from '../styles/theme';
 import { AdminTabs } from './AdminTabs';
 import { ProfileStack } from './ProfileStack';
-import { SearchStack } from './SearchStack';
+import { CustomerNavigation } from './CustomerNavigation';
+import { HomeStack, SearchStack } from './SearchStack';
+import type { SearchStackParamList } from './SearchStack';
 
 export type MainTabsParamList = {
-  Home: undefined;
-  Search: undefined;
+  Home: NavigatorScreenParams<SearchStackParamList> | undefined;
+  Search: NavigatorScreenParams<SearchStackParamList> | undefined;
   Appointments: undefined;
   Notifications: undefined;
   Profile: undefined;
@@ -35,14 +37,6 @@ const ClientTab = createBottomTabNavigator<MainTabsParamList>();
 const ProviderTab = createBottomTabNavigator<ProviderTabsParamList>();
 
 type TabIconName = ComponentProps<typeof MaterialIcons>['name'];
-
-const clientTabIcons: Record<keyof MainTabsParamList, TabIconName> = {
-  Home: 'home',
-  Search: 'search',
-  Appointments: 'event',
-  Notifications: 'notifications',
-  Profile: 'person',
-};
 
 const providerTabIcons: Record<keyof ProviderTabsParamList, TabIconName> = {
   ProviderAgenda: 'event',
@@ -68,47 +62,12 @@ const sharedScreenOptions = {
   },
 } as const;
 
-const customerScreenOptions = {
-  headerShown: false,
-  tabBarActiveTintColor: theme.colors.white,
-  tabBarInactiveTintColor: theme.colors.white,
-  tabBarShowLabel: false,
-  tabBarStyle: {
-    backgroundColor: '#7324E3',
-    borderRadius: 32,
-    borderTopWidth: 0,
-    bottom: 16,
-    elevation: 8,
-    height: 60,
-    left: '50%',
-    paddingHorizontal: 12,
-    position: 'absolute',
-    shadowColor: '#24102E',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    transform: [{ translateX: -167.5 }],
-    width: 335,
-  },
-  tabBarItemStyle: { height: 60 },
-} as const;
-
 function TabIcon({ name, color, size }: { name: TabIconName; color: string; size: number }) {
   return <MaterialIcons name={name} color={color} size={size} />;
 }
 
-function CustomerTabIcon({ name, focused }: { name: TabIconName; focused: boolean }) {
-  return (
-    <View style={{
-      alignItems: 'center', backgroundColor: focused ? '#481793' : 'transparent', borderRadius: 999,
-      height: 44, justifyContent: 'center', width: 44,
-    }}>
-      <MaterialIcons name={name} color={theme.colors.white} size={22} />
-    </View>
-  );
-}
-
 function MainTabsInner() {
+  const { width } = useWindowDimensions();
   const { usuario } = useAuth();
   const { unreadCount } = useNotifications();
   const tipoUsuario = usuario?.tipo_usuario?.toLowerCase();
@@ -162,13 +121,13 @@ function MainTabsInner() {
   }
 
   return (
-    <ClientTab.Navigator screenOptions={customerScreenOptions}>
+    <ClientTab.Navigator tabBar={(props) => <CustomerNavigation {...props} />}
+      screenOptions={{ headerShown: false, sceneStyle: { marginLeft: width >= 900 ? (width >= 1280 ? 272 : 248) : 0 } }}>
       <ClientTab.Screen
         name="Home"
-        component={HomeScreen}
+        component={HomeStack}
         options={{
           title: 'Inicio',
-          tabBarIcon: ({ focused }) => <CustomerTabIcon name={clientTabIcons.Home} focused={focused} />,
         }}
       />
       <ClientTab.Screen
@@ -176,7 +135,6 @@ function MainTabsInner() {
         component={SearchStack}
         options={{
           title: 'Buscar',
-          tabBarIcon: ({ focused }) => <CustomerTabIcon name={clientTabIcons.Search} focused={focused} />,
         }}
       />
       <ClientTab.Screen
@@ -184,7 +142,6 @@ function MainTabsInner() {
         component={AppointmentsScreen}
         options={{
           title: 'Agenda',
-          tabBarIcon: ({ focused }) => <CustomerTabIcon name={clientTabIcons.Appointments} focused={focused} />,
         }}
       />
       <ClientTab.Screen
@@ -192,8 +149,6 @@ function MainTabsInner() {
         component={NotificationsScreen}
         options={{
           title: 'Avisos',
-          tabBarBadge: notificationsBadge,
-          tabBarIcon: ({ focused }) => <CustomerTabIcon name={clientTabIcons.Notifications} focused={focused} />,
         }}
       />
       <ClientTab.Screen
@@ -201,7 +156,6 @@ function MainTabsInner() {
         component={ProfileStack}
         options={{
           title: 'Perfil',
-          tabBarIcon: ({ focused }) => <CustomerTabIcon name={clientTabIcons.Profile} focused={focused} />,
         }}
       />
     </ClientTab.Navigator>

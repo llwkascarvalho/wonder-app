@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { Button } from '../components/Button';
 import { CatalogImage } from '../components/catalog/CatalogImage';
+import { HeroGlows } from '../components/customer/HeroGlows';
+import { CustomerFeedbackCard } from '../components/customer/CustomerFeedbackCard';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { ProviderAddressStep } from '../components/provider-onboarding/ProviderAddressStep';
 import { ProviderApplicationStatus } from '../components/provider-onboarding/ProviderApplicationStatus';
@@ -53,12 +55,15 @@ function draftFromProfile(profile: ProviderOnboardingProfile): ProviderRegistrat
 }
 
 export function ProviderOnboardingScreen({ navigation }: ProviderOnboardingScreenProps = {}) {
+  const { width } = useWindowDimensions();
+  const desktop = width >= 900;
   const [step, setStep] = useState<StepKey>('dados');
   const [draft, setDraft] = useState<ProviderRegistrationDraft>({ ...emptyProviderDraft });
   const [profile, setProfile] = useState<ProviderOnboardingProfile | null>(null);
   const [correcting, setCorrecting] = useState(false);
   const [viewingSubmitted, setViewingSubmitted] = useState(false);
   const [confirmingSubmit, setConfirmingSubmit] = useState(false);
+  const [submittedConfirmation, setSubmittedConfirmation] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -204,6 +209,7 @@ export function ProviderOnboardingScreen({ navigation }: ProviderOnboardingScree
       setProfile({ ...updated, ...submitted }); setCorrecting(false); setViewingSubmitted(false); setPhoto(undefined);
       setStep('dados');
       setMessage(correcting ? 'Cadastro corrigido e reenviado para aprovação.' : 'Cadastro enviado para aprovação.');
+      setSubmittedConfirmation(true);
     } catch (submitError) {
       setError(getBackendMessage(submitError, 'Não foi possível reenviar o cadastro. As correções salvas foram mantidas.'));
     } finally { submitting.current = false; setSaving(false); }
@@ -267,26 +273,33 @@ export function ProviderOnboardingScreen({ navigation }: ProviderOnboardingScree
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View style={styles.topBar}>
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View style={[styles.hero, desktop && styles.heroDesktop]}>
+          <HeroGlows desktop={desktop} />
+          <View style={styles.heroContent}>
+          <View style={styles.topBar}>
         <Pressable accessibilityRole="button" accessibilityLabel="Voltar" disabled={saving || picking}
           onPress={() => navigation?.goBack()}
           style={({ pressed }) => [styles.backButton, pressed && styles.pressed,
             (saving || picking) && styles.backButtonDisabled]}>
-          <MaterialIcons name="chevron-left" size={28} color={customerTheme.colors.brandDark} />
+          <MaterialIcons name="chevron-left" size={28} color="#FFFFFF" />
         </Pressable>
-        </View>
         <View style={styles.header}>
         <Text style={styles.eyebrow}>Prestador Wonder</Text>
           <Text style={styles.title}>{viewingSubmitted
             ? 'Solicitação enviada'
-            : correcting ? 'Corrigir cadastro profissional' : 'Cadastro profissional'}</Text>
+            : correcting ? 'Corrigir cadastro' : 'Cadastro profissional'}</Text>
+        </View>
+          </View>
           <Text style={styles.subtitle}>{viewingSubmitted
             ? 'Estas são as informações que estão sendo avaliadas pelo administrador.'
             : correcting
               ? 'Revise os dados do estabelecimento antes de reenviar para aprovação.'
               : 'Conte sobre seu estabelecimento e prepare seu perfil profissional.'}</Text>
+          </View>
         </View>
+        <View style={[styles.sheet, desktop && styles.sheetDesktop]}>
+        <View style={styles.container}>
         {error ? <View style={styles.errorCard}>
           <MaterialIcons name="error-outline" size={20} color={customerTheme.colors.danger} />
           <Text accessibilityRole="alert" style={styles.error}>{error}</Text>
@@ -295,7 +308,7 @@ export function ProviderOnboardingScreen({ navigation }: ProviderOnboardingScree
           <MaterialIcons name="check-circle" size={20} color="#17805A" />
           <Text style={styles.success}>{message}</Text>
         </View> : null}
-        {loadFailed ? <Button title="Tentar novamente" onPress={load} />
+        {loadFailed ? <Button appearance="customer" title="Tentar novamente" onPress={load} />
           : profile && !correcting && !viewingSubmitted && !applicationInProgress && step === 'dados' ? (
             <>
               <View style={styles.profileCard}>
@@ -340,7 +353,7 @@ export function ProviderOnboardingScreen({ navigation }: ProviderOnboardingScree
                           setStep(item.key);
                         }
                       }}>
-                      <View style={[styles.stepCircle, (active || completed) && styles.stepCircleActive]}>
+                      <View style={[styles.stepCircle, (active || completed) && styles.stepCircleActive, active && styles.stepCircleCurrent]}>
                         {completed ? <MaterialIcons name="check" size={14} color="#FFFFFF" />
                           : <Text style={[styles.stepNumber, active && styles.stepNumberActive]}>{index + 1}</Text>}
                       </View>
@@ -364,17 +377,19 @@ export function ProviderOnboardingScreen({ navigation }: ProviderOnboardingScree
                 categories={categories} services={services} schedules={schedules}
                 submitTitle={correcting ? 'Reenviar para aprovação' : 'Enviar cadastro'} /> : null}
               <View style={styles.navigation}>
-                {viewingSubmitted ? <Button title="Voltar ao acompanhamento" variant="secondary"
+                {viewingSubmitted ? <Button appearance="customer" title="Voltar ao acompanhamento" variant="secondary"
                   onPress={() => { setViewingSubmitted(false); setStep('dados'); }} style={styles.navButton} /> : <>
                   {steps.findIndex((item) => item.key === step) > 0
-                    ? <Button title="Voltar" variant="secondary" disabled={saving || picking}
+                    ? <Button appearance="customer" title="Voltar" variant="secondary" disabled={saving || picking}
                       onPress={previousStep} style={styles.navButton} /> : null}
-                  {step !== 'revisao' ? <Button title="Avançar" disabled={saving || picking}
+                  {step !== 'revisao' ? <Button appearance="customer" title="Avançar" disabled={saving || picking}
                     onPress={handleAdvance} style={styles.navButton} /> : null}
                 </>}
               </View>
             </>
           )}
+        </View>
+        </View>
       </ScrollView>
       <Modal transparent visible={confirmingSubmit} animationType="fade"
         onRequestClose={() => !saving && setConfirmingSubmit(false)}>
@@ -384,12 +399,26 @@ export function ProviderOnboardingScreen({ navigation }: ProviderOnboardingScree
             <Text style={styles.modalTitle}>{correcting ? 'Reenviar para análise?' : 'Enviar para análise?'}</Text>
             <Text style={styles.modalText}>Após o envio, o cadastro não poderá ser alterado até a conclusão da análise ou até que o administrador solicite uma correção.</Text>
             <View style={styles.modalActions}>
-              <Button title="Voltar e revisar" variant="secondary" disabled={saving}
+              <Button appearance="customer" title="Voltar e revisar" variant="secondary" disabled={saving}
                 onPress={() => setConfirmingSubmit(false)} style={styles.modalButton} />
-              <Button title={correcting ? 'Reenviar' : 'Confirmar envio'} loading={saving}
+              <Button appearance="customer" title={correcting ? 'Reenviar' : 'Confirmar envio'} loading={saving}
                 onPress={handleSubmit} style={styles.modalButton} />
             </View>
           </View>
+        </View>
+      </Modal>
+      <Modal transparent visible={submittedConfirmation} animationType="fade"
+        onRequestClose={() => setSubmittedConfirmation(false)}>
+        <View style={styles.modalOverlay}>
+          <CustomerFeedbackCard kind="success" title="Cadastro enviado para análise"
+            description="Sua solicitação foi recebida e está aguardando a análise do administrador. Você será avisado no app quando houver uma decisão.">
+            <Text style={styles.modalHint}>Os detalhes da decisão também serão enviados para o e-mail da sua conta.</Text>
+            <Button appearance="customer" title="Acompanhar solicitação" onPress={() => {
+              setSubmittedConfirmation(false);
+              setViewingSubmitted(true);
+              setStep('revisao');
+            }} style={styles.modalFullButton} />
+          </CustomerFeedbackCard>
         </View>
       </Modal>
     </View>
@@ -397,71 +426,80 @@ export function ProviderOnboardingScreen({ navigation }: ProviderOnboardingScree
 }
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: customerTheme.colors.background, flex: 1 },
+  screen: { backgroundColor: customerTheme.v4.bg, flex: 1 },
+  scrollContent: { flexGrow: 1 },
+  hero: { backgroundColor: customerTheme.v4.primary, minHeight: 203, overflow: 'hidden', paddingBottom: 56, paddingTop: 44 },
+  heroDesktop: { paddingBottom: 76, paddingTop: 44 },
+  heroContent: { alignSelf: 'center', maxWidth: 1040, paddingHorizontal: 20, width: '100%', zIndex: 1 },
+  sheet: { backgroundColor: customerTheme.v4.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, flexGrow: 1, marginTop: -28, paddingTop: 24 },
+  sheetDesktop: { borderTopLeftRadius: 40, borderTopRightRadius: 40, marginTop: -40, paddingTop: 36 },
   container: {
-    alignSelf: 'center', flexGrow: 1, gap: 14, maxWidth: 560,
-    paddingBottom: 110, paddingHorizontal: 20, paddingTop: 24, width: '100%',
+    alignSelf: 'center', gap: 16, maxWidth: 560,
+    paddingBottom: 150, paddingHorizontal: 20, width: '100%',
   },
-  topBar: { alignItems: 'center', flexDirection: 'row' },
-  header: { gap: 4, marginBottom: 4, marginTop: 4 },
-  eyebrow: { color: customerTheme.colors.brand, fontSize: 12, fontWeight: '600' },
-  title: { color: customerTheme.colors.text, fontSize: 28, fontWeight: '800', letterSpacing: -0.7 },
-  subtitle: { color: customerTheme.colors.textSecondary, fontSize: 13, lineHeight: 19 },
+  topBar: { alignItems: 'center', flexDirection: 'row', gap: 12 },
+  header: { flex: 1, gap: 2 },
+  eyebrow: { color: '#FFFFFF', fontFamily: customerTheme.v4.fontBodySemi, fontSize: 14 },
+  title: { color: '#FFFFFF', fontFamily: customerTheme.v4.fontDisplay, fontSize: 24, lineHeight: 28 },
+  subtitle: { color: '#FFFFFF', fontFamily: customerTheme.v4.fontBody, fontSize: 15, lineHeight: 20, marginLeft: 56, marginTop: 10 },
   errorCard: { alignItems: 'flex-start', backgroundColor: customerTheme.colors.dangerSurface, borderRadius: 16, flexDirection: 'row', gap: 10, padding: 13 },
-  error: { color: customerTheme.colors.danger, flex: 1, fontSize: 12, lineHeight: 17 },
+  error: { color: customerTheme.v4.danger, flex: 1, fontFamily: customerTheme.v4.fontBody, fontSize: 14, lineHeight: 20 },
   successCard: { alignItems: 'flex-start', backgroundColor: '#DDF3E8', borderRadius: 16, flexDirection: 'row', gap: 10, padding: 13 },
-  success: { color: '#17805A', flex: 1, fontSize: 12, lineHeight: 17 },
-  correctionCard: { alignItems: 'flex-start', backgroundColor: '#FFF0C7', borderRadius: 18, flexDirection: 'row', gap: 12, padding: 14 },
+  success: { color: '#17805A', flex: 1, fontFamily: customerTheme.v4.fontBody, fontSize: 14, lineHeight: 20 },
+  successModalIcon: { alignItems: 'center', backgroundColor: '#DDF3E8', borderRadius: 999, height: 58, justifyContent: 'center', marginBottom: 4, width: 58 },
+  correctionCard: { alignItems: 'flex-start', backgroundColor: '#FFF0D6', borderRadius: 20, flexDirection: 'row', gap: 12, padding: 14 },
   correctionIcon: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 13, height: 40, justifyContent: 'center', width: 40 },
   correctionContent: { flex: 1, gap: 4 },
-  correctionTitle: { color: customerTheme.colors.text, fontSize: 13, fontWeight: '800' },
-  correctionText: { color: '#795600', fontSize: 12, lineHeight: 17 },
-  progressCard: { backgroundColor: customerTheme.colors.surface, borderRadius: customerTheme.radius.card, gap: 12, padding: 16, ...customerTheme.shadow },
+  correctionTitle: { color: '#9A5200', fontFamily: customerTheme.v4.fontBodyBold, fontSize: 15 },
+  correctionText: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontBody, fontSize: 14, lineHeight: 19 },
+  progressCard: { backgroundColor: customerTheme.v4.surface, borderRadius: 24, gap: 14, padding: 16, ...customerTheme.shadow },
   progressHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  progressTitle: { color: customerTheme.colors.textSecondary, fontSize: 11, fontWeight: '600' },
-  progressCurrent: { color: customerTheme.colors.brandDark, fontSize: 12, fontWeight: '800' },
-  progressTrack: { backgroundColor: '#E7E0EF', borderRadius: 999, height: 5, overflow: 'hidden' },
-  progressValue: { backgroundColor: customerTheme.colors.brand, borderRadius: 999, height: 5 },
+  progressTitle: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 14 },
+  progressCurrent: { color: customerTheme.v4.primary, fontFamily: customerTheme.v4.fontBodyBold, fontSize: 14 },
+  progressTrack: { backgroundColor: customerTheme.v4.lilac, borderRadius: 999, height: 6, overflow: 'hidden' },
+  progressValue: { backgroundColor: customerTheme.v4.primary, borderRadius: 999, height: 6 },
   tabs: { flexDirection: 'row', justifyContent: 'space-between' },
-  stepItem: { alignItems: 'center', gap: 5, maxWidth: 68 },
-  stepCircle: { alignItems: 'center', backgroundColor: '#EEE9F4', borderRadius: 999, height: 28, justifyContent: 'center', width: 28 },
-  stepCircleActive: { backgroundColor: customerTheme.colors.brandDark },
-  stepNumber: { color: customerTheme.colors.textSecondary, fontSize: 11, fontWeight: '700' },
+  stepItem: { alignItems: 'center', gap: 6, width: 58 },
+  stepCircle: { alignItems: 'center', backgroundColor: customerTheme.v4.lilac, borderRadius: 16, height: 32, justifyContent: 'center', width: 32 },
+  stepCircleActive: { backgroundColor: customerTheme.v4.primary },
+  stepCircleCurrent: { borderColor: customerTheme.v4.lilac, borderWidth: 4 },
+  stepNumber: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBodyBold, fontSize: 14 },
   stepNumberActive: { color: '#FFFFFF' },
-  stepLabel: { color: customerTheme.colors.textSecondary, fontSize: 9, fontWeight: '600' },
-  stepLabelActive: { color: customerTheme.colors.brandDark, fontWeight: '800' },
+  stepLabel: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBodySemi, fontSize: 11 },
+  stepLabelActive: { color: customerTheme.v4.primary, fontFamily: customerTheme.v4.fontBodyBold },
   pressed: { opacity: 0.75 },
-  navigation: { flexDirection: 'row', gap: 10, marginTop: 2 },
+  navigation: { flexDirection: 'row', gap: 16, marginTop: 8 },
   navButton: { flex: 1 },
   backButton: {
-    alignItems: 'center', backgroundColor: customerTheme.colors.surface,
-    borderRadius: customerTheme.radius.pill, height: 40, justifyContent: 'center',
-    width: 40, ...customerTheme.shadow,
+    alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.16)',
+    borderRadius: 22, height: 44, justifyContent: 'center', width: 44,
   },
   backButtonDisabled: { opacity: 0.5 },
   profileCard: {
-    alignItems: 'center', backgroundColor: customerTheme.colors.surface, borderRadius: customerTheme.radius.card,
+    alignItems: 'center', backgroundColor: customerTheme.v4.surface, borderRadius: 24,
     flexDirection: 'row', gap: 14, padding: 16, ...customerTheme.shadow,
   },
   profilePhoto: { borderRadius: 18, height: 78, width: 78 },
   profileSummary: { flex: 1, gap: 4 },
-  profileLabel: { color: customerTheme.colors.textSecondary, fontSize: 11 },
-  profileName: { color: customerTheme.colors.text, fontSize: 17, fontWeight: '800' },
+  profileLabel: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 14 },
+  profileName: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontDisplay, fontSize: 20 },
   modalOverlay: {
-    alignItems: 'center', backgroundColor: 'rgba(36, 16, 46, 0.42)', flex: 1,
+    alignItems: 'center', backgroundColor: 'rgba(46,10,87,0.62)', flex: 1,
     justifyContent: 'center', padding: 20,
   },
   modalCard: {
-    alignItems: 'center', backgroundColor: customerTheme.colors.surface,
-    borderRadius: customerTheme.radius.card, gap: 12, maxWidth: 480, padding: 22,
+    alignItems: 'center', backgroundColor: customerTheme.v4.surface,
+    borderRadius: 28, gap: 12, maxWidth: 480, padding: 24,
     width: '100%', ...customerTheme.shadow,
   },
   modalIcon: {
-    alignItems: 'center', backgroundColor: '#EFE3FA', borderRadius: 18,
-    height: 52, justifyContent: 'center', width: 52,
+    alignItems: 'center', backgroundColor: customerTheme.v4.lilac, borderRadius: 36,
+    height: 72, justifyContent: 'center', width: 72,
   },
-  modalTitle: { color: customerTheme.colors.text, fontSize: 20, fontWeight: '800', textAlign: 'center' },
-  modalText: { color: customerTheme.colors.textSecondary, fontSize: 13, lineHeight: 20, textAlign: 'center' },
+  modalTitle: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontDisplay, fontSize: 24, lineHeight: 28, textAlign: 'center' },
+  modalText: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 16, lineHeight: 22, textAlign: 'center' },
+  modalHint: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 4, width: '100%' },
   modalButton: { flex: 1 },
+  modalFullButton: { alignSelf: 'stretch', marginTop: 4 },
 });

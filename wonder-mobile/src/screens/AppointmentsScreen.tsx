@@ -1,12 +1,14 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Image, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CatalogImage } from '../components/catalog/CatalogImage';
 import { RatingStars } from '../components/catalog/RatingStars';
-import { CustomerHeader } from '../components/customer/CustomerHeader';
+import { CustomerFeedbackCard } from '../components/customer/CustomerFeedbackCard';
+import { CustomerFormSheet } from '../components/customer/CustomerFormSheet';
+import { HeroGlows } from '../components/customer/HeroGlows';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { atualizarStatusAgendamento, extrairMensagemErro, listarAgendamentos } from '../services/agendamentos';
 import { criarAvaliacaoPrestador, listarAvaliacoesPrestador } from '../services/avaliacoes';
@@ -17,7 +19,7 @@ import { Avaliacao } from '../types/avaliacao';
 import { Prestador, Servico } from '../types/catalogo';
 import { podeAvaliarAgendamento } from '../utils/avaliacoes';
 
-type AgendaTab = 'agendados' | 'finalizados' | 'cancelados';
+type AgendaTab = 'proximos' | 'historico' | 'cancelados';
 type FeedbackModal = 'cancelado' | 'avaliado' | null;
 type AgendamentoEnriquecido = {
   agendamento: Agendamento;
@@ -28,8 +30,8 @@ type AgendamentoEnriquecido = {
 };
 
 const tabs: Array<{ key: AgendaTab; label: string }> = [
-  { key: 'agendados', label: 'Agendados' },
-  { key: 'finalizados', label: 'Finalizados' },
+  { key: 'proximos', label: 'Agendados' },
+  { key: 'historico', label: 'Finalizados' },
   { key: 'cancelados', label: 'Cancelados' },
 ];
 const STATUS_LABEL: Record<string, string> = {
@@ -95,17 +97,20 @@ async function enriquecerAgendamentos(agendamentos: Agendamento[]) {
   }));
 }
 
-function filtrarPorAba(item: AgendamentoEnriquecido, aba: AgendaTab) {
+function filtrarPorAba(item: AgendamentoEnriquecido, aba: AgendaTab, agora: number) {
   const status = item.agendamento.status;
-  if (aba === 'agendados') return agendadosStatuses.has(status);
-  if (aba === 'finalizados') return finalizadosStatuses.has(status);
+  const passado = new Date(item.agendamento.inicio).getTime() < agora;
+  if (aba === 'proximos') return !passado && agendadosStatuses.has(status);
+  if (aba === 'historico') return !canceladosStatuses.has(status) && (passado || finalizadosStatuses.has(status));
   return canceladosStatuses.has(status);
 }
 
 export function AppointmentsScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<AgendaTab>('agendados');
+  const { width } = useWindowDimensions();
+  const desktop = width >= 900;
+  const [activeTab, setActiveTab] = useState<AgendaTab>('proximos');
   const [agendamentos, setAgendamentos] = useState<AgendamentoEnriquecido[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [atualizando, setAtualizando] = useState(false);
@@ -137,7 +142,7 @@ export function AppointmentsScreen() {
   }, [carregarAgendamentos]);
 
   const visiveis = useMemo(
-    () => agendamentos.filter((item) => filtrarPorAba(item, activeTab)),
+    () => agendamentos.filter((item) => filtrarPorAba(item, activeTab, Date.now())),
     [activeTab, agendamentos]
   );
 
@@ -209,7 +214,7 @@ export function AppointmentsScreen() {
       setAvaliacaoTarget(null);
       setNotaAvaliacao(0);
       await carregarAgendamentos();
-      setActiveTab('finalizados');
+      setActiveTab('historico');
       setFeedbackModal('avaliado');
     } catch (error) {
       setAvaliacaoErro(extrairMensagemErro(error, 'Não foi possível avaliar. Tente novamente.'));
@@ -224,12 +229,15 @@ export function AppointmentsScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={[styles.container, { paddingTop: Math.max(insets.top, 20) + 6 }]}>
-        <CustomerHeader />
+      <View style={[styles.hero, { paddingTop: desktop ? 44 : Math.max(insets.top, 56), paddingHorizontal: desktop ? 76 : 20 }]}>
+        <HeroGlows desktop={desktop} />
         <View style={styles.intro}>
           <Text style={styles.title}>Agendamentos</Text>
           <Text style={styles.subtitle}>Acompanhe seus horários.</Text>
         </View>
+      </View>
+      <View style={[styles.sheet, desktop && styles.sheetDesktop]}>
+      <View style={[styles.container, desktop && styles.containerDesktop]}>
         <View style={styles.tabs}>
           {tabs.map((tab) => {
             const selected = activeTab === tab.key;
@@ -274,12 +282,11 @@ export function AppointmentsScreen() {
           />
         )}
       </View>
+      </View>
 
-      <Modal transparent visible={cancelTarget !== null} animationType="fade" onRequestClose={fecharCancelamento}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.formModal}>
-            <Text style={styles.modalTitle}>Cancelar agendamento</Text>
-            <Text style={styles.modalText}>Informe o motivo. O cancelamento não será permitido próximo do atendimento.</Text>
+      <CustomerFormSheet visible={cancelTarget !== null} title="Cancelar agendamento"
+        onClose={fecharCancelamento} disabled={cancelandoId !== null}>
+            <Text style={styles.modalText}>Informe o motivo. O cancelamento não será permitido próximo do horário do atendimento.</Text>
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Motivo do cancelamento</Text>
               <TextInput
@@ -296,20 +303,22 @@ export function AppointmentsScreen() {
               <ModalButton label="Voltar" onPress={fecharCancelamento} disabled={cancelandoId !== null} variant="secondary" />
               <ModalButton label={cancelandoId !== null ? 'Cancelando...' : 'Confirmar'} onPress={cancelarAgendamento} disabled={cancelandoId !== null} variant="danger" />
             </View>
-          </View>
-        </View>
-      </Modal>
+      </CustomerFormSheet>
 
-      <Modal transparent visible={avaliacaoTarget !== null} animationType="fade" onRequestClose={fecharAvaliacao}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.formModal}>
-            <Text style={styles.modalTitle}>Avaliar atendimento</Text>
+      <CustomerFormSheet visible={avaliacaoTarget !== null} title="Avaliar atendimento"
+        onClose={fecharAvaliacao} disabled={avaliandoId !== null}>
             <Text style={styles.modalText}>Como foi seu atendimento com {avaliacaoTarget?.prestador?.nome_estab ?? 'este prestador'}?</Text>
             <View style={styles.ratingSelector}>
-              <RatingStars value={notaAvaliacao} onChange={(nota) => {
-                setNotaAvaliacao(nota);
-                setAvaliacaoErro(null);
-              }} disabled={avaliandoId !== null} size={38} />
+              <View style={styles.ratingStars}>
+                {[1, 2, 3, 4, 5].map((nota) => <Pressable key={nota} accessibilityRole="button"
+                  accessibilityLabel={`${nota} ${nota === 1 ? 'estrela' : 'estrelas'}`}
+                  accessibilityState={{ selected: notaAvaliacao === nota }} disabled={avaliandoId !== null}
+                  onPress={() => { setNotaAvaliacao(nota); setAvaliacaoErro(null); }}>
+                  <Image source={nota <= notaAvaliacao
+                    ? require('../assets/icons/modal-star-filled-v4.png')
+                    : require('../assets/icons/modal-star-empty-v4.png')} style={styles.ratingStar} />
+                </Pressable>)}
+              </View>
               <Text style={[styles.ratingHint, notaAvaliacao > 0 && styles.ratingHintSelected]}>
                 {notaAvaliacao > 0 ? `${notaAvaliacao} de 5 estrelas` : 'Selecione uma nota'}
               </Text>
@@ -318,11 +327,9 @@ export function AppointmentsScreen() {
             {avaliacaoErro ? <Text style={styles.formError}>{avaliacaoErro}</Text> : null}
             <View style={styles.modalActions}>
               <ModalButton label="Voltar" onPress={fecharAvaliacao} disabled={avaliandoId !== null} variant="secondary" />
-              <ModalButton label={avaliandoId !== null ? 'Enviando...' : 'Enviar avaliação'} onPress={enviarAvaliacao} disabled={avaliandoId !== null} variant="primary" />
+              <ModalButton label={avaliandoId !== null ? 'Enviando...' : 'Enviar avaliação'} onPress={enviarAvaliacao} disabled={avaliandoId !== null || notaAvaliacao === 0} variant="primary" />
             </View>
-          </View>
-        </View>
-      </Modal>
+      </CustomerFormSheet>
       <FeedbackModalView type={feedbackModal} onClose={() => setFeedbackModal(null)} />
     </View>
   );
@@ -334,22 +341,27 @@ function AppointmentCard({ item, expanded, cancelando, disabled, onDetails, onCa
 }) {
   const { agendamento, prestador, servico, avaliacao, avaliacoesCarregadas } = item;
   const { data, horario } = formatarData(agendamento.inicio);
-  const cancelavel = cancelaveisStatuses.has(agendamento.status);
+  const passado = new Date(agendamento.inicio).getTime() < Date.now();
+  const cancelavel = !passado && cancelaveisStatuses.has(agendamento.status);
   const avaliavel = podeAvaliarAgendamento(agendamento.status, avaliacoesCarregadas, avaliacao);
-  const statusLabel = STATUS_LABEL[agendamento.status] ?? agendamento.status;
+  const statusPassado = passado && agendadosStatuses.has(agendamento.status);
+  const statusLabel = statusPassado ? 'Passado' : STATUS_LABEL[agendamento.status] ?? agendamento.status;
   return (
     <View style={styles.appointmentCard}>
       <View style={styles.summary}>
-        <CatalogImage fotoUrl={servico?.foto_url} kind="service" style={styles.servicePhoto} />
+        <CatalogImage fotoUrl={prestador?.foto_url} kind="provider" style={styles.servicePhoto} />
         <View style={styles.summaryText}>
           <Text style={styles.serviceName} numberOfLines={1}>{servico?.nome ?? `Serviço ${agendamento.servico_id}`}</Text>
           <Text style={styles.providerName} numberOfLines={1}>{prestador?.nome_estab ?? `Prestador ${agendamento.prestador_id}`}</Text>
-          <Text style={styles.dateText}>{data} · {horario}</Text>
         </View>
-        <View style={[styles.statusBadge, statusStyle(agendamento.status)]}>
-          <Text style={[styles.statusText, statusTextStyle(agendamento.status)]}>{statusLabel}</Text>
+        <View style={[styles.statusBadge, statusStyle(agendamento.status, statusPassado)]}>
+          <View style={[styles.statusDotHalo, statusDotHaloStyle(agendamento.status, statusPassado)]}>
+            <View style={[styles.statusDot, statusDotStyle(agendamento.status, statusPassado)]} />
+          </View>
+          <Text style={[styles.statusText, statusTextStyle(agendamento.status, statusPassado)]}>{statusLabel}</Text>
         </View>
       </View>
+      <View style={styles.dateBar}><MaterialIcons name="event" size={20} color={customerTheme.v4.primary} /><Text style={styles.dateText}>{data} · {horario}</Text></View>
       {expanded ? (
         <View style={styles.details}>
           <View style={styles.divider} />
@@ -389,87 +401,128 @@ function FeedbackModalView({ type, onClose }: { type: FeedbackModal; onClose: ()
   const canceled = type === 'cancelado';
   return (
     <Modal transparent visible={type !== null} animationType="fade" onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}><View accessibilityRole="alert" style={styles.feedbackModal}>
-        <View style={[styles.feedbackIcon, canceled && styles.feedbackIconDanger]}><MaterialIcons name={canceled ? 'close' : 'check'} size={28} color={canceled ? customerTheme.colors.danger : '#17805A'} /></View>
-        <Text style={styles.feedbackTitle}>{canceled ? 'Agendamento cancelado' : 'Avaliação enviada!'}</Text>
-        <Text style={styles.feedbackText}>{canceled ? 'O agendamento foi movido para Cancelados.' : 'Obrigado por avaliar este atendimento.'}</Text>
+      <View style={styles.modalBackdrop}><CustomerFeedbackCard kind={canceled ? 'danger' : 'success'}
+        title={canceled ? 'Agendamento cancelado' : 'Avaliação enviada!'}
+        description={canceled ? 'O agendamento foi movido para Cancelados.' : 'Obrigado por avaliar este atendimento.'}>
         <Pressable accessibilityRole="button" onPress={onClose} style={styles.feedbackButton}><Text style={styles.feedbackButtonText}>OK</Text></Pressable>
-      </View></View>
+      </CustomerFeedbackCard></View>
     </Modal>
   );
 }
 
-function statusStyle(status: string) {
+function statusStyle(status: string, passado = false) {
+  if (passado && agendadosStatuses.has(status)) return styles.statusPast;
   if (canceladosStatuses.has(status)) return styles.statusCanceled;
   if (finalizadosStatuses.has(status)) return styles.statusDone;
   return styles.statusOpen;
 }
-function statusTextStyle(status: string) {
+function statusTextStyle(status: string, passado = false) {
+  if (passado && agendadosStatuses.has(status)) return styles.statusPastText;
   if (canceladosStatuses.has(status)) return styles.statusCanceledText;
   if (finalizadosStatuses.has(status)) return styles.statusDoneText;
   return styles.statusOpenText;
 }
+function statusDotStyle(status: string, passado = false) {
+  if (passado && agendadosStatuses.has(status)) return styles.statusDotPast;
+  if (canceladosStatuses.has(status)) return styles.statusDotCanceled;
+  if (finalizadosStatuses.has(status)) return styles.statusDotDone;
+  return styles.statusDotOpen;
+}
+function statusDotHaloStyle(status: string, passado = false) {
+  if (passado && agendadosStatuses.has(status)) return styles.statusDotHaloPast;
+  if (canceladosStatuses.has(status)) return styles.statusDotHaloCanceled;
+  if (finalizadosStatuses.has(status)) return styles.statusDotHaloDone;
+  return styles.statusDotHaloOpen;
+}
+
+const appointmentShadow = {
+  boxShadow: '0 2px 4px rgba(36,16,46,0.05), 0 8px 18px rgba(36,16,46,0.08)',
+  elevation: 2,
+  shadowColor: '#24102E',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.06,
+  shadowRadius: 6,
+} as const;
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: customerTheme.colors.background, flex: 1 },
-  loading: { alignItems: 'center', backgroundColor: customerTheme.colors.background, flex: 1, justifyContent: 'center' },
+  screen: { backgroundColor: customerTheme.v4.bg, flex: 1 },
+  loading: { alignItems: 'center', backgroundColor: customerTheme.v4.bg, flex: 1, justifyContent: 'center' },
+  hero: { backgroundColor: customerTheme.v4.primary, height: 176, overflow: 'hidden' },
+  sheet: { backgroundColor: customerTheme.v4.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, flex: 1, marginTop: -28, paddingTop: 20 },
+  sheetDesktop: { borderTopLeftRadius: 40, borderTopRightRadius: 40, marginTop: -40, paddingTop: 40 },
   container: { alignSelf: 'center', flex: 1, gap: 14, maxWidth: 560, paddingHorizontal: 20, width: '100%' },
-  intro: { gap: 2, marginTop: 2 },
-  title: { color: customerTheme.colors.text, fontSize: 28, fontWeight: '800', letterSpacing: -0.6 },
-  subtitle: { color: customerTheme.colors.textSecondary, fontSize: 13 },
-  tabs: { flexDirection: 'row', gap: 8 },
-  tab: { alignItems: 'center', backgroundColor: customerTheme.colors.surface, borderRadius: 999, height: 36, justifyContent: 'center', paddingHorizontal: 13 },
-  tabActive: { backgroundColor: customerTheme.colors.brandDark },
-  tabText: { color: customerTheme.colors.text, fontSize: 12, fontWeight: '600' },
-  tabTextActive: { color: customerTheme.colors.textOnBrand },
-  list: { flexGrow: 1, gap: 12, paddingBottom: 110 },
+  containerDesktop: { maxWidth: 1100, paddingHorizontal: 76 },
+  intro: { gap: 6 },
+  title: { color: '#FFF', fontFamily: customerTheme.v4.fontDisplay, fontSize: 34, lineHeight: 38 },
+  subtitle: { color: '#FFF', fontFamily: customerTheme.v4.fontBody, fontSize: 17 },
+  tabs: { alignItems: 'center', backgroundColor: customerTheme.v4.field, borderRadius: 26, flexDirection: 'row', gap: 4, height: 52, padding: 4 },
+  tab: { alignItems: 'center', borderRadius: 22, flex: 1, height: 44, justifyContent: 'center' },
+  tabActive: { backgroundColor: customerTheme.v4.surface, ...customerTheme.shadow },
+  tabText: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBodySemi, fontSize: 14 },
+  tabTextActive: { color: customerTheme.v4.primary, fontFamily: customerTheme.v4.fontBodyBold },
+  list: { flexGrow: 1, gap: 14, overflow: 'visible', paddingBottom: 150, paddingTop: 2 },
   errorCard: { backgroundColor: customerTheme.colors.dangerSurface, borderRadius: 18, padding: 14 },
   errorText: { color: customerTheme.colors.danger, fontSize: 13 },
-  emptyCard: { alignItems: 'center', backgroundColor: customerTheme.colors.surface, borderRadius: 22, gap: 14, marginTop: 4, padding: 24, ...customerTheme.shadow },
-  emptyIcon: { alignItems: 'center', backgroundColor: '#EFE7DA', borderRadius: 18, height: 64, justifyContent: 'center', width: 64 },
-  emptyTitle: { color: customerTheme.colors.text, fontSize: 19, fontWeight: '800', lineHeight: 22, textAlign: 'center' },
-  emptyText: { color: customerTheme.colors.textSecondary, fontSize: 13, lineHeight: 18, textAlign: 'center' },
-  primaryAction: { alignItems: 'center', backgroundColor: customerTheme.colors.brand, borderRadius: 999, height: 44, justifyContent: 'center', width: '100%' },
-  primaryActionText: { color: customerTheme.colors.textOnBrand, fontSize: 14, fontWeight: '600' },
-  appointmentCard: { backgroundColor: customerTheme.colors.surface, borderRadius: 22, gap: 12, padding: 14, ...customerTheme.shadow },
-  summary: { alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 64 },
-  servicePhoto: { borderRadius: 18, height: 56, width: 56 },
-  summaryText: { flex: 1, gap: 3 },
-  serviceName: { color: customerTheme.colors.text, fontSize: 14, fontWeight: '600' },
-  providerName: { color: customerTheme.colors.textSecondary, fontSize: 12 },
-  dateText: { color: customerTheme.colors.text, fontSize: 12, fontWeight: '600' },
-  statusBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7 },
-  statusText: { fontSize: 11, fontWeight: '600' },
-  statusOpen: { backgroundColor: '#FFF0C7' }, statusOpenText: { color: '#9A6700' },
-  statusDone: { backgroundColor: '#DDF3E8' }, statusDoneText: { color: '#17805A' },
-  statusCanceled: { backgroundColor: customerTheme.colors.dangerSurface }, statusCanceledText: { color: customerTheme.colors.danger },
+  emptyCard: { alignItems: 'center', backgroundColor: '#FFF', borderRadius: 24, gap: 16, marginTop: 4, padding: 24, ...customerTheme.shadow },
+  emptyIcon: { alignItems: 'center', backgroundColor: customerTheme.v4.lilac, borderRadius: 50, height: 96, justifyContent: 'center', width: 96 },
+  emptyTitle: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontDisplay, fontSize: 24, lineHeight: 28, textAlign: 'center' },
+  emptyText: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 16, lineHeight: 22, textAlign: 'center' },
+  primaryAction: { alignItems: 'center', backgroundColor: customerTheme.v4.primary, borderRadius: 28, height: 56, justifyContent: 'center', marginTop: 12, width: '100%' },
+  primaryActionText: { color: '#FFF', fontFamily: customerTheme.v4.fontBodySemi, fontSize: 17 },
+  appointmentCard: { backgroundColor: '#FFF', borderRadius: 24, gap: 12, overflow: 'visible', padding: 16, ...appointmentShadow },
+  summary: { alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 58 },
+  servicePhoto: { borderRadius: 16, height: 60, width: 60 },
+  summaryText: { flex: 1, gap: 4 },
+  serviceName: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontDisplay, fontSize: 18 },
+  providerName: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 15 },
+  dateBar: { alignItems: 'center', backgroundColor: customerTheme.v4.bg, borderRadius: 16, flexDirection: 'row', gap: 10, minHeight: 44, paddingHorizontal: 14 },
+  dateText: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontBodyBold, fontSize: 15 },
+  statusBadge: { alignItems: 'center', alignSelf: 'flex-start', borderRadius: 999, flexDirection: 'row', gap: 4, marginTop: 4, paddingHorizontal: 10, paddingVertical: 7 },
+  statusText: { fontFamily: customerTheme.v4.fontBodySemi, fontSize: 13 },
+  statusOpen: { backgroundColor: customerTheme.v4.lilac }, statusOpenText: { color: customerTheme.v4.primary },
+  statusDone: { backgroundColor: '#DDF5EA' }, statusDoneText: { color: customerTheme.v4.success },
+  statusCanceled: { backgroundColor: '#FDE3E5' }, statusCanceledText: { color: customerTheme.v4.danger },
+  statusPast: { backgroundColor: customerTheme.v4.field }, statusPastText: { color: customerTheme.v4.textMuted },
+  statusDotHalo: { alignItems: 'center', borderRadius: 7, height: 14, justifyContent: 'center', shadowColor: '#E89B00', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.28, shadowRadius: 4, width: 14 },
+  statusDotHaloOpen: { backgroundColor: '#FFF0C7' }, statusDotHaloDone: { backgroundColor: '#DDF3E8' },
+  statusDotHaloCanceled: { backgroundColor: customerTheme.colors.dangerSurface }, statusDotHaloPast: { backgroundColor: '#EEE9F4' },
+  statusDot: { borderRadius: 4, height: 7, width: 7 },
+  statusDotOpen: { backgroundColor: '#E89B00' }, statusDotDone: { backgroundColor: '#17805A' },
+  statusDotCanceled: { backgroundColor: customerTheme.colors.danger }, statusDotPast: { backgroundColor: customerTheme.colors.textSecondary },
   details: { gap: 10 }, divider: { backgroundColor: '#EFE7DA', height: 1 },
   detailRow: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between', minHeight: 20 },
   detailLabel: { color: customerTheme.colors.textSecondary, fontSize: 12 },
   detailValue: { color: customerTheme.colors.text, flex: 1, fontSize: 12, fontWeight: '600', marginLeft: 16, textAlign: 'right' },
-  cardActions: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  detailsButton: { alignItems: 'center', flexDirection: 'row', gap: 3, justifyContent: 'center', minHeight: 42 },
-  detailsButtonText: { color: customerTheme.colors.brand, fontSize: 12, fontWeight: '600' },
-  cancelButton: { alignItems: 'center', backgroundColor: customerTheme.colors.dangerSurface, borderRadius: 999, justifyContent: 'center', minHeight: 41, paddingHorizontal: 18 },
-  cancelButtonText: { color: customerTheme.colors.danger, fontSize: 14, fontWeight: '600' },
-  fullPrimaryButton: { alignItems: 'center', backgroundColor: customerTheme.colors.brand, borderRadius: 999, height: 44, justifyContent: 'center' },
-  fullPrimaryText: { color: customerTheme.colors.textOnBrand, fontSize: 14, fontWeight: '600' },
+  cardActions: { alignItems: 'center', flexDirection: 'row', gap: 12 },
+  detailsButton: { alignItems: 'center', backgroundColor: customerTheme.v4.lilac, borderRadius: 24, flex: 1, flexDirection: 'row', gap: 3, height: 48, justifyContent: 'center' },
+  detailsButtonText: { color: customerTheme.v4.primary, fontFamily: customerTheme.v4.fontBodySemi, fontSize: 16 },
+  cancelButton: { alignItems: 'center', backgroundColor: '#FDE3E5', borderRadius: 24, flex: 1, height: 48, justifyContent: 'center' },
+  cancelButtonText: { color: customerTheme.v4.danger, fontFamily: customerTheme.v4.fontBodySemi, fontSize: 16 },
+  fullPrimaryButton: { alignItems: 'center', backgroundColor: customerTheme.v4.primary, borderRadius: 24, height: 48, justifyContent: 'center' },
+  fullPrimaryText: { color: '#FFF', fontFamily: customerTheme.v4.fontBodySemi, fontSize: 16 },
   completedRating: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   completedRatingText: { color: customerTheme.colors.textSecondary, fontSize: 12 }, disabled: { opacity: 0.56 },
-  modalBackdrop: { alignItems: 'center', backgroundColor: 'rgba(36,16,46,0.52)', flex: 1, justifyContent: 'center', paddingHorizontal: 20 },
-  formModal: { backgroundColor: customerTheme.colors.surface, borderRadius: 24, gap: 16, maxWidth: 335, padding: 24, width: '100%', ...customerTheme.shadow },
-  modalTitle: { color: customerTheme.colors.text, fontSize: 24, fontWeight: '800', lineHeight: 29 },
-  modalText: { color: customerTheme.colors.textSecondary, fontSize: 14, lineHeight: 20 },
-  fieldGroup: { gap: 7 }, fieldLabel: { color: customerTheme.colors.text, fontSize: 13, fontWeight: '600' },
-  reasonInput: { backgroundColor: '#EFE7DA', borderRadius: 14, color: customerTheme.colors.text, minHeight: 96, padding: 14, textAlignVertical: 'top' },
-  formError: { color: customerTheme.colors.danger, fontSize: 12 }, modalActions: { flexDirection: 'row', gap: 10 },
-  modalButton: { alignItems: 'center', borderRadius: 24, flex: 1, height: 48, justifyContent: 'center' },
-  modalButtonSecondary: { backgroundColor: '#EFE3FA' }, modalButtonDanger: { backgroundColor: customerTheme.colors.dangerSurface }, modalButtonPrimary: { backgroundColor: customerTheme.colors.brand },
-  modalButtonText: { fontSize: 15, fontWeight: '600' }, modalButtonTextSecondary: { color: customerTheme.colors.brandDark }, modalButtonTextDanger: { color: customerTheme.colors.danger }, modalButtonTextPrimary: { color: customerTheme.colors.textOnBrand },
-  ratingSelector: { alignItems: 'center', gap: 10 }, ratingHint: { color: customerTheme.colors.textSecondary, fontSize: 13, fontWeight: '600' }, ratingHintSelected: { color: customerTheme.colors.brand },
-  ratingScale: { backgroundColor: '#EFE7DA', borderRadius: 12, flexDirection: 'row', height: 36, justifyContent: 'space-between', paddingHorizontal: 12, paddingTop: 11 }, scaleText: { color: customerTheme.colors.textSecondary, fontSize: 12 },
-  feedbackModal: { alignItems: 'center', backgroundColor: customerTheme.colors.surface, borderRadius: 24, gap: 16, maxWidth: 319, padding: 24, width: '100%', ...customerTheme.shadow },
-  feedbackIcon: { alignItems: 'center', backgroundColor: '#DDF3E8', borderRadius: 18, height: 56, justifyContent: 'center', width: 56 }, feedbackIconDanger: { backgroundColor: customerTheme.colors.dangerSurface },
-  feedbackTitle: { color: customerTheme.colors.text, fontSize: 24, fontWeight: '800', lineHeight: 29, textAlign: 'center' }, feedbackText: { color: customerTheme.colors.textSecondary, fontSize: 14, lineHeight: 20, textAlign: 'center' },
-  feedbackButton: { alignItems: 'center', backgroundColor: customerTheme.colors.brand, borderRadius: 24, height: 48, justifyContent: 'center', width: '100%' }, feedbackButtonText: { color: customerTheme.colors.textOnBrand, fontSize: 15, fontWeight: '600' },
+  modalBackdrop: { alignItems: 'center', backgroundColor: 'rgba(46,10,87,0.62)', flex: 1, justifyContent: 'center', paddingHorizontal: 30 },
+  modalText: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 16, lineHeight: 22 },
+  fieldGroup: { gap: 8 }, fieldLabel: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontBodySemi, fontSize: 15 },
+  reasonInput: { backgroundColor: customerTheme.v4.field, borderRadius: 16, color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontBody, fontSize: 17, height: 110, padding: 16, textAlignVertical: 'top' },
+  formError: { color: customerTheme.v4.danger, fontFamily: customerTheme.v4.fontBody, fontSize: 14 },
+  modalActions: { flexDirection: 'row', gap: 12, paddingTop: 4 },
+  modalButton: { alignItems: 'center', borderRadius: 28, flex: 1, height: 56, justifyContent: 'center' },
+  modalButtonSecondary: { backgroundColor: customerTheme.v4.lilac },
+  modalButtonDanger: { backgroundColor: '#FDE7EA' },
+  modalButtonPrimary: { backgroundColor: customerTheme.v4.primary, shadowColor: customerTheme.v4.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.32, shadowRadius: 8 },
+  modalButtonText: { fontFamily: customerTheme.v4.fontBodySemi, fontSize: 17 },
+  modalButtonTextSecondary: { color: customerTheme.v4.primary },
+  modalButtonTextDanger: { color: customerTheme.v4.danger },
+  modalButtonTextPrimary: { color: '#FFF' },
+  ratingSelector: { alignItems: 'center', gap: 16 },
+  ratingStars: { flexDirection: 'row', gap: 10, justifyContent: 'center', paddingVertical: 8, width: '100%' },
+  ratingStar: { height: 44, width: 44 },
+  ratingHint: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBodyBold, fontSize: 16 },
+  ratingHintSelected: { color: customerTheme.v4.primary },
+  ratingScale: { backgroundColor: customerTheme.v4.field, borderRadius: 14, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
+  scaleText: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 14 },
+  feedbackButton: { alignItems: 'center', backgroundColor: customerTheme.v4.primary, borderRadius: 28, height: 56, justifyContent: 'center', width: '100%', shadowColor: customerTheme.v4.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.32, shadowRadius: 8 },
+  feedbackButtonText: { color: '#FFF', fontFamily: customerTheme.v4.fontBodySemi, fontSize: 17 },
 });

@@ -2,12 +2,15 @@ import {
   listarCategoriasPrestador,
   listarHorariosPrestador,
 } from '../services/catalogo';
+import { listarAvaliacoesPrestador } from '../services/avaliacoes';
 import { Categoria, Horario, Prestador } from '../types/catalogo';
+import { calcularMediaAvaliacoes } from './avaliacoes';
 
 export type ProviderCardModel = {
   prestador: Prestador;
   categorias: Categoria[];
   atendeHoje: boolean | null;
+  avaliacao: { media: number; quantidade: number } | null;
 };
 
 const APP_TIMEZONE = 'America/Fortaleza';
@@ -54,19 +57,23 @@ export function atendeHoje(horarios: Horario[], data = new Date()) {
 }
 
 async function carregarDadosCard(prestador: Prestador, signal?: AbortSignal): Promise<ProviderCardModel> {
-  const [categoriasResult, horariosResult] = await Promise.allSettled([
+  const [categoriasResult, horariosResult, avaliacoesResult] = await Promise.allSettled([
     listarCategoriasPrestador(prestador.id, signal),
     listarHorariosPrestador(prestador.id, signal),
+    listarAvaliacoesPrestador(prestador.id, signal),
   ]);
 
   if (signal?.aborted) throw new Error('Consulta cancelada.');
 
   const categorias = categoriasResult.status === 'fulfilled' ? categoriasResult.value : [];
+  const avaliacoes = avaliacoesResult.status === 'fulfilled' && Array.isArray(avaliacoesResult.value)
+    ? avaliacoesResult.value.filter((item) => typeof item.nota === 'number' && Number.isFinite(item.nota)) : [];
 
   return {
     prestador,
     categorias,
     atendeHoje: horariosResult.status === 'fulfilled' ? atendeHoje(horariosResult.value) : null,
+    avaliacao: avaliacoes.length > 0 ? { media: calcularMediaAvaliacoes(avaliacoes), quantidade: avaliacoes.length } : null,
   };
 }
 

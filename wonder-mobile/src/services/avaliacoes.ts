@@ -1,9 +1,9 @@
 import { api } from './api';
 import { Avaliacao, CadastroAvaliacao } from '../types/avaliacao';
 
-export async function listarAvaliacoesPrestador(prestadorId: number): Promise<Avaliacao[]> {
+export async function listarAvaliacoesPrestador(prestadorId: number, signal?: AbortSignal): Promise<Avaliacao[]> {
   const response = await api.get<Avaliacao[]>(
-    `/catalogo/prestadores/${prestadorId}/avaliacoes`
+    `/catalogo/prestadores/${prestadorId}/avaliacoes`, { signal }
   );
   return response.data;
 }

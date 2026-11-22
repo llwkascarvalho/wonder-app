@@ -1,11 +1,13 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { AgendamentoScreen } from '../screens/AgendamentoScreen';
+import { HomeScreen } from '../screens/HomeScreen';
 import { PrestadorProfileScreen } from '../screens/PrestadorProfileScreen';
 import { SearchScreen } from '../screens/SearchScreen';
 import { theme } from '../styles/theme';
 
 export type SearchStackParamList = {
+  HomeRoot: undefined;
   SearchHome: undefined;
   PrestadorProfile: { prestadorId: number };
   Agendamento: { prestadorId: number };
@@ -13,9 +15,10 @@ export type SearchStackParamList = {
 
 const Stack = createNativeStackNavigator<SearchStackParamList>();
 
-export function SearchStack() {
+function CatalogStack({ root }: { root: 'HomeRoot' | 'SearchHome' }) {
   return (
     <Stack.Navigator
+      initialRouteName={root}
       screenOptions={{
         headerShown: false,
         headerStyle: { backgroundColor: theme.colors.surface },
@@ -24,7 +27,9 @@ export function SearchStack() {
         headerTitleStyle: { fontWeight: theme.fontWeight.semibold as '600' },
       }}
     >
-      <Stack.Screen name="SearchHome" component={SearchScreen} options={{ title: 'Buscar' }} />
+      {root === 'HomeRoot'
+        ? <Stack.Screen name="HomeRoot" component={HomeScreen} options={{ title: 'Início' }} />
+        : <Stack.Screen name="SearchHome" component={SearchScreen} options={{ title: 'Buscar' }} />}
       <Stack.Screen
         name="PrestadorProfile"
         component={PrestadorProfileScreen}
@@ -37,4 +42,12 @@ export function SearchStack() {
       />
     </Stack.Navigator>
   );
+}
+
+export function HomeStack() {
+  return <CatalogStack root="HomeRoot" />;
+}
+
+export function SearchStack() {
+  return <CatalogStack root="SearchHome" />;
 }

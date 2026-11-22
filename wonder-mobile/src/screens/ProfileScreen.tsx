@@ -2,9 +2,8 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Button } from '../components/Button';
 import { ProfileScreenContent } from '../components/profile/ProfileScreenContent';
 import { useAuth } from '../contexts/AuthContext';
 import { ProfileStackParamList } from '../navigation/ProfileStack';
@@ -40,7 +39,7 @@ export function ProfileScreen() {
   );
 
   const providerButtonTitle = getProviderButtonTitle(providerProfile);
-  const providerMessage = getProviderMessage(providerProfile);
+  const providerNotice = error ? null : getProviderNotice(providerProfile);
   const handleProviderAction = error
     ? loadProviderProfile
     : () => navigation.navigate('ProviderOnboarding');
@@ -49,51 +48,68 @@ export function ProfileScreen() {
     <ProfileScreenContent appearance="customer" title="Meu perfil" subtitle="Gerencie seus dados pessoais." onSignOut={signOut}>
       <View style={styles.providerCard}>
         <View style={styles.providerHeading}>
-          <View style={styles.providerIcon}><MaterialIcons name="storefront" size={22} color={customerTheme.colors.brandDark} /></View>
+          <View style={styles.providerIcon}><MaterialIcons name="storefront" size={26} color={customerTheme.v4.primary} /></View>
           <View style={styles.providerHeadingText}>
             <Text style={styles.providerTitle}>Prestador Wonder</Text>
             <Text style={styles.providerCaption}>Ofereça seus serviços na plataforma</Text>
           </View>
         </View>
-        <Text style={providerProfile?.status === 'rejeitado' || providerProfile?.status === 'rascunho'
-          ? styles.providerWarning : styles.providerText}>{providerMessage}</Text>
-        {providerProfile?.motivo_rejeicao ? (
-          <Text accessibilityRole="alert" style={styles.providerWarning}>Motivo: {providerProfile.motivo_rejeicao}</Text>
-        ) : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Button
-          title={error ? 'Tentar novamente' : providerButtonTitle}
-          loading={loadingProviderProfile}
-          disabled={loadingProviderProfile}
-          onPress={handleProviderAction}
-        />
+        {providerNotice ? <View accessibilityRole="summary" style={[styles.notice, styles[providerNotice.tone]]}>
+          <MaterialIcons name={providerNotice.icon} size={21} color={providerNotice.color} />
+          <View style={styles.noticeText}>
+            <Text style={[styles.noticeTitle, { color: providerNotice.color }]}>{providerNotice.title}</Text>
+            <Text style={styles.noticeDescription}>{providerNotice.description}</Text>
+            {providerNotice.reason ? <Text style={styles.noticeReason}>Motivo: {providerNotice.reason}</Text> : null}
+          </View>
+        </View> : null}
+        {error ? <View accessibilityRole="alert" style={[styles.notice, styles.danger]}>
+          <MaterialIcons name="error-outline" size={21} color={customerTheme.v4.danger} />
+          <Text style={[styles.noticeDescription, styles.noticeText]}>{error}</Text>
+        </View> : null}
+        <Pressable accessibilityRole="button" disabled={loadingProviderProfile} onPress={handleProviderAction}
+          style={[styles.providerAction, !error && providerProfile?.status === 'pendente' && Boolean(providerProfile.enviado_em) && styles.providerActionSecondary, loadingProviderProfile && styles.disabled]}>
+          <Text style={[styles.providerActionText, !error && providerProfile?.status === 'pendente' && Boolean(providerProfile.enviado_em) && styles.providerActionTextSecondary]}>{loadingProviderProfile ? 'Carregando...' : error ? 'Tentar novamente' : providerButtonTitle}</Text>
+        </Pressable>
       </View>
     </ProfileScreenContent>
   );
 }
 
-function getProviderMessage(profile: ProviderOnboardingProfile | null): string {
-  if (!profile) return 'Cadastre seu estabelecimento para oferecer serviços na plataforma.';
+type ProviderNotice = {
+  tone: 'warning' | 'danger' | 'success';
+  icon: keyof typeof MaterialIcons.glyphMap;
+  color: string;
+  title: string;
+  description: string;
+  reason?: string | null;
+};
+
+function getProviderNotice(profile: ProviderOnboardingProfile | null): ProviderNotice | null {
+  if (!profile) return null;
   if (profile.status === 'pendente' && !profile.enviado_em) {
-    return 'Seu cadastro ainda não foi enviado. Complete os serviços e horários para finalizar.';
+    return { tone: 'warning', icon: 'edit-note', color: '#9A5200', title: 'Cadastro em preenchimento', description: 'Complete os serviços e horários antes de enviar para análise.' };
   }
-  if (profile.status === 'pendente') return 'Seu cadastro foi enviado e está aguardando análise do administrador.';
-  if (profile.status === 'rejeitado') return 'Seu cadastro foi rejeitado. Revise o motivo informado e envie novamente.';
+  if (profile.status === 'pendente') return { tone: 'warning', icon: 'schedule', color: '#9A5200', title: 'Em análise', description: 'Você será avisado quando houver uma decisão.' };
+  if (profile.status === 'rejeitado') return { tone: 'danger', icon: 'error-outline', color: customerTheme.v4.danger, title: 'Cadastro rejeitado', description: 'Revise o motivo informado e envie novamente.', reason: profile.motivo_rejeicao };
   if (profile.status === 'rascunho') return profile.motivo_rejeicao
-    ? 'O administrador solicitou correções no seu cadastro.'
-    : 'Seu cadastro ainda não foi enviado. Continue para cadastrar serviços e horários.';
-  if (profile.status === 'ativo') return 'Seu cadastro profissional está aprovado e ativo.';
-  if (profile.status === 'suspenso') return 'Seu cadastro profissional está suspenso.';
-  return 'Acompanhe aqui seu cadastro profissional.';
+    ? { tone: 'warning', icon: 'edit-note', color: '#9A5200', title: 'Correção solicitada', description: 'Revise seu cadastro antes de reenviar para análise.', reason: profile.motivo_rejeicao }
+    : { tone: 'warning', icon: 'edit-note', color: '#9A5200', title: 'Cadastro em preenchimento', description: 'Complete os serviços e horários antes de enviar para análise.' };
+  if (profile.status === 'ativo') return { tone: 'success', icon: 'check-circle-outline', color: customerTheme.v4.success, title: 'Cadastro aprovado', description: 'Seu cadastro profissional está ativo.' };
+  if (profile.status === 'suspenso') return { tone: 'danger', icon: 'block', color: customerTheme.v4.danger, title: 'Cadastro suspenso', description: 'Aguarde a reativação pelo administrador.' };
+  return null;
 }
 
 function getProviderButtonTitle(profile: ProviderOnboardingProfile | null): string {
   if (!profile) {
-    return 'Quero oferecer meus servicos';
+    return 'Quero ser prestador';
   }
 
-  if (profile.status === 'rascunho' || profile.status === 'suspenso') {
-    return 'Continuar cadastro profissional';
+  if (profile.status === 'rascunho') {
+    return profile.motivo_rejeicao ? 'Continuar correção' : 'Continuar cadastro profissional';
+  }
+
+  if (profile.status === 'suspenso') {
+    return 'Ver cadastro';
   }
 
   if (profile.status === 'pendente') {
@@ -105,7 +121,7 @@ function getProviderButtonTitle(profile: ProviderOnboardingProfile | null): stri
   }
 
   if (profile.status === 'ativo') {
-    return 'Cadastro aprovado';
+    return 'Ver cadastro';
   }
 
   return 'Continuar cadastro profissional';
@@ -113,23 +129,27 @@ function getProviderButtonTitle(profile: ProviderOnboardingProfile | null): stri
 
 const styles = StyleSheet.create({
   providerCard: {
-    backgroundColor: customerTheme.colors.surface, borderRadius: customerTheme.radius.card,
-    gap: 12, padding: 18, ...customerTheme.shadow,
+    backgroundColor: customerTheme.v4.surface, borderRadius: 24,
+    gap: 14, padding: 16, ...customerTheme.shadow,
   },
   providerHeading: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   providerHeadingText: { flex: 1, gap: 2 },
-  providerIcon: { alignItems: 'center', backgroundColor: '#EFE3FA', borderRadius: 14, height: 44, justifyContent: 'center', width: 44 },
+  providerIcon: { alignItems: 'center', backgroundColor: customerTheme.v4.lilac, borderRadius: 16, height: 48, justifyContent: 'center', width: 48 },
   providerTitle: {
-    color: customerTheme.colors.text, fontSize: 16, fontWeight: '800',
+    color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontDisplay, fontSize: 19,
   },
-  providerCaption: { color: customerTheme.colors.textSecondary, fontSize: 11 },
-  providerText: {
-    color: customerTheme.colors.textSecondary, fontSize: 13, lineHeight: 19,
-  },
-  error: {
-    color: customerTheme.colors.danger, fontSize: 12,
-  },
-  providerWarning: {
-    color: '#9A6700', fontSize: 13, fontWeight: '600', lineHeight: 19,
-  },
+  providerCaption: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 15 },
+  notice: { alignItems: 'flex-start', borderRadius: 16, flexDirection: 'row', gap: 12, padding: 14 },
+  warning: { backgroundColor: '#FFF0D6' },
+  danger: { backgroundColor: '#FDE7EA' },
+  success: { backgroundColor: '#DDF3E8' },
+  noticeText: { flex: 1, gap: 3 },
+  noticeTitle: { fontFamily: customerTheme.v4.fontBodyBold, fontSize: 15, lineHeight: 20 },
+  noticeDescription: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontBody, fontSize: 14, lineHeight: 19 },
+  noticeReason: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontBodySemi, fontSize: 14, lineHeight: 19 },
+  providerAction: { alignItems: 'center', backgroundColor: customerTheme.v4.primary, borderRadius: 28, height: 52, justifyContent: 'center' },
+  providerActionSecondary: { backgroundColor: customerTheme.v4.lilac },
+  providerActionText: { color: '#FFF', fontFamily: customerTheme.v4.fontBodySemi, fontSize: 17 },
+  providerActionTextSecondary: { color: customerTheme.v4.primary },
+  disabled: { opacity: 0.55 },
 });

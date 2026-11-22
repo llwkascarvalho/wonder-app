@@ -66,7 +66,7 @@ function StatusCard({ icon, tone, title, text, action }: StatusCardProps) {
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.text}>{text}</Text>
       </View>
-      {action ? <Button title={action.title} onPress={action.onPress} /> : null}
+      {action ? <Button appearance="customer" title={action.title} onPress={action.onPress} /> : null}
     </View>
   );
 }
@@ -79,15 +79,15 @@ const statusPalette = {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: customerTheme.colors.surface, borderRadius: customerTheme.radius.card,
-    gap: 14, padding: 18, ...customerTheme.shadow,
+    backgroundColor: customerTheme.v4.surface, borderRadius: 24,
+    gap: 16, padding: 20, ...customerTheme.shadow,
   },
-  statusIcon: { alignItems: 'center', borderRadius: 16, height: 48, justifyContent: 'center', width: 48 },
+  statusIcon: { alignItems: 'center', borderRadius: 18, height: 56, justifyContent: 'center', width: 56 },
   content: { gap: 5 },
   title: {
-    color: customerTheme.colors.text, fontSize: 18, fontWeight: '800',
+    color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontDisplay, fontSize: 22,
   },
   text: {
-    color: customerTheme.colors.textSecondary, fontSize: 13, lineHeight: 19,
+    color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 16, lineHeight: 23,
   },
 });

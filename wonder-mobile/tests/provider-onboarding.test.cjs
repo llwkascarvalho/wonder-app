@@ -62,7 +62,7 @@ function setup({ existing = null, initialServices = [], initialSchedules = [], p
       requestMediaLibraryPermissionsAsync: async () => ({ granted: true }),
       launchImageLibraryAsync: picker || (async () => ({ canceled: true, assets: [] })),
     },
-    'react-native': { Modal: 'Modal', Platform: { OS: 'web' }, ScrollView: 'ScrollView', View: 'View', Text: 'Text', StyleSheet: { create: (v) => v } },
+    'react-native': { Modal: 'Modal', Platform: { OS: 'web' }, Pressable: 'Pressable', ScrollView: 'ScrollView', View: 'View', Text: 'Text', useWindowDimensions: () => ({ width: 375, height: 812 }), StyleSheet: { create: (v) => v } },
   };
   const cache = new Map();
   function load(filename) {
@@ -88,7 +88,9 @@ function setup({ existing = null, initialServices = [], initialSchedules = [], p
     function walk(node) { if (!node || typeof node !== 'object') return; if (Array.isArray(node)) return node.forEach(walk); nodes.push(node); walk(node.props?.children); }
     walk(root);
     return { find: (type) => nodes.find((node) => node.type === type)?.props,
-      button: (title) => nodes.find((node) => node.type === 'Button' && node.props.title === title)?.props };
+      button: (title) => nodes.find((node) =>
+        (node.type === 'Button' && node.props.title === title) ||
+        (node.type === 'Pressable' && node.props.accessibilityLabel === title))?.props };
   }
   return { calls, render, utils: load(path.resolve(__dirname, '../src/utils/providerRegistration.ts')),
     async init() { render(); effects.forEach((effect) => effect()); await new Promise((resolve) => setImmediate(resolve)); return render(); } };
@@ -183,7 +185,7 @@ test('foto selecionada é enviada junto ao cadastro pendente', async () => {
 
 test('é possível voltar ao perfil', async () => {
   let returns = 0; const app = setup({ navigation: { goBack: () => { returns += 1; } } });
-  (await app.init()).button('Voltar ao perfil').onPress(); assert.equal(returns, 1);
+  (await app.init()).button('Voltar').onPress(); assert.equal(returns, 1);
 });
 
 test('cadastro pendente ainda não enviado retoma serviços e horários', async () => {
