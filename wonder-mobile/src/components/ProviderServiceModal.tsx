@@ -203,6 +203,7 @@ export function ProviderServiceModal({
               <Text style={[styles.imageLabel, customer && styles.customerImageLabel]}>Foto do serviço</Text>
               <Text style={styles.imageText}>Opcional · JPEG, PNG ou WebP de até 5 MiB.</Text>
               <Button
+                appearance={appearance}
                 title={photo || initialService?.foto_url ? 'Alterar foto' : 'Selecionar foto'}
                 size="sm"
                 variant="outline"
@@ -211,7 +212,7 @@ export function ProviderServiceModal({
                 disabled={loading}
               />
               {photo ? (
-                <Button title="Remover selecao" size="sm" variant="secondary" onPress={() => setPhoto(undefined)} disabled={loading} />
+                <Button appearance={appearance} title="Remover seleção" size="sm" variant="secondary" onPress={() => setPhoto(undefined)} disabled={loading} />
               ) : null}
             </View>
           </View>
@@ -219,8 +220,8 @@ export function ProviderServiceModal({
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <View style={styles.actions}>
-            <Button title="Cancelar" variant="secondary" onPress={onClose} disabled={loading} />
-            <Button title="Salvar" onPress={handleSave} loading={loading} />
+            <Button appearance={appearance} title="Cancelar" variant="secondary" onPress={onClose} disabled={loading} />
+            <Button appearance={appearance} title="Salvar" onPress={handleSave} loading={loading} />
           </View>
           </ScrollView>
         </View>
@@ -246,8 +247,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   customerModalCard: {
-    backgroundColor: customerTheme.colors.surface,
-    borderRadius: customerTheme.radius.card,
+    backgroundColor: customerTheme.v4.surface,
+    borderRadius: 28,
     ...customerTheme.shadow,
   },
   content: {
@@ -262,16 +263,17 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   customerTitle: {
-    color: customerTheme.colors.text,
-    fontSize: 22,
-    letterSpacing: -0.3,
+    color: customerTheme.v4.text,
+    fontFamily: customerTheme.v4.fontDisplay,
+    fontSize: 24,
     textAlign: 'left',
     textTransform: 'none',
   },
   customerSubtitle: {
-    color: customerTheme.colors.textSecondary,
-    fontSize: 12,
-    lineHeight: 17,
+    color: customerTheme.v4.textMuted,
+    fontFamily: customerTheme.v4.fontBody,
+    fontSize: 15,
+    lineHeight: 21,
     marginTop: -8,
   },
   imageSection: {
@@ -283,7 +285,7 @@ const styles = StyleSheet.create({
     padding: theme.spacing.sm,
   },
   customerImageSection: {
-    backgroundColor: '#F4F1F8',
+    backgroundColor: customerTheme.v4.bg,
     borderRadius: 18,
   },
   imagePreview: {
@@ -300,7 +302,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.bold,
   },
-  customerImageLabel: { color: customerTheme.colors.text },
+  customerImageLabel: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontBodyBold, fontSize: 15 },
   imageText: {
     color: theme.colors.textMuted,
     fontSize: theme.fontSize.sm,
@@ -313,7 +315,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.medium,
   },
-  customerCategoryLabel: { color: customerTheme.colors.text, fontWeight: '600' },
+  customerCategoryLabel: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontBodySemi, fontSize: 15 },
   categoryList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -327,8 +329,8 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
   },
   customerCategoryChip: {
-    backgroundColor: customerTheme.colors.surface,
-    borderColor: '#E7E0EF',
+    backgroundColor: customerTheme.v4.surface,
+    borderColor: customerTheme.v4.border,
     minHeight: 38,
   },
   categoryChipSelected: {

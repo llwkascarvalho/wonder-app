@@ -23,13 +23,13 @@ export function ProviderSchedulesStep({ schedules, saving, disabled, onCreate, o
     <View style={styles.card}>
       <View style={styles.header}>
         <View style={styles.headingGroup}>
-          <View style={styles.iconBox}><MaterialIcons name="schedule" size={20} color={customerTheme.colors.brandDark} /></View>
+          <View style={styles.iconBox}><MaterialIcons name="schedule" size={26} color={customerTheme.v4.primary} /></View>
           <View style={styles.headerText}>
             <Text style={styles.title}>Horários de atendimento *</Text>
             <Text style={styles.text}>Cadastre ao menos um intervalo de atendimento.</Text>
           </View>
         </View>
-        <Button title="Adicionar" size="sm" disabled={disabled} onPress={() => setModalVisible(true)} />
+        <Button appearance="customer" title="Adicionar" size="sm" disabled={disabled} onPress={() => setModalVisible(true)} />
       </View>
       {schedules.length ? schedules.map((schedule) => (
         <View key={schedule.id} style={styles.item}>
@@ -37,7 +37,7 @@ export function ProviderSchedulesStep({ schedules, saving, disabled, onCreate, o
             <Text style={styles.itemTitle}>{dayLabels[schedule.dia_semana] || 'Dia'}</Text>
             <Text style={styles.text}>{schedule.hora_inicio} - {schedule.hora_fim}</Text>
           </View>
-          <Button title="Remover" size="sm" variant="danger" disabled={disabled} onPress={() => onRemove(schedule.id)} />
+          <Button appearance="customer" title="Remover" size="sm" variant="danger" disabled={disabled} onPress={() => onRemove(schedule.id)} />
         </View>
       )) : <Text style={styles.warning}>Nenhum horário cadastrado.</Text>}
       <ProviderScheduleModal visible={modalVisible} loading={saving} appearance="customer" onClose={() => setModalVisible(false)}
@@ -48,20 +48,20 @@ export function ProviderSchedulesStep({ schedules, saving, disabled, onCreate, o
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: customerTheme.colors.surface, borderRadius: customerTheme.radius.card,
-    gap: 14, padding: 18, ...customerTheme.shadow,
+    backgroundColor: customerTheme.v4.surface, borderRadius: 24,
+    gap: 18, padding: 20, ...customerTheme.shadow,
   },
   header: { alignItems: 'flex-start', gap: 12 },
   headingGroup: { alignItems: 'center', flexDirection: 'row', gap: 12, width: '100%' },
   headerText: { flex: 1, gap: 3 },
   iconBox: {
-    alignItems: 'center', backgroundColor: '#EFE3FA', borderRadius: 14,
-    height: 44, justifyContent: 'center', width: 44,
+    alignItems: 'center', backgroundColor: customerTheme.v4.lilac, borderRadius: 16,
+    height: 48, justifyContent: 'center', width: 48,
   },
-  title: { color: customerTheme.colors.text, fontSize: 18, fontWeight: '800' },
-  text: { color: customerTheme.colors.textSecondary, fontSize: 12, lineHeight: 17 },
-  warning: { color: '#9A6700', fontSize: 12, fontWeight: '600' },
-  item: { alignItems: 'center', backgroundColor: '#F4F1F8', borderRadius: 18, flexDirection: 'row', gap: 12, padding: 14 },
+  title: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontDisplay, fontSize: 20, lineHeight: 24 },
+  text: { color: customerTheme.v4.textMuted, fontFamily: customerTheme.v4.fontBody, fontSize: 15, lineHeight: 21 },
+  warning: { color: '#9A6700', fontFamily: customerTheme.v4.fontBodySemi, fontSize: 15 },
+  item: { alignItems: 'center', backgroundColor: customerTheme.v4.bg, borderRadius: 18, flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 14 },
   itemInfo: { flex: 1 },
-  itemTitle: { color: customerTheme.colors.text, fontSize: 14, fontWeight: '700' },
+  itemTitle: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontDisplay, fontSize: 18 },
 });

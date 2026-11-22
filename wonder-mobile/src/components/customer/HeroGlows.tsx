@@ -14,4 +14,3 @@ const styles = StyleSheet.create({
   topDesktop: { width: 520, height: 520, borderRadius: 260, right: -120, top: -260 },
   bottomDesktop: { width: 380, height: 380, borderRadius: 190, left: -140, bottom: -200 },
 });
-

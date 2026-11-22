@@ -58,4 +58,3 @@ const styles = StyleSheet.create({
   badge: { position: 'absolute', top: -8, left: 16, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 3, backgroundColor: C.danger, borderWidth: 2, borderColor: '#FFF', alignItems: 'center', justifyContent: 'center' },
   badgeText: { fontFamily: C.fontBodyBold, fontSize: 11, color: '#FFF', lineHeight: 15 },
 });
-

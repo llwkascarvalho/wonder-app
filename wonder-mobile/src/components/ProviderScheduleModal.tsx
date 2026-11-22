@@ -86,8 +86,8 @@ export function ProviderScheduleModal({
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <View style={styles.actions}>
-            <Button title="Cancelar" variant="secondary" onPress={onClose} disabled={loading} />
-            <Button title="Salvar" onPress={handleSave} loading={loading} />
+            <Button appearance={appearance} title="Cancelar" variant="secondary" onPress={onClose} disabled={loading} />
+            <Button appearance={appearance} title="Salvar" onPress={handleSave} loading={loading} />
           </View>
         </View>
       </View>
@@ -112,8 +112,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   customerContent: {
-    backgroundColor: customerTheme.colors.surface,
-    borderRadius: customerTheme.radius.card,
+    backgroundColor: customerTheme.v4.surface,
+    borderRadius: 28,
     ...customerTheme.shadow,
   },
   title: {
@@ -123,15 +123,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   customerTitle: {
-    color: customerTheme.colors.text,
-    fontSize: 22,
-    letterSpacing: -0.3,
+    color: customerTheme.v4.text,
+    fontFamily: customerTheme.v4.fontDisplay,
+    fontSize: 24,
     textAlign: 'left',
   },
   customerSubtitle: {
-    color: customerTheme.colors.textSecondary,
-    fontSize: 12,
-    lineHeight: 17,
+    color: customerTheme.v4.textMuted,
+    fontFamily: customerTheme.v4.fontBody,
+    fontSize: 15,
+    lineHeight: 21,
     marginTop: -8,
   },
   days: {
@@ -148,8 +149,8 @@ const styles = StyleSheet.create({
     width: 32,
   },
   customerDayButton: {
-    backgroundColor: customerTheme.colors.surface,
-    borderColor: '#E7E0EF',
+    backgroundColor: customerTheme.v4.surface,
+    borderColor: customerTheme.v4.border,
     height: 36,
     width: 36,
   },
