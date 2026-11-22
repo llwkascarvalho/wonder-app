@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 
 import { theme } from '../styles/theme';
+import { customerTheme } from '../styles/customerTheme';
 
 type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'danger';
 type ButtonSize = 'sm' | 'md' | 'lg';
@@ -19,6 +20,7 @@ type ButtonProps = PressableProps & {
   disabled?: boolean;
   variant?: ButtonVariant;
   size?: ButtonSize;
+  appearance?: 'default' | 'customer';
   style?: StyleProp<ViewStyle>;
 };
 
@@ -28,6 +30,7 @@ export function Button({
   disabled = false,
   variant = 'primary',
   size = 'md',
+  appearance = 'default',
   style,
   ...pressableProps
 }: ButtonProps) {
@@ -41,6 +44,9 @@ export function Button({
         styles.base,
         styles[variant],
         styles[size],
+        appearance === 'customer' && styles.customerButton,
+        appearance === 'customer' && variant === 'secondary' && styles.customerSecondary,
+        appearance === 'customer' && variant === 'outline' && styles.customerOutline,
         pressed && !isDisabled && styles.pressed,
         isDisabled && styles.disabled,
         style,
@@ -52,7 +58,7 @@ export function Button({
           color={variant === 'outline' ? theme.colors.primary : variant === 'danger' ? theme.colors.danger : theme.colors.white}
         />
       ) : (
-        <Text style={[styles.text, styles[`${variant}Text`]]}>{title}</Text>
+        <Text style={[styles.text, styles[`${variant}Text`], appearance === 'customer' && styles.customerText]}>{title}</Text>
       )}
     </Pressable>
   );
@@ -113,4 +119,8 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.56,
   },
+  customerButton: { minHeight: 52, borderRadius: 28 },
+  customerSecondary: { backgroundColor: customerTheme.v4.lilac },
+  customerOutline: { borderColor: customerTheme.v4.primary },
+  customerText: { fontFamily: customerTheme.v4.fontBodyBold, fontSize: 15 },
 });
