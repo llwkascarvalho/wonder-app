@@ -2,9 +2,9 @@ import api from './api';
 import { ProfilePhotoAsset } from '../types/profile';
 import { adaptarPayloadPrestador, adaptarPrestador, PrestadorApiResponse } from './providerAdapter';
 import { appendImageFile } from './profileService';
+import type { FotoEstabelecimento } from '../types/catalogo';
 import {
   Agendamento,
-  FotoEstabelecimento,
   Horario,
   HorarioPayload,
   Prestador,
@@ -48,60 +48,20 @@ export async function uploadFotoPrestador(
   asset: ProfilePhotoAsset
 ): Promise<Prestador> {
   const formData = new FormData();
-  const fileName = asset.fileName || `prestador-${Date.now()}.jpg`;
-  const mimeType = asset.mimeType || 'image/jpeg';
-
-  formData.append('file', {
-    uri: asset.uri,
-    name: fileName,
-    type: mimeType,
-  } as unknown as Blob);
-
-  const response = await api.post<PrestadorApiResponse>(`/catalogo/prestadores/${prestadorId}/foto`, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  appendImageFile(formData, 'file', asset, `prestador-${prestadorId}`);
+  const response = await api.post<PrestadorApiResponse>(`/catalogo/prestadores/${prestadorId}/foto`, formData);
 
   return adaptarPrestador(response.data);
 }
 
-export async function listarFotosEstabelecimento(
-  prestadorId: number
-): Promise<FotoEstabelecimento[]> {
-  const response = await api.get<FotoEstabelecimento[]>(
-    `/catalogo/prestadores/${prestadorId}/fotos`
-  );
-  return response.data;
-}
-
-export async function adicionarFotoEstabelecimento(
-  prestadorId: number,
-  asset: ProfilePhotoAsset
-): Promise<FotoEstabelecimento> {
+export async function adicionarFotoEstabelecimento(prestadorId: number, asset: ProfilePhotoAsset) {
   const formData = new FormData();
-  const fileName = asset.fileName || `estabelecimento-${Date.now()}.jpg`;
-  const mimeType = asset.mimeType || 'image/jpeg';
-
-  formData.append('file', {
-    uri: asset.uri,
-    name: fileName,
-    type: mimeType,
-  } as unknown as Blob);
-
-  const response = await api.post<FotoEstabelecimento>(
-    `/catalogo/prestadores/${prestadorId}/fotos`,
-    formData,
-    { headers: { 'Content-Type': 'multipart/form-data' } }
-  );
-
+  appendImageFile(formData, 'file', asset, `galeria-${prestadorId}`);
+  const response = await api.post<FotoEstabelecimento>(`/catalogo/prestadores/${prestadorId}/fotos`, formData);
   return response.data;
 }
 
-export async function removerFotoEstabelecimento(
-  prestadorId: number,
-  fotoId: number
-): Promise<void> {
+export async function removerFotoEstabelecimento(prestadorId: number, fotoId: number) {
   await api.delete(`/catalogo/prestadores/${prestadorId}/fotos/${fotoId}`);
 }
 
@@ -150,6 +110,11 @@ export async function listarHorarios(prestadorId: number) {
 
 export async function criarHorario(prestadorId: number, payload: HorarioPayload) {
   const response = await api.post<Horario>(`/catalogo/prestadores/${prestadorId}/horarios`, payload);
+  return response.data;
+}
+
+export async function criarHorariosLote(prestadorId: number, payload: HorarioPayload[]) {
+  const response = await api.post<Horario[]>(`/catalogo/prestadores/${prestadorId}/horarios/lote`, payload);
   return response.data;
 }
 

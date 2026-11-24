@@ -68,17 +68,15 @@ test('listas vazias e erros 404 não são convertidos em dados fictícios', asyn
   await assert.rejects(catalogo.obterPrestador(99), (recebido) => recebido === erro);
 });
 
-test('galeria legada ausente não impede consultar os dados essenciais do prestador', async () => {
+test('falha 404 da galeria não se transforma em lista vazia', async () => {
   const erro = Object.assign(new Error('Não encontrado'), { response: { status: 404 } });
   const catalogo = carregarModulos({ get: async (rota) => {
     if (rota.endsWith('/fotos') || rota.endsWith('/99')) throw erro;
     return { data: prestadorApi };
   } })('services/catalogo.ts');
-  const [prestador, fotos] = await Promise.all([
-    catalogo.obterPrestador(7), catalogo.listarFotosEstabelecimento(7),
-  ]);
+  const prestador = await catalogo.obterPrestador(7);
   assert.equal(prestador.nome_estab, 'Studio teste');
-  assert.deepEqual(fotos, []);
+  await assert.rejects(catalogo.listarFotosEstabelecimento(7), recebido => recebido === erro);
   await assert.rejects(catalogo.obterPrestador(99), recebido => recebido === erro);
 });
 

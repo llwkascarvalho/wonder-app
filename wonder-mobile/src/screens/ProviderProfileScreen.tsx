@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -12,13 +12,13 @@ import { ProviderIcon, ProviderIconName } from '../components/provider/ProviderI
 import { ProviderScheduleModal } from '../components/ProviderScheduleModal';
 import { ProviderServiceModal } from '../components/ProviderServiceModal';
 import { useAuth } from '../contexts/AuthContext';
+import { listarFotosEstabelecimento } from '../services/catalogo';
 import {
   adicionarFotoEstabelecimento,
   atualizarPrestador,
   atualizarServico,
-  criarHorario,
+  criarHorariosLote,
   criarServico,
-  listarFotosEstabelecimento,
   listarHorarios,
   listarServicos,
   obterPrestadorLogado,
@@ -32,14 +32,21 @@ import {
   listarCategoriasAtivas,
   listarMinhasCategoriasPrestadorSeguro,
 } from '../services/providerOnboarding';
+import { customerTheme } from '../styles/customerTheme';
 import { theme } from '../styles/theme';
-import { Categoria } from '../types/catalogo';
-import { FotoEstabelecimento, Horario, Prestador, PrestadorPayload, Servico } from '../types/provider';
+import { Categoria, FotoEstabelecimento } from '../types/catalogo';
+import { Horario, Prestador, PrestadorPayload, Servico } from '../types/provider';
 import { ProfilePhotoAsset } from '../types/profile';
+import { getProfileErrorMessage } from '../services/profileService';
 
+const C = customerTheme.v4;
 const MAX_FOTOS_GALERIA = 8;
 
-const dayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+const dayLabels = ['', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'];
+
+function horaCurta(value: string) {
+  return value.slice(0, 5);
+}
 
 function normalizeOptionalText(value: string) {
   return value.trim();
@@ -53,8 +60,16 @@ function withImageVersion(url: string | null | undefined, version: number | unde
   return `${url}${url.includes('?') ? '&' : '?'}v=${version}`;
 }
 
+function scheduleErrorMessage(error: unknown) {
+  const status = (error as { response?: { status?: number } })?.response?.status;
+  if (status === 409) return 'Este horário se sobrepõe a outro já cadastrado.';
+  if (status === 400) return 'Confira o dia e o intervalo informado.';
+  return getProfileErrorMessage(error, 'Não foi possível cadastrar o horário.');
+}
+
 export function ProviderProfileScreen() {
   const { usuario, signOut } = useAuth();
+  const { width } = useWindowDimensions();
   const [prestador, setPrestador] = useState<Prestador | null>(null);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [categoriasAtivas, setCategoriasAtivas] = useState<Categoria[]>([]);
@@ -71,6 +86,7 @@ export function ProviderProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingProviderPhoto, setUploadingProviderPhoto] = useState(false);
+  const [providerPhotoVersion, setProviderPhotoVersion] = useState(0);
   const [fotos, setFotos] = useState<FotoEstabelecimento[]>([]);
   const [uploadingFoto, setUploadingFoto] = useState(false);
   const [removingFotoId, setRemovingFotoId] = useState<number | null>(null);
@@ -81,15 +97,17 @@ export function ProviderProfileScreen() {
   const [servicePhotoVersions, setServicePhotoVersions] = useState<Record<number, number>>({});
   const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
 
-  const horariosResumo = useMemo(() => {
-    if (!horarios.length) {
-      return 'Nenhum horario cadastrado';
-    }
+  const horariosPorDia = useMemo(() => dayLabels.slice(1).map((nome, index) => ({
+    nome,
+    dia: index + 1,
+    intervalos: horarios.filter((horario) => horario.dia_semana === index + 1)
+      .sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio)),
+  })).filter((grupo) => grupo.intervalos.length > 0), [horarios]);
 
-    return horarios
-      .map((horario) => `${dayLabels[horario.dia_semana] || 'Dia'} ${horario.hora_inicio} - ${horario.hora_fim}`)
-      .join(', ');
-  }, [horarios]);
+  const horariosResumo = useMemo(() => horariosPorDia.length
+    ? horariosPorDia.map((grupo) => `${grupo.nome} ${grupo.intervalos
+      .map((horario) => `${horaCurta(horario.hora_inicio)}–${horaCurta(horario.hora_fim)}`).join(', ')}`).join(' · ')
+    : 'Nenhum horário cadastrado', [horariosPorDia]);
 
   const loadProviderProfile = useCallback(async () => {
     if (!usuario?.id) {
@@ -144,8 +162,8 @@ export function ProviderProfileScreen() {
       return;
     }
 
-    if (!nomeEstab.trim() || !documento.trim()) {
-      setError('Informe nome do estabelecimento e documento.');
+    if (!nomeEstab.trim()) {
+      setError('Informe o nome do estabelecimento.');
       return;
     }
 
@@ -189,11 +207,12 @@ export function ProviderProfileScreen() {
     setError('');
 
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (!permission.granted) {
-        setError('Permita o acesso a galeria para alterar a foto do estabelecimento.');
-        return;
+      if (Platform.OS !== 'web') {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          setError('Permita o acesso à galeria para alterar a foto do estabelecimento.');
+          return;
+        }
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -211,74 +230,65 @@ export function ProviderProfileScreen() {
         uri: asset.uri,
         fileName: asset.fileName,
         mimeType: asset.mimeType,
+        fileSize: asset.fileSize,
+        file: asset.file,
       });
 
       setPrestador(updated);
-    } catch {
-      setError('Nao foi possivel enviar a foto do estabelecimento.');
+      setProviderPhotoVersion((current) => current + 1);
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      setError(status === 409
+        ? 'A foto não pode ser alterada enquanto o cadastro está em análise.'
+        : getProfileErrorMessage(error, 'Não foi possível enviar a foto do estabelecimento.'));
     } finally {
       setUploadingProviderPhoto(false);
     }
   }
 
   async function handleAddGaleriaFoto() {
-    if (!prestador) {
-      return;
-    }
-    if (fotos.length >= MAX_FOTOS_GALERIA) {
-      setError(`Limite de ${MAX_FOTOS_GALERIA} fotos na galeria atingido.`);
-      return;
-    }
-
+    if (!prestador || fotos.length >= MAX_FOTOS_GALERIA) return;
     setUploadingFoto(true);
     setError('');
-
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (!permission.granted) {
-        setError('Permita o acesso a galeria para adicionar fotos do estabelecimento.');
-        return;
+      if (Platform.OS !== 'web') {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          setError('Permita o acesso à galeria para adicionar uma foto.');
+          return;
+        }
       }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        allowsEditing: true,
-        mediaTypes: ['images'],
-        quality: 0.85,
-      });
-
-      if (result.canceled || !result.assets.length) {
-        return;
-      }
-
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85 });
+      if (result.canceled || !result.assets.length) return;
       const asset = result.assets[0];
-      const novaFoto = await adicionarFotoEstabelecimento(prestador.id, {
+      await adicionarFotoEstabelecimento(prestador.id, {
         uri: asset.uri,
         fileName: asset.fileName,
         mimeType: asset.mimeType,
+        fileSize: asset.fileSize,
+        file: asset.file,
       });
-
-      setFotos((atual) => [...atual, novaFoto]);
-    } catch {
-      setError('Nao foi possivel adicionar a foto a galeria.');
+      setFotos(await listarFotosEstabelecimento(prestador.id));
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      setError(status === 409 ? 'A galeria está cheia ou o cadastro está em análise.'
+        : getProfileErrorMessage(error, 'Não foi possível adicionar a foto à galeria.'));
     } finally {
       setUploadingFoto(false);
     }
   }
 
   async function handleRemoveGaleriaFoto(fotoId: number) {
-    if (!prestador) {
-      return;
-    }
-
+    if (!prestador) return;
     setRemovingFotoId(fotoId);
     setError('');
-
     try {
       await removerFotoEstabelecimento(prestador.id, fotoId);
-      setFotos((atual) => atual.filter((foto) => foto.id !== fotoId));
-    } catch {
-      setError('Nao foi possivel remover a foto.');
+      setFotos((current) => current.filter((foto) => foto.id !== fotoId));
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      setError(status === 409 ? 'A galeria não pode ser alterada enquanto o cadastro está em análise.'
+        : getProfileErrorMessage(error, 'Não foi possível remover a foto da galeria.'));
     } finally {
       setRemovingFotoId(null);
     }
@@ -387,7 +397,7 @@ export function ProviderProfileScreen() {
     }
   }
 
-  async function handleCreateSchedule(payload: { dia_semana: number; hora_inicio: string; hora_fim: string }) {
+  async function handleCreateSchedule(payload: { dia_semana: number; hora_inicio: string; hora_fim: string }[]) {
     if (!prestador) {
       return;
     }
@@ -395,11 +405,11 @@ export function ProviderProfileScreen() {
     setSaving(true);
     setError('');
     try {
-      await criarHorario(prestador.id, payload);
+      await criarHorariosLote(prestador.id, payload);
       setScheduleModalVisible(false);
       setHorarios(await listarHorarios(prestador.id));
-    } catch {
-      setError('Nao foi possivel cadastrar o horario.');
+    } catch (error) {
+      throw new Error(scheduleErrorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -424,70 +434,72 @@ export function ProviderProfileScreen() {
 
   return (
     <ProfileScreenContent
-      title="Perfil pessoal"
-      subtitle="Gerencie seus dados pessoais e profissionais."
+      title="Meu estabelecimento"
+      subtitle="Gerencie seus dados e serviços."
+      appearance="customer"
       onSignOut={signOut}
     >
       {loading ? (
       <LoadingIndicator text="Carregando dados do estabelecimento..." />
       ) : !prestador ? (
-        <Card style={styles.formCard}>
+        <Card appearance="customer" style={styles.formCard}>
           <Text style={styles.title}>Cadastro profissional indisponível</Text>
           <Text style={styles.cardText}>
             Não foi possível localizar o cadastro aprovado desta conta. Atualize a sessão e tente novamente.
           </Text>
           {error ? <Text style={styles.error}>{error}</Text> : null}
-          <Button title="Tentar novamente" onPress={loadProviderProfile} />
+          <Button appearance="customer" title="Tentar novamente" onPress={loadProviderProfile} />
         </Card>
       ) : (
-        <>
+        <View style={[styles.profileLayout, width >= 900 && styles.profileLayoutDesktop]}>
+          <View style={[styles.profileColumn, width >= 900 && styles.profileColumnDesktop]}>
           <Text style={styles.sectionTitle}>Estabelecimento</Text>
-          <Card style={styles.detailsCard}>
+          <Card appearance="customer" style={styles.detailsCard}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardSectionTitle}>Dados do estabelecimento</Text>
               {!editingEstablishment ? (
-                <Button title="Editar" size="sm" variant="secondary" onPress={() => setEditingEstablishment(true)} />
+                <Button appearance="customer" title="Editar" size="sm" variant="secondary" onPress={() => setEditingEstablishment(true)} />
               ) : null}
             </View>
 
             {editingEstablishment ? (
               <>
-                <Input
+                <Input appearance="customer"
                   label="Nome do estabelecimento"
                   placeholder="Diego BarberShop"
                   value={nomeEstab}
                   onChangeText={setNomeEstab}
                 />
-                <Input label="CPF/CNPJ" placeholder="00.000.000/0000-00" value={documento} onChangeText={setDocumento} />
+                <Input appearance="customer" label="CPF/CNPJ" placeholder="00.000.000/0000-00" value={documento} onChangeText={setDocumento} />
                 <Text style={styles.cardSectionTitle}>Localizacao</Text>
-                <Input label="Endereco" placeholder="Rua Principal" value={endereco} onChangeText={setEndereco} />
-                <Input label="Numero" placeholder="123" value={numero} onChangeText={setNumero} />
-                <Input label="Bairro" placeholder="Centro" value={bairro} onChangeText={setBairro} />
-                <Input label="Cidade" placeholder="Pau dos Ferros" value={cidade} onChangeText={setCidade} />
-                <Input
+                <Input appearance="customer" label="Endereco" placeholder="Rua Principal" value={endereco} onChangeText={setEndereco} />
+                <Input appearance="customer" label="Numero" placeholder="123" value={numero} onChangeText={setNumero} />
+                <Input appearance="customer" label="Bairro" placeholder="Centro" value={bairro} onChangeText={setBairro} />
+                <Input appearance="customer" label="Cidade" placeholder="Pau dos Ferros" value={cidade} onChangeText={setCidade} />
+                <Input appearance="customer"
                   label="Estado"
                   placeholder="RN"
                   value={estado}
                   onChangeText={(value) => setEstado(value.toUpperCase())}
                 />
-                <Input
+                <Input appearance="customer"
                   label="Complemento"
                   placeholder="Sala, bloco ou referencia"
                   value={complemento}
                   onChangeText={setComplemento}
                 />
                 <View style={styles.editActions}>
-                  <Button title="Cancelar" size="sm" variant="secondary" onPress={handleCancelEditEstablishment} disabled={saving} />
-                  <Button title="Salvar" size="sm" onPress={handleUpdatePrestador} loading={saving} />
+                  <Button appearance="customer" title="Cancelar" size="sm" variant="secondary" onPress={handleCancelEditEstablishment} disabled={saving} />
+                  <Button appearance="customer" title="Salvar" size="sm" onPress={handleUpdatePrestador} loading={saving} />
                 </View>
               </>
             ) : (
               <>
                 <View style={styles.providerPhotoRow}>
-                  <CatalogImage fotoUrl={prestador.foto_url} kind="provider" style={styles.providerPhoto} />
+                  <CatalogImage fotoUrl={withImageVersion(prestador.foto_url, providerPhotoVersion)} kind="provider" style={styles.providerPhoto} />
                   <View style={styles.providerPhotoContent}>
                     <Text style={styles.providerPhotoTitle}>Foto do estabelecimento</Text>
-                    <Button
+                    <Button appearance="customer"
                       title="Alterar foto"
                       size="sm"
                       variant="secondary"
@@ -507,56 +519,44 @@ export function ProviderProfileScreen() {
             )}
           </Card>
 
+          <Text style={styles.sectionTitle}>Gestão</Text>
+          <Card appearance="customer" style={styles.metricsCard}>
+            <MetricItem icon="category" label="Categorias" value={String(categorias.length)} />
+            <MetricItem icon="content-cut" label="Serviços" value={String(servicos.length)} />
+            <MetricItem icon="schedule" label="Horários" value={String(horarios.length)} />
+          </Card>
+
           <View style={styles.galeriaHeader}>
             <Text style={styles.sectionTitle}>Galeria de fotos ({fotos.length}/{MAX_FOTOS_GALERIA})</Text>
-            <Button
-              title="Adicionar foto"
-              size="sm"
-              variant="secondary"
-              onPress={handleAddGaleriaFoto}
-              loading={uploadingFoto}
-              disabled={fotos.length >= MAX_FOTOS_GALERIA || removingFotoId !== null}
-            />
+            <Button appearance="customer" title="Adicionar foto" size="sm" variant="secondary"
+              onPress={handleAddGaleriaFoto} loading={uploadingFoto}
+              disabled={fotos.length >= MAX_FOTOS_GALERIA || removingFotoId !== null} />
           </View>
-
-          {fotos.length === 0 ? (
-            <Card>
-              <Text style={styles.cardText}>
-                Nenhuma foto na galeria ainda. Adicione ate {MAX_FOTOS_GALERIA} fotos para os
-                clientes verem ao abrir seu perfil.
-              </Text>
-            </Card>
-          ) : (
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={fotos}
-              keyExtractor={(item) => String(item.id)}
-              contentContainerStyle={styles.galeriaList}
-              renderItem={({ item }) => (
-                <View style={styles.galeriaItem}>
-                  <CatalogImage fotoUrl={item.foto_url} kind="provider" style={styles.galeriaFoto} />
-                  <Button
-                    title="Remover"
-                    size="sm"
-                    variant="secondary"
-                    onPress={() => handleRemoveGaleriaFoto(item.id)}
-                    loading={removingFotoId === item.id}
-                    disabled={removingFotoId !== null}
-                  />
-                </View>
-              )}
-            />
-          )}
+          <FlatList horizontal showsHorizontalScrollIndicator={false} data={fotos}
+            keyExtractor={(item) => String(item.id)} contentContainerStyle={styles.galeriaList}
+            renderItem={({ item }) => (
+              <View style={styles.galeriaItem}>
+                <CatalogImage fotoUrl={item.foto_url} kind="provider" style={styles.galeriaFoto} />
+                <Pressable accessibilityRole="button" accessibilityLabel="Remover foto da galeria"
+                  style={styles.galeriaRemove} onPress={() => handleRemoveGaleriaFoto(item.id)}
+                  disabled={removingFotoId !== null || uploadingFoto}>
+                  <ProviderIcon name="close" color={C.danger} size={18} />
+                </Pressable>
+              </View>
+            )}
+            ListFooterComponent={fotos.length < MAX_FOTOS_GALERIA ? (
+              <Pressable accessibilityRole="button" style={styles.galeriaAdd} onPress={handleAddGaleriaFoto}
+                disabled={uploadingFoto || removingFotoId !== null}>
+                <ProviderIcon name="add" color={C.primary} size={24} />
+                <Text style={styles.galeriaAddText}>Adicionar</Text>
+              </Pressable>
+            ) : null} />
+          <Text style={styles.galeriaHelp}>Opcional. Adicione até 8 fotos para mostrar seu espaço aos clientes.</Text>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <Text style={styles.sectionTitle}>Gestao</Text>
-          <Card style={styles.metricsCard}>
-            <MetricItem icon="category" label="Categorias" value={String(categorias.length)} />
-            <MetricItem icon="content-cut" label="Servicos" value={String(servicos.length)} />
-            <MetricItem icon="schedule" label="Horarios" value={String(horarios.length)} />
-          </Card>
+          </View>
+          <View style={[styles.profileColumn, width >= 900 && styles.profileColumnDesktop]}>
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Categorias</Text>
@@ -571,64 +571,66 @@ export function ProviderProfileScreen() {
               ))}
             </View>
           ) : (
-            <Card>
+            <Card appearance="customer">
               <Text style={styles.cardText}>As categorias aparecerao aqui conforme os servicos cadastrados.</Text>
             </Card>
           )}
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Horarios cadastrados</Text>
-            <Button title="Adicionar" size="sm" onPress={() => setScheduleModalVisible(true)} />
+            <Button appearance="customer" title="Adicionar" size="sm" onPress={() => setScheduleModalVisible(true)} />
           </View>
 
-          {horarios.map((horario) => (
-            <Card key={horario.id} style={styles.listCard}>
-              <View style={styles.listRow}>
-                <Text style={styles.cardTitle}>{dayLabels[horario.dia_semana] || 'Dia'}</Text>
-                <Text style={styles.cardText}>
-                  {horario.hora_inicio} - {horario.hora_fim}
-                </Text>
-                <Button
-                  title="Remover"
-                  size="sm"
-                  variant="outline"
-                  onPress={() => handleRemoveSchedule(horario.id)}
-                  disabled={saving}
-                />
-              </View>
+          {horariosPorDia.map((grupo) => (
+            <Card appearance="customer" key={grupo.dia} style={styles.listCard}>
+              <Text style={styles.cardTitle}>{grupo.nome}</Text>
+              {grupo.intervalos.map((horario) => (
+                <View key={horario.id} style={styles.scheduleIntervalRow}>
+                  <Text style={styles.scheduleTime}>{horaCurta(horario.hora_inicio)} – {horaCurta(horario.hora_fim)}</Text>
+                  <Pressable accessibilityRole="button"
+                    accessibilityLabel={`Remover horário de ${grupo.nome}, ${horaCurta(horario.hora_inicio)} a ${horaCurta(horario.hora_fim)}`}
+                    style={styles.scheduleRemove} onPress={() => handleRemoveSchedule(horario.id)} disabled={saving}>
+                    <ProviderIcon name="close" color={C.danger} size={18} />
+                  </Pressable>
+                </View>
+              ))}
             </Card>
           ))}
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Servicos cadastrados</Text>
-            <Button title="Cadastrar" size="sm" onPress={handleOpenCreateService} />
+            <Button appearance="customer" title="Cadastrar" size="sm" onPress={handleOpenCreateService} />
           </View>
 
           {servicos.map((servico) => (
-            <Card key={servico.id} style={styles.listCard}>
+            <Card appearance="customer" key={servico.id} style={styles.listCard}>
               <View style={styles.serviceRow}>
-                <CatalogImage
-                  fotoUrl={withImageVersion(servico.foto_url, servicePhotoVersions[servico.id])}
-                  kind="service"
-                  style={styles.servicePhoto}
-                />
-                <View style={styles.serviceInfo}>
-                  <Text style={styles.cardTitle}>{servico.nome}</Text>
-                  <Text style={styles.cardText}>
-                    R$ {servico.preco.toFixed(2)} - {servico.duracao_min} min
-                  </Text>
+                <View style={styles.serviceIdentity}>
+                  <CatalogImage
+                    fotoUrl={withImageVersion(servico.foto_url, servicePhotoVersions[servico.id])}
+                    kind="service"
+                    style={styles.servicePhoto}
+                  />
+                  <View style={styles.serviceInfo}>
+                    <Text style={styles.serviceTitle}>{servico.nome}</Text>
+                    <Text style={styles.serviceDescription}>
+                      R$ {servico.preco.toFixed(2)} · {servico.duracao_min} min
+                    </Text>
+                  </View>
                 </View>
                 <View style={styles.serviceActions}>
-                  <Button title="Editar" size="sm" variant="secondary" onPress={() => handleOpenEditService(servico)} disabled={saving} />
-                  <Button title="Remover" size="sm" variant="outline" onPress={() => handleRemoveService(servico.id)} disabled={saving} />
+                  <Button appearance="customer" title="Editar" size="sm" variant="secondary" onPress={() => handleOpenEditService(servico)} disabled={saving} />
+                  <Button appearance="customer" title="Remover" size="sm" variant="outline" onPress={() => handleRemoveService(servico.id)} disabled={saving} />
                 </View>
               </View>
             </Card>
           ))}
-        </>
+          </View>
+        </View>
       )}
 
       <ProviderServiceModal
+        appearance="customer"
         visible={serviceModalVisible}
         loading={saving}
         categories={categoriasAtivas}
@@ -637,8 +639,10 @@ export function ProviderProfileScreen() {
         onSave={handleSaveService}
       />
       <ProviderScheduleModal
+        appearance="customer"
         visible={scheduleModalVisible}
         loading={saving}
+        existingHorarios={horarios}
         onClose={() => setScheduleModalVisible(false)}
         onSave={handleCreateSchedule}
       />
@@ -673,15 +677,23 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  profileLayout: { gap: 24 },
+  profileLayoutDesktop: { flexDirection: 'row', alignItems: 'flex-start', gap: 32 },
+  profileColumn: { gap: 16, minWidth: 0, width: '100%' },
+  profileColumnDesktop: { flex: 1, width: 'auto' },
   title: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.xl,
-    fontWeight: theme.fontWeight.bold,
+    color: C.text,
+    fontFamily: C.fontDisplay,
+    fontSize: 22,
   },
   formCard: {
     gap: theme.spacing.md,
   },
   metricsCard: {
+    borderWidth: 0,
+    borderRadius: 24,
+    paddingVertical: 18,
+    ...customerTheme.shadow,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
@@ -691,17 +703,22 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   metricValue: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.bold,
+    color: C.text,
+    fontFamily: C.fontDisplay,
+    fontSize: 27,
   },
   metricLabel: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.xs,
-    fontWeight: theme.fontWeight.semibold,
+    color: C.textMuted,
+    fontFamily: C.fontBody,
+    fontSize: 14,
   },
   detailsCard: {
-    gap: theme.spacing.sm,
+    borderWidth: 0,
+    borderRadius: 24,
+    gap: 14,
+    minWidth: 0,
+    padding: 16,
+    ...customerTheme.shadow,
   },
   cardHeader: {
     alignItems: 'center',
@@ -710,10 +727,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardSectionTitle: {
-    color: theme.colors.text,
+    color: C.text,
     flex: 1,
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.bold,
+    fontFamily: C.fontDisplay,
+    fontSize: 18,
   },
   editActions: {
     flexDirection: 'row',
@@ -722,51 +739,55 @@ const styles = StyleSheet.create({
   },
   providerPhotoRow: {
     alignItems: 'center',
-    backgroundColor: theme.colors.surfaceMuted,
-    borderRadius: theme.borderRadius.sm,
+    backgroundColor: C.bg,
+    borderRadius: 18,
     flexDirection: 'row',
-    gap: theme.spacing.md,
-    padding: theme.spacing.sm,
+    gap: 12,
+    padding: 12,
   },
   providerPhoto: {
-    borderRadius: theme.borderRadius.md,
-    height: 88,
-    width: 88,
+    borderRadius: 38,
+    height: 76,
+    width: 76,
   },
   providerPhotoContent: {
     flex: 1,
     gap: theme.spacing.xs,
   },
   providerPhotoTitle: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.bold,
+    color: C.text,
+    fontFamily: C.fontBodySemi,
+    fontSize: 15,
   },
   infoRow: {
-    backgroundColor: theme.colors.surfaceMuted,
-    borderRadius: theme.borderRadius.sm,
-    gap: theme.spacing.xs,
-    padding: theme.spacing.sm,
+    backgroundColor: C.bg,
+    borderRadius: 16,
+    gap: 4,
+    padding: 12,
   },
   infoLabel: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.bold,
+    color: C.textMuted,
+    fontFamily: C.fontBody,
+    fontSize: 14,
   },
   infoValue: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.sm,
+    color: C.text,
+    fontFamily: C.fontBodySemi,
+    fontSize: 16,
+    lineHeight: 22,
   },
   sectionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
     justifyContent: 'space-between',
   },
   sectionTitle: {
-    color: theme.colors.text,
+    color: C.text,
     flex: 1,
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.bold,
+    fontFamily: C.fontDisplay,
+    fontSize: 22,
   },
   chips: {
     flexDirection: 'row',
@@ -775,36 +796,76 @@ const styles = StyleSheet.create({
   },
   chip: {
     alignItems: 'center',
-    backgroundColor: '#F3E8FF',
+    backgroundColor: C.lilac,
     borderRadius: theme.borderRadius.pill,
     flexDirection: 'row',
     gap: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
   },
   chipText: {
-    color: theme.colors.primary,
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.semibold,
+    color: C.primary,
+    fontFamily: C.fontBodySemi,
+    fontSize: 15,
   },
   listCard: {
-    gap: theme.spacing.xs,
+    borderWidth: 0,
+    borderRadius: 20,
+    gap: 8,
+    padding: 14,
+    ...customerTheme.shadow,
+  },
+  scheduleIntervalRow: {
+    alignItems: 'center',
+    backgroundColor: C.bg,
+    borderRadius: 14,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    minHeight: 48,
+    paddingLeft: 14,
+    paddingRight: 6,
+  },
+  scheduleTime: { color: C.text, fontFamily: C.fontBodySemi, fontSize: 16 },
+  scheduleRemove: {
+    alignItems: 'center',
+    backgroundColor: C.surface,
+    borderRadius: 18,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
   },
   listRow: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: theme.spacing.sm,
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
   },
   serviceRow: {
+    gap: 12,
+    width: '100%',
+  },
+  serviceIdentity: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: theme.spacing.sm,
-    justifyContent: 'space-between',
+    gap: 12,
+    width: '100%',
   },
   serviceInfo: {
     flex: 1,
-    gap: theme.spacing.xs,
+    minWidth: 0,
+    gap: 4,
+  },
+  serviceTitle: {
+    color: C.text,
+    fontFamily: C.fontDisplay,
+    fontSize: 18,
+  },
+  serviceDescription: {
+    color: C.textMuted,
+    fontFamily: C.fontBody,
+    fontSize: 15,
+    lineHeight: 21,
   },
   servicePhoto: {
     borderRadius: theme.borderRadius.md,
@@ -813,38 +874,48 @@ const styles = StyleSheet.create({
   },
   serviceActions: {
     alignItems: 'stretch',
-    gap: theme.spacing.xs,
-  },
-  cardTitle: {
-    color: theme.colors.text,
-    flex: 1,
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.bold,
-  },
-  cardText: {
-    color: theme.colors.textSecondary,
-    flex: 1,
-    fontSize: theme.fontSize.sm,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingTop: 4,
   },
   galeriaHeader: {
     alignItems: 'center',
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
     justifyContent: 'space-between',
   },
-  galeriaList: {
-    gap: theme.spacing.sm,
+  galeriaList: { gap: 12, paddingVertical: 4 },
+  galeriaItem: { position: 'relative' },
+  galeriaFoto: { borderRadius: 18, height: 120, width: 120 },
+  galeriaRemove: {
+    alignItems: 'center', backgroundColor: C.surface, borderRadius: 16, height: 30,
+    justifyContent: 'center', position: 'absolute', right: 6, top: 6, width: 30,
   },
-  galeriaItem: {
-    alignItems: 'center',
-    gap: theme.spacing.xs,
+  galeriaAdd: {
+    alignItems: 'center', backgroundColor: C.lilac, borderColor: C.primary,
+    borderRadius: 18, borderStyle: 'dashed', borderWidth: 1, gap: 6,
+    height: 120, justifyContent: 'center', width: 120,
   },
-  galeriaFoto: {
-    borderRadius: theme.borderRadius.md,
-    height: 110,
-    width: 150,
+  galeriaAddText: { color: C.primary, fontFamily: C.fontBodySemi, fontSize: 14 },
+  galeriaHelp: { color: C.textMuted, fontFamily: C.fontBody, fontSize: 14, lineHeight: 20 },
+  cardTitle: {
+    color: C.text,
+    flex: 1,
+    fontFamily: C.fontDisplay,
+    fontSize: 18,
+  },
+  cardText: {
+    color: C.textMuted,
+    flex: 1,
+    fontFamily: C.fontBody,
+    fontSize: 15,
+    lineHeight: 21,
   },
   error: {
-    color: theme.colors.error,
-    fontSize: theme.fontSize.sm,
+    color: C.danger,
+    fontFamily: C.fontBodySemi,
+    fontSize: 15,
   },
 });

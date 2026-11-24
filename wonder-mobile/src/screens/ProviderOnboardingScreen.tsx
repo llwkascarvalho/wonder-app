@@ -16,7 +16,7 @@ import { ProviderReviewStep } from '../components/provider-onboarding/ProviderRe
 import { ProviderSchedulesStep } from '../components/provider-onboarding/ProviderSchedulesStep';
 import { ProviderServicesStep } from '../components/provider-onboarding/ProviderServicesStep';
 import {
-  atualizarPerfilPrestador, atualizarServicoPrestadorOnboarding, criarHorarioPrestadorOnboarding,
+  atualizarPerfilPrestador, atualizarServicoPrestadorOnboarding, criarHorariosPrestadorOnboarding,
   criarPerfilPrestador, criarServicoPrestadorOnboarding, enviarPrestadorParaAprovacao,
   getBackendMessage, listarCategoriasAtivas, listarMeusHorariosPrestador,
   listarMeusServicosPrestador, obterMeuPrestador, removerHorarioPrestadorOnboarding,
@@ -26,6 +26,7 @@ import { uploadFotoServico } from '../services/provider';
 import { validateProfilePhoto } from '../services/profileService';
 import { customerTheme } from '../styles/customerTheme';
 import type { ProfileStackParamList } from '../navigation/ProfileStack';
+import { useResetScrollOnFocus } from '../navigation/useResetScrollOnFocus';
 import {
   ProviderOnboardingCategory, ProviderOnboardingProfile, ProviderOnboardingSchedule,
   ProviderOnboardingService, ProviderRegistrationDraft
@@ -55,9 +56,12 @@ function draftFromProfile(profile: ProviderOnboardingProfile): ProviderRegistrat
 }
 
 export function ProviderOnboardingScreen({ navigation }: ProviderOnboardingScreenProps = {}) {
+  const scrollRef = useRef<ScrollView>(null);
+  useResetScrollOnFocus(scrollRef);
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
   const [step, setStep] = useState<StepKey>('dados');
+  useEffect(() => { scrollRef.current?.scrollTo({ y: 0, animated: false }); }, [step]);
   const [draft, setDraft] = useState<ProviderRegistrationDraft>({ ...emptyProviderDraft });
   const [profile, setProfile] = useState<ProviderOnboardingProfile | null>(null);
   const [correcting, setCorrecting] = useState(false);
@@ -238,12 +242,12 @@ export function ProviderOnboardingScreen({ navigation }: ProviderOnboardingScree
     finally { setSaving(false); }
   }
 
-  async function createSchedule(payload: { dia_semana: number; hora_inicio: string; hora_fim: string }) {
+  async function createSchedule(payload: { dia_semana: number; hora_inicio: string; hora_fim: string }[]) {
     if (!profile) return;
     setSaving(true); setError('');
     try {
-      const created = await criarHorarioPrestadorOnboarding(profile.id, payload);
-      setSchedules((current) => [...current, created]);
+      const created = await criarHorariosPrestadorOnboarding(profile.id, payload);
+      setSchedules((current) => [...current, ...created]);
     }
     catch (scheduleError) { throw new Error(getBackendMessage(scheduleError, 'Não foi possível salvar o horário.')); }
     finally { setSaving(false); }
@@ -273,7 +277,7 @@ export function ProviderOnboardingScreen({ navigation }: ProviderOnboardingScree
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={[styles.hero, desktop && styles.heroDesktop]}>
           <HeroGlows desktop={desktop} />
           <View style={styles.heroContent}>
