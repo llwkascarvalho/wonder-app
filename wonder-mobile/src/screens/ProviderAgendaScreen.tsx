@@ -1,72 +1,53 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Alert,
-  Image,
-  Modal,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '../components/Button';
-import { Card } from '../components/Card';
+import { CatalogImage } from '../components/catalog/CatalogImage';
+import { CustomerFormSheet } from '../components/customer/CustomerFormSheet';
+import { HeroGlows } from '../components/customer/HeroGlows';
 import { LoadingIndicator } from '../components/LoadingIndicator';
-import {
-  getCurrentMonthKey,
-  MonthlyAvailabilityCalendar,
-} from '../components/MonthlyAvailabilityCalendar';
-import { ProviderIcon } from '../components/provider/ProviderIcon';
+import { getCurrentMonthKey, MonthlyAvailabilityCalendar } from '../components/MonthlyAvailabilityCalendar';
 import { useAuth } from '../contexts/AuthContext';
-import {
-  atualizarStatusAgendamento,
-  listarAgendamentos,
-  listarServicos,
-  obterPrestadorLogado,
-} from '../services/provider';
+import { useResetScrollOnFocus } from '../navigation/useResetScrollOnFocus';
+import { atualizarStatusAgendamento, listarAgendamentos, listarServicos, obterPrestadorLogado } from '../services/provider';
 import { resolveProfilePhotoUrl } from '../services/profileService';
-import { theme } from '../styles/theme';
+import { customerTheme } from '../styles/customerTheme';
 import { Agendamento, Prestador, Servico } from '../types/provider';
 
 type AgendaTab = 'abertos' | 'finalizados' | 'cancelados';
-
+const C = customerTheme.v4;
 const tabs: Array<{ key: AgendaTab; label: string }> = [
-  { key: 'abertos', label: 'Em aberto' },
-  { key: 'finalizados', label: 'Finalizados' },
-  { key: 'cancelados', label: 'Cancelados' },
+  { key: 'abertos', label: 'Em aberto' }, { key: 'finalizados', label: 'Finalizados' }, { key: 'cancelados', label: 'Cancelados' },
 ];
-
 const openStatuses = ['pendente', 'confirmado'];
 const doneStatuses = ['concluido', 'finalizado'];
 const statusLabels: Record<string, string> = {
-  pendente: 'Pendente',
-  confirmado: 'Confirmado',
-  cancelado: 'Cancelado',
-  concluido: 'Concluido',
-  finalizado: 'Finalizado',
+  pendente: 'Pendente', confirmado: 'Agendado', cancelado: 'Cancelado', concluido: 'Concluído', finalizado: 'Finalizado',
 };
-
+function formatDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+function dateFromKey(key: string) {
+  const [year, month, day] = key.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+function formatDateLabel(key: string) {
+  return dateFromKey(key).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
 function extractBackendMessage(error: unknown, fallback: string): string {
   const detail = (error as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
   return typeof detail === 'string' ? detail : fallback;
 }
 
-function formatDateKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
-    date.getDate()
-  ).padStart(2, '0')}`;
-}
-
-function formatDateLabel(dateKey: string) {
-  const [year, month, day] = dateKey.split('-').map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
-}
-
 export function ProviderAgendaScreen() {
-  const { usuario, signOut } = useAuth();
+  const scrollRef = useRef<ScrollView>(null);
+  useResetScrollOnFocus(scrollRef);
+  const { usuario } = useAuth();
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const desktop = width >= 900;
   const [prestador, setPrestador] = useState<Prestador | null>(null);
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [servicos, setServicos] = useState<Servico[]>([]);
@@ -80,469 +61,201 @@ export function ProviderAgendaScreen() {
   const [cancelTarget, setCancelTarget] = useState<Agendamento | null>(null);
   const [cancelMotivo, setCancelMotivo] = useState('');
 
-  const servicosById = useMemo(() => {
-    return servicos.reduce<Record<number, Servico>>((acc, servico) => {
-      acc[servico.id] = servico;
-      return acc;
-    }, {});
-  }, [servicos]);
-
-  const visibleAppointments = useMemo(() => {
-    if (activeTab === 'abertos') {
-      return agendamentos.filter((agendamento) => openStatuses.includes(agendamento.status));
-    }
-
-    if (activeTab === 'cancelados') {
-      return agendamentos.filter((agendamento) => agendamento.status === 'cancelado');
-    }
-
-    return agendamentos.filter((agendamento) => doneStatuses.includes(agendamento.status));
-  }, [activeTab, agendamentos]);
-
-  const sectionTitle = selectedDate === formatDateKey(new Date())
-    ? 'Agendados hoje'
-    : `Agendados em ${formatDateLabel(selectedDate)}`;
+  const servicosById = useMemo(() => Object.fromEntries(servicos.map(servico => [servico.id, servico])) as Record<number, Servico>, [servicos]);
+  const visibleAppointments = useMemo(() => agendamentos.filter(item =>
+    activeTab === 'abertos' ? openStatuses.includes(item.status) :
+    activeTab === 'cancelados' ? item.status === 'cancelado' : doneStatuses.includes(item.status)
+  ), [activeTab, agendamentos]);
+  const counts = useMemo(() => [
+    agendamentos.filter(item => openStatuses.includes(item.status)).length,
+    agendamentos.filter(item => doneStatuses.includes(item.status)).length,
+    agendamentos.filter(item => item.status === 'cancelado').length,
+  ], [agendamentos]);
+  const dateTitle = activeTab === 'abertos' ? 'Agendados' : activeTab === 'finalizados' ? 'Finalizados' : 'Cancelados';
 
   const loadAgenda = useCallback(async () => {
-    setError('');
-    setLoading(true);
+    setError(''); setLoading(true);
     try {
-      const nextAgendamentos = await listarAgendamentos(selectedDate);
-      setAgendamentos(nextAgendamentos);
-
+      const next = await listarAgendamentos(selectedDate);
+      setAgendamentos(next);
       if (usuario?.id) {
-        const foundPrestador = await obterPrestadorLogado();
-        setPrestador(foundPrestador);
-        if (foundPrestador) {
-          setServicos(await listarServicos(foundPrestador.id));
-        }
+        const found = await obterPrestadorLogado();
+        setPrestador(found);
+        setServicos(found ? await listarServicos(found.id) : []);
       }
     } catch {
-      setError('Nao foi possivel carregar os agendamentos.');
-    } finally {
-      setLoading(false);
-    }
+      setAgendamentos([]);
+      setError('Não foi possível carregar os agendamentos.');
+    } finally { setLoading(false); }
   }, [selectedDate, usuario?.id]);
+  useEffect(() => { loadAgenda(); }, [loadAgenda]);
 
-  useEffect(() => {
-    loadAgenda();
-  }, [loadAgenda]);
-
-  async function handleStatus(agendamentoId: number, status: string, motivo?: string) {
-    setSavingId(agendamentoId);
-    setError('');
+  async function handleStatus(id: number, status: string, motivo?: string) {
+    setSavingId(id); setError('');
     try {
-      await atualizarStatusAgendamento(agendamentoId, status, motivo);
+      await atualizarStatusAgendamento(id, status, motivo);
       setAgendamentos(await listarAgendamentos(selectedDate));
       return true;
-    } catch (statusError) {
-      const message = extractBackendMessage(statusError, 'Nao foi possivel atualizar o agendamento.');
-      setError(message);
-      Alert.alert('Nao foi possivel atualizar', message);
+    } catch (caught) {
+      setError(extractBackendMessage(caught, 'Não foi possível atualizar o agendamento.'));
       return false;
-    } finally {
-      setSavingId(null);
-    }
+    } finally { setSavingId(null); }
   }
-
-  function openCancelModal(agendamento: Agendamento) {
-    setCancelTarget(agendamento);
-    setCancelMotivo('');
-  }
-
-  function closeCancelModal() {
-    if (savingId !== null) {
-      return;
-    }
-    setCancelTarget(null);
-    setCancelMotivo('');
-  }
-
   async function confirmCancel() {
+    if (!cancelTarget) return;
     const motivo = cancelMotivo.trim();
-    if (!cancelTarget) {
-      return;
-    }
-
-    if (!motivo) {
-      Alert.alert('Motivo obrigatorio', 'Informe o motivo do cancelamento.');
-      return;
-    }
-
-    const cancelled = await handleStatus(cancelTarget.id, 'cancelado', motivo);
-    if (cancelled) {
-      setCancelTarget(null);
-      setCancelMotivo('');
+    if (!motivo) { setError('Informe o motivo do cancelamento.'); return; }
+    if (await handleStatus(cancelTarget.id, 'cancelado', motivo)) {
+      setCancelTarget(null); setCancelMotivo('');
     }
   }
+  if (loading && agendamentos.length === 0 && !error) return <LoadingIndicator text="Carregando agendamentos..." />;
 
-  function handleSelectDate(dateKey: string) {
-    setSelectedDate(dateKey);
-    setCalendarVisible(false);
-  }
-
-  if (loading) {
-    return <LoadingIndicator text="Carregando agendamentos..." />;
-  }
-
-  return (
-    <ScrollView
-      contentContainerStyle={styles.container}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={loadAgenda} />}
-    >
-      <View style={styles.header}>
-        <Text style={styles.greeting}>Ola, {prestador?.nome_estab || usuario?.email || 'prestador'}</Text>
-        <Button title="Sair" size="sm" variant="secondary" onPress={signOut} />
-      </View>
-
-      <View style={styles.segment}>
-        {tabs.map((tab) => {
-          const selected = activeTab === tab.key;
-
-          return (
-            <Pressable
-              key={tab.key}
-              accessibilityRole="button"
-              onPress={() => setActiveTab(tab.key)}
-              style={({ pressed }) => [
-                styles.segmentButton,
-                selected && styles.segmentButtonActive,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text style={[styles.segmentText, selected && styles.segmentTextActive]} numberOfLines={1}>
-                {tab.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <View style={styles.sectionRow}>
-        <View>
-          <Text style={styles.sectionTitle}>{sectionTitle}</Text>
-          <Text style={styles.selectedDateText}>{formatDateLabel(selectedDate)}</Text>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setCalendarVisible((current) => !current)}
-          style={styles.calendarButton}
-        >
-          <ProviderIcon name="calendar-today" color={theme.colors.white} size={22} />
-        </Pressable>
-      </View>
-
-      {calendarVisible ? (
-        <Card>
-          <MonthlyAvailabilityCalendar
-            mes={calendarMonth}
-            diasDisponiveis={[]}
-            dataSelecionada={selectedDate}
-            allowUnavailableSelection
-            onChangeMes={setCalendarMonth}
-            onSelectDate={handleSelectDate}
-          />
-        </Card>
-      ) : null}
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      {visibleAppointments.length ? (
-        visibleAppointments.map((agendamento) => (
-          <AppointmentCard
-            key={agendamento.id}
-            agendamento={agendamento}
-            servico={servicosById[agendamento.servico_id]}
-            saving={savingId === agendamento.id}
-            showActions={activeTab === 'abertos'}
-            onConfirm={() => handleStatus(agendamento.id, 'confirmado')}
-            onFinish={() => handleStatus(agendamento.id, 'concluido')}
-            onCancel={() => openCancelModal(agendamento)}
-          />
-        ))
-      ) : (
-        <Card>
-          <Text style={styles.emptyText}>Nenhum agendamento para este filtro.</Text>
-        </Card>
-      )}
-
-      <Modal transparent visible={cancelTarget !== null} animationType="fade" onRequestClose={closeCancelModal}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Cancelar atendimento</Text>
-            <Text style={styles.modalText}>
-              Informe o motivo. O cancelamento nao sera permitido proximo do atendimento.
-            </Text>
-            <TextInput
-              multiline
-              maxLength={100}
-              editable={savingId === null}
-              placeholder="Ex.: Prestador indisponivel no horario."
-              placeholderTextColor={theme.colors.textMuted}
-              value={cancelMotivo}
-              onChangeText={setCancelMotivo}
-              style={styles.reasonInput}
-            />
-            <View style={styles.modalActions}>
-              <Button
-                title="Voltar"
-                size="sm"
-                variant="secondary"
-                disabled={savingId !== null}
-                onPress={closeCancelModal}
-              />
-              <Button
-                title={savingId !== null ? 'Cancelando...' : 'Confirmar'}
-                size="sm"
-                variant="danger"
-                disabled={savingId !== null}
-                onPress={confirmCancel}
-              />
-            </View>
+  return <View style={styles.screen}>
+    <ScrollView ref={scrollRef} refreshControl={<RefreshControl refreshing={loading} onRefresh={loadAgenda} />}
+      contentContainerStyle={{ paddingBottom: desktop ? 60 : 150 }}>
+      <View style={[styles.hero, { paddingTop: desktop ? 44 : Math.max(insets.top, 56), paddingHorizontal: desktop ? 76 : 20 }]}>
+        <HeroGlows desktop={desktop} />
+        <View style={styles.heroTop}>
+          <CatalogImage fotoUrl={prestador?.foto_url} kind="provider" style={styles.heroAvatar} />
+          <View style={styles.heroIdentity}>
+            <Text style={styles.heroGreeting} numberOfLines={1}>Olá, {usuario?.nome?.trim().split(/\s+/)[0] || 'prestador'}!</Text>
+            <Text style={styles.heroRole}>Painel Wonder</Text>
           </View>
         </View>
-      </Modal>
+        <Text style={styles.heroTitle}>Agenda</Text>
+        <Text style={styles.heroSubtitle}>Acompanhe os atendimentos do dia.</Text>
+      </View>
+      <View style={[styles.sheet, desktop && styles.sheetDesktop]}>
+        <View style={[styles.content, { paddingHorizontal: width >= 640 ? 32 : 20 }, desktop && styles.contentDesktop]}>
+          <View style={[styles.layout, desktop && styles.layoutDesktop]}>
+            <View style={styles.mainColumn}>
+              <View style={styles.segment} accessibilityRole="tablist">
+                {tabs.map(tab => <Pressable key={tab.key} accessibilityRole="tab" accessibilityState={{ selected: activeTab === tab.key }}
+                  onPress={() => { setActiveTab(tab.key); scrollRef.current?.scrollTo({ y: 0, animated: false }); }}
+                  style={[styles.segmentButton, activeTab === tab.key && styles.segmentActive]}>
+                  <Text numberOfLines={1} style={[styles.segmentText, activeTab === tab.key && styles.segmentTextActive]}>{tab.label}</Text>
+                </Pressable>)}
+              </View>
+              <Pressable accessibilityRole="button" accessibilityLabel="Escolher outra data" onPress={() => setCalendarVisible(true)} style={styles.dateCard}>
+                <View style={styles.dateInfo}><Text style={styles.dateCaption}>{dateTitle} em</Text>
+                  <Text style={styles.dateValue} numberOfLines={2}>{formatDateLabel(selectedDate)}</Text></View>
+                <View style={styles.calendarIcon}><Ionicons name="calendar-outline" size={24} color="#FFF" /></View>
+              </Pressable>
+              {error ? <View style={styles.errorCard}><Text style={styles.error}>{error}</Text>
+                <Button appearance="customer" title="Tentar novamente" variant="secondary" onPress={loadAgenda} /></View> : null}
+              {visibleAppointments.length ? visibleAppointments.map(item => <AppointmentCard key={item.id}
+                agendamento={item} servico={servicosById[item.servico_id]} saving={savingId === item.id}
+                onConfirm={() => handleStatus(item.id, 'confirmado')} onFinish={() => handleStatus(item.id, 'concluido')}
+                onCancel={() => { setError(''); setCancelMotivo(''); setCancelTarget(item); }} />) : !error ?
+                <View style={styles.emptyCard}><View style={styles.emptyIcon}><Ionicons name="calendar-outline" size={28} color={C.primary} /></View>
+                  <Text style={styles.emptyTitle}>{activeTab === 'abertos' ? 'Nenhum atendimento em aberto' : activeTab === 'finalizados' ? 'Nada finalizado neste dia' : 'Nenhum cancelamento neste dia'}</Text>
+                  <Text style={styles.emptyText}>{activeTab === 'abertos' ? 'Quando um cliente agendar, o atendimento aparecerá aqui.' : 'Os atendimentos desta etapa aparecerão aqui.'}</Text></View> : null}
+            </View>
+            {desktop ? <View style={styles.aside}><Text style={styles.asideTitle}>Resumo do dia</Text>
+              <Text style={styles.dateCaption}>{formatDateLabel(selectedDate)}</Text>
+              <View style={styles.stats}>{tabs.map((tab, index) => <View key={tab.key} style={styles.stat}>
+                <Text style={styles.statNumber}>{counts[index]}</Text><Text style={styles.statLabel}>{tab.label}</Text></View>)}</View>
+              <Button appearance="customer" title="Escolher outra data" variant="secondary" onPress={() => setCalendarVisible(true)} /></View> : null}
+          </View>
+        </View>
+      </View>
     </ScrollView>
-  );
+    <CustomerFormSheet visible={calendarVisible} title="Escolher data" onClose={() => setCalendarVisible(false)}>
+      <MonthlyAvailabilityCalendar mes={calendarMonth} diasDisponiveis={[]} dataSelecionada={selectedDate}
+        allowUnavailableSelection onChangeMes={setCalendarMonth} onSelectDate={key => { setSelectedDate(key); setCalendarVisible(false); }} />
+    </CustomerFormSheet>
+    <CustomerFormSheet visible={cancelTarget !== null} title="Cancelar atendimento" disabled={savingId !== null}
+      onClose={() => { if (savingId === null) { setCancelTarget(null); setCancelMotivo(''); setError(''); } }}>
+      <Text style={styles.modalText}>Informe o motivo do cancelamento. A disponibilidade pode depender da antecedência do atendimento.</Text>
+      <TextInput multiline maxLength={100} editable={savingId === null} placeholder="Motivo do cancelamento"
+        placeholderTextColor={C.textMuted} value={cancelMotivo} onChangeText={setCancelMotivo} style={styles.reasonInput} />
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <View style={styles.modalActions}>
+        <Button appearance="customer" title="Voltar" variant="secondary" onPress={() => { setCancelTarget(null); setCancelMotivo(''); setError(''); }} disabled={savingId !== null} />
+        <Button appearance="customer" title={savingId === null ? 'Confirmar cancelamento' : 'Cancelando...'} variant="danger" onPress={confirmCancel} disabled={savingId !== null} />
+      </View>
+    </CustomerFormSheet>
+  </View>;
 }
 
-function AppointmentCard({
-  agendamento,
-  servico,
-  saving,
-  showActions,
-  onConfirm,
-  onFinish,
-  onCancel,
-}: {
-  agendamento: Agendamento;
-  servico?: Servico;
-  saving: boolean;
-  showActions: boolean;
-  onConfirm: () => void;
-  onFinish: () => void;
-  onCancel: () => void;
+function AppointmentCard({ agendamento, servico, saving, onConfirm, onFinish, onCancel }: {
+  agendamento: Agendamento; servico?: Servico; saving: boolean;
+  onConfirm: () => void; onFinish: () => void; onCancel: () => void;
 }) {
   const start = new Date(agendamento.inicio);
-  const dateLabel = Number.isNaN(start.getTime())
-    ? agendamento.inicio
-    : `${start.toLocaleDateString('pt-BR')} ${start.toLocaleTimeString('pt-BR', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })}`;
-
-  return (
-    <Card style={styles.appointmentCard}>
-      <View style={styles.appointmentAvatar}>
-        <ClientAvatar nome={agendamento.cliente_nome} fotoUrl={agendamento.cliente_foto_url} />
-      </View>
-      <View style={styles.appointmentInfo}>
-        <Text style={styles.cardTitle}>{servico?.nome || `Servico ${agendamento.servico_id}`}</Text>
-        <Text style={styles.cardText}>{agendamento.cliente_nome || `Cliente ${agendamento.cliente_id}`}</Text>
-        <Text style={styles.cardText}>{dateLabel}</Text>
-        {showActions ? <Text style={styles.cardText}>{statusLabels[agendamento.status]}</Text> : null}
-      </View>
-      {showActions && openStatuses.includes(agendamento.status) ? (
-        <View style={styles.actions}>
-          {agendamento.status === 'pendente' ? (
-            <Button title="Confirmar" size="sm" variant="outline" loading={saving} onPress={onConfirm} />
-          ) : (
-            <Button title="Concluir" size="sm" variant="outline" loading={saving} onPress={onFinish} />
-          )}
-          <Button title="Cancelar" size="sm" variant="danger" disabled={saving} onPress={onCancel} />
-        </View>
-      ) : (
-        <Text style={[styles.statusBadge, agendamento.status === 'cancelado' && styles.statusCanceled]}>
-          {statusLabels[agendamento.status] ?? agendamento.status}
-        </Text>
-      )}
-    </Card>
-  );
+  const dateLabel = Number.isNaN(start.getTime()) ? agendamento.inicio :
+    `${start.toLocaleDateString('pt-BR')} · ${start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+  const photo = resolveProfilePhotoUrl(agendamento.cliente_foto_url);
+  const active = openStatuses.includes(agendamento.status);
+  return <View style={styles.appointmentCard}>
+    <View style={styles.appointmentTop}>
+      <View style={styles.avatar}>{photo ? <Image source={{ uri: photo }} style={styles.avatarImage} /> :
+        <Text style={styles.avatarText}>{agendamento.cliente_nome?.trim().slice(0, 1).toUpperCase() || 'C'}</Text>}</View>
+      <View style={styles.appointmentInfo}><Text style={styles.appointmentTitle} numberOfLines={2}>{servico?.nome || `Serviço ${agendamento.servico_id}`}</Text>
+        <Text style={styles.clientName} numberOfLines={2}>{agendamento.cliente_nome || `Cliente ${agendamento.cliente_id}`}</Text></View>
+      <View style={[styles.statusPill, agendamento.status === 'cancelado' ? styles.statusDanger :
+        doneStatuses.includes(agendamento.status) ? styles.statusSuccess : styles.statusPending]}>
+        <Text style={styles.statusText}>{statusLabels[agendamento.status] ?? agendamento.status}</Text></View>
+    </View>
+    <View style={styles.when}><Ionicons name="calendar-outline" size={19} color={C.primary} /><Text style={styles.whenText}>{dateLabel}</Text></View>
+    {active ? <View style={styles.actions}>
+      <View style={styles.actionSlot}><Button appearance="customer" title={agendamento.status === 'pendente' ? 'Confirmar' : 'Finalizar'}
+        onPress={agendamento.status === 'pendente' ? onConfirm : onFinish} loading={saving} /></View>
+      <View style={styles.actionSlot}><Button appearance="customer" title="Cancelar" variant="danger" onPress={onCancel} disabled={saving} /></View>
+    </View> : null}
+  </View>;
 }
 
-function ClientAvatar({ nome, fotoUrl }: { nome?: string | null; fotoUrl?: string | null }) {
-  const source = resolveProfilePhotoUrl(fotoUrl);
-  const initial = nome?.trim().slice(0, 1).toUpperCase();
-
-  if (source) {
-    return <Image source={{ uri: source }} style={styles.clientImage} />;
-  }
-
-  return <Text style={styles.appointmentAvatarText}>{initial || 'Cliente'}</Text>;
-}
-
+const shadow = { shadowColor: C.primaryDeep, shadowOffset: { width: 0, height: 6 }, shadowOpacity: .08, shadowRadius: 20, elevation: 3 } as const;
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: theme.colors.background,
-    gap: theme.spacing.md,
-    padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xxl,
-    paddingTop: theme.spacing.xxl,
-  },
-  header: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  greeting: {
-    color: theme.colors.primary,
-    flex: 1,
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.bold,
-  },
-  segment: {
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    flexDirection: 'row',
-    overflow: 'hidden',
-  },
-  segmentButton: {
-    alignItems: 'center',
-    flex: 1,
-    height: 44,
-    justifyContent: 'center',
-    paddingHorizontal: theme.spacing.xs,
-  },
-  segmentButtonActive: {
-    backgroundColor: theme.colors.primary,
-  },
-  segmentText: {
-    color: theme.colors.primary,
-    fontSize: theme.fontSize.xs,
-    fontWeight: theme.fontWeight.bold,
-    textTransform: 'uppercase',
-  },
-  segmentTextActive: {
-    color: theme.colors.white,
-  },
-  pressed: {
-    opacity: 0.86,
-  },
-  sectionRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  sectionTitle: {
-    color: theme.colors.primary,
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.bold,
-    textTransform: 'uppercase',
-  },
-  selectedDateText: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.sm,
-    marginTop: theme.spacing.xs,
-  },
-  calendarButton: {
-    alignItems: 'center',
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.borderRadius.pill,
-    height: 40,
-    justifyContent: 'center',
-    width: 48,
-  },
-  appointmentCard: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  appointmentAvatar: {
-    alignItems: 'center',
-    backgroundColor: theme.colors.surfaceMuted,
-    borderRadius: theme.borderRadius.md,
-    height: 56,
-    justifyContent: 'center',
-    width: 56,
-  },
-  clientImage: {
-    borderRadius: theme.borderRadius.md,
-    height: 56,
-    width: 56,
-  },
-  appointmentAvatarText: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.bold,
-  },
-  appointmentInfo: {
-    flex: 1,
-    gap: theme.spacing.xs,
-  },
-  cardTitle: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.bold,
-  },
-  cardText: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.sm,
-  },
-  actions: {
-    gap: theme.spacing.xs,
-    width: 96,
-  },
-  statusBadge: {
-    backgroundColor: theme.colors.success,
-    borderRadius: theme.borderRadius.sm,
-    color: theme.colors.white,
-    fontSize: theme.fontSize.xs,
-    fontWeight: theme.fontWeight.bold,
-    overflow: 'hidden',
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    textTransform: 'uppercase',
-  },
-  statusCanceled: {
-    backgroundColor: theme.colors.error,
-  },
-  emptyText: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.md,
-    textAlign: 'center',
-  },
-  error: {
-    color: theme.colors.error,
-    fontSize: theme.fontSize.sm,
-  },
-  modalBackdrop: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    flex: 1,
-    justifyContent: 'center',
-    padding: theme.spacing.lg,
-  },
-  modalContent: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.lg,
-    gap: theme.spacing.md,
-    padding: theme.spacing.lg,
-    width: '100%',
-  },
-  modalTitle: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.bold,
-  },
-  modalText: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.sm,
-    lineHeight: 18,
-  },
-  reasonInput: {
-    backgroundColor: theme.colors.surfaceMuted,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    color: theme.colors.text,
-    minHeight: 88,
-    padding: theme.spacing.md,
-    textAlignVertical: 'top',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-    justifyContent: 'flex-end',
-  },
+  screen: { flex: 1, backgroundColor: C.bg },
+  hero: { backgroundColor: C.primary, minHeight: 176, overflow: 'hidden', paddingBottom: 56 },
+  heroTop: { alignItems: 'center', flexDirection: 'row', gap: 12, marginBottom: 16 },
+  heroAvatar: { borderRadius: 22, height: 44, width: 44 },
+  heroIdentity: { flex: 1, minWidth: 0 },
+  heroGreeting: { color: '#FFF', fontFamily: C.fontBodyBold, fontSize: 18, lineHeight: 22 },
+  heroRole: { color: '#FFF', fontFamily: C.fontBody, fontSize: 14, lineHeight: 19, opacity: .8 },
+  heroTitle: { color: '#FFF', fontFamily: C.fontDisplay, fontSize: 34, lineHeight: 38 },
+  heroSubtitle: { color: '#FFF', fontFamily: C.fontBody, fontSize: 17, lineHeight: 23, marginTop: 6 },
+  sheet: { backgroundColor: C.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, marginTop: -28, minHeight: 500 },
+  sheetDesktop: { borderTopLeftRadius: 40, borderTopRightRadius: 40, marginTop: -40 },
+  content: { paddingTop: 24 }, contentDesktop: { paddingTop: 32, paddingHorizontal: 76 },
+  layout: { gap: 32 }, layoutDesktop: { flexDirection: 'row', alignItems: 'flex-start' },
+  mainColumn: { flex: 1, gap: 16, minWidth: 0 },
+  segment: { alignItems: 'center', backgroundColor: C.field, borderRadius: 26, flexDirection: 'row', gap: 4, minHeight: 52, padding: 4 },
+  segmentButton: { alignItems: 'center', borderRadius: 22, flex: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 3 },
+  segmentActive: { backgroundColor: C.primary },
+  segmentText: { color: C.textMuted, fontFamily: C.fontBodySemi, fontSize: 13, textAlign: 'center' },
+  segmentTextActive: { color: '#FFF' },
+  dateCard: { alignItems: 'center', backgroundColor: C.surface, borderRadius: 20, flexDirection: 'row', gap: 14, padding: 16, ...shadow },
+  dateInfo: { flex: 1 }, dateCaption: { color: C.textMuted, fontFamily: C.fontBody, fontSize: 14, lineHeight: 20 },
+  dateValue: { color: C.text, fontFamily: C.fontDisplay, fontSize: 19, lineHeight: 23 },
+  calendarIcon: { alignItems: 'center', backgroundColor: C.primary, borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
+  appointmentCard: { backgroundColor: C.surface, borderRadius: 24, gap: 14, padding: 16, ...shadow },
+  appointmentTop: { alignItems: 'center', flexDirection: 'row', gap: 12 },
+  avatar: { alignItems: 'center', backgroundColor: C.primary, borderRadius: 28, height: 56, justifyContent: 'center', overflow: 'hidden', width: 56 },
+  avatarImage: { height: 56, width: 56 }, avatarText: { color: '#FFF', fontFamily: C.fontDisplay, fontSize: 20 },
+  appointmentInfo: { flex: 1, minWidth: 0 }, appointmentTitle: { color: C.text, fontFamily: C.fontDisplay, fontSize: 19, lineHeight: 23 },
+  clientName: { color: C.textMuted, fontFamily: C.fontBody, fontSize: 15, lineHeight: 20 },
+  statusPill: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
+  statusPending: { backgroundColor: '#FFF0C7' }, statusSuccess: { backgroundColor: '#DDF3E8' }, statusDanger: { backgroundColor: '#FDE3E5' },
+  statusText: { color: C.text, fontFamily: C.fontBodySemi, fontSize: 12 },
+  when: { alignItems: 'center', backgroundColor: C.bg, borderRadius: 16, flexDirection: 'row', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  whenText: { color: C.text, fontFamily: C.fontBodyBold, fontSize: 16, flexShrink: 1 },
+  actions: { flexDirection: 'row', gap: 12 }, actionSlot: { flex: 1, minWidth: 0 },
+  emptyCard: { alignItems: 'center', backgroundColor: C.surface, borderRadius: 24, gap: 8, padding: 28, ...shadow },
+  emptyIcon: { alignItems: 'center', backgroundColor: C.lilac, borderRadius: 28, height: 56, justifyContent: 'center', width: 56 },
+  emptyTitle: { color: C.text, fontFamily: C.fontDisplay, fontSize: 20, textAlign: 'center' },
+  emptyText: { color: C.textMuted, fontFamily: C.fontBody, fontSize: 16, lineHeight: 23, textAlign: 'center' },
+  aside: { backgroundColor: C.surface, borderRadius: 24, gap: 16, padding: 20, width: 340, ...shadow },
+  asideTitle: { color: C.text, fontFamily: C.fontDisplay, fontSize: 22 }, stats: { flexDirection: 'row', gap: 8 },
+  stat: { alignItems: 'center', backgroundColor: C.bg, borderRadius: 16, flex: 1, gap: 4, padding: 8 },
+  statNumber: { color: C.primary, fontFamily: C.fontDisplay, fontSize: 24 },
+  statLabel: { color: C.textMuted, fontFamily: C.fontBody, fontSize: 12, textAlign: 'center' },
+  errorCard: { backgroundColor: '#FDE3E5', borderRadius: 18, gap: 10, padding: 16 },
+  error: { color: C.danger, fontFamily: C.fontBodySemi, fontSize: 15, lineHeight: 21 },
+  modalText: { color: C.textMuted, fontFamily: C.fontBody, fontSize: 16, lineHeight: 23 },
+  reasonInput: { backgroundColor: C.field, borderRadius: 16, color: C.text, fontFamily: C.fontBody, fontSize: 16, minHeight: 100, padding: 14, textAlignVertical: 'top' },
+  modalActions: { flexDirection: 'row', gap: 12 },
 });

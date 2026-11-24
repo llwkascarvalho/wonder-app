@@ -1,11 +1,12 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { HeroGlows } from '../components/customer/HeroGlows';
 import { useNotifications } from '../contexts/NotificationsContext';
+import { useResetScrollOnFocus } from '../navigation/useResetScrollOnFocus';
 import { listarNotificacoesPagina, marcarNotificacaoComoLida, marcarTodasNotificacoesComoLidas } from '../services/notificacoes';
 import { customerTheme } from '../styles/customerTheme';
 import { Notificacao } from '../types/notificacao';
@@ -43,6 +44,8 @@ function rotuloPeriodo(criadoEm: string): string {
 }
 
 export function NotificationsScreen() {
+  const listRef = useRef<FlatList<ItemLista>>(null);
+  useResetScrollOnFocus(listRef);
   const insets = useSafeAreaInsets();
   const { width: viewportWidth } = useWindowDimensions();
   const desktop = viewportWidth >= 900;
@@ -78,6 +81,7 @@ export function NotificationsScreen() {
 
   function trocarFiltro(proximoFiltro: FiltroNotificacao) {
     if (proximoFiltro === filtro) return;
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
     setFiltro(proximoFiltro);
   }
   async function handleRefresh() {
@@ -162,6 +166,7 @@ export function NotificationsScreen() {
       </View>
       <View style={[styles.sheetContainer, desktop && styles.sheetDesktop]}>
       <FlatList
+        ref={listRef}
         style={styles.list}
         data={itensLista}
         keyExtractor={(item, index) => item.tipo === 'grupo' ? `grupo-${item.titulo}` : `notificacao-${item.notificacao.id}-${index}`}

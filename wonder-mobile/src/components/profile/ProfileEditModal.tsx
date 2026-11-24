@@ -103,11 +103,12 @@ export function ProfileEditModal({
             {appearance === 'customer' ? (
               <Text style={styles.customerSubtitle}>Atualize seus dados pessoais ou escolha uma nova foto.</Text>
             ) : null}
-            <Input label="Nome" value={nome} onChangeText={setNome} maxLength={255} editable={!loading} />
-            <Input label="Sobrenome" value={sobrenome} onChangeText={setSobrenome} maxLength={255} editable={!loading} />
-            <Input label="E-mail" value={email} onChangeText={setEmail} maxLength={254}
+            <Input appearance={appearance} label="Nome" value={nome} onChangeText={setNome} maxLength={255} editable={!loading} />
+            <Input appearance={appearance} label="Sobrenome" value={sobrenome} onChangeText={setSobrenome} maxLength={255} editable={!loading} />
+            <Input appearance={appearance} label="E-mail" value={email} onChangeText={setEmail} maxLength={254}
               keyboardType="email-address" autoCapitalize="none" editable={!loading} />
             <Input
+              appearance={appearance}
               label="Telefone"
               value={telefone}
               onChangeText={setTelefone}
@@ -119,14 +120,14 @@ export function ProfileEditModal({
             <Text style={appearance === 'customer' ? styles.customerHelper : undefined}>
               Deixe o telefone em branco para manter o atual.
             </Text>
-            <Button title={foto ? 'Trocar foto selecionada' : 'Selecionar foto'} variant="secondary" onPress={selectPhoto} loading={picking} disabled={loading} />
+            <Button appearance={appearance} title={foto ? 'Trocar foto selecionada' : 'Selecionar foto'} variant="secondary" onPress={selectPhoto} loading={picking} disabled={loading} />
             <Text style={appearance === 'customer' ? styles.customerHelper : undefined}>
               {foto ? `Foto selecionada: ${foto.fileName || 'imagem'}` : 'JPEG, PNG ou WebP de até 5 MiB.'}
             </Text>
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <View style={styles.actions}>
-              <Button title="Cancelar" variant="secondary" onPress={onClose} disabled={loading} />
-              <Button title="Salvar" onPress={handleSave} loading={loading} disabled={picking || (!phoneChanged && !foto && !identityChanged)} />
+              <Button appearance={appearance} title="Cancelar" variant="secondary" onPress={onClose} disabled={loading} />
+              <Button appearance={appearance} title="Salvar" onPress={handleSave} loading={loading} disabled={picking || (!phoneChanged && !foto && !identityChanged)} />
             </View>
             </ScrollView>
         </View>
@@ -152,7 +153,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxHeight: '90%',
   },
-  fields: { gap: theme.spacing.md },
+  fields: { gap: theme.spacing.md, minWidth: 0, width: '100%' },
   title: {
     color: theme.colors.text,
     fontSize: theme.fontSize.xl,
@@ -171,7 +172,7 @@ const styles = StyleSheet.create({
   customerOverlay: { backgroundColor: 'rgba(46, 10, 87, 0.62)', justifyContent: 'flex-end', padding: 0 },
   customerContent: {
     alignSelf: 'center', borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    gap: 14, maxHeight: '90%', maxWidth: 560, padding: 20, width: '100%',
+    gap: 14, maxHeight: '90%', maxWidth: 560, minWidth: 0, padding: 20, width: '100%',
     ...customerTheme.shadow,
   },
   handle: { alignSelf: 'center', backgroundColor: customerTheme.v4.border, borderRadius: 3, height: 5, marginBottom: 2, width: 44 },

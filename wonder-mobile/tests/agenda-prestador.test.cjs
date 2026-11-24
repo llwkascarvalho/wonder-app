@@ -20,6 +20,11 @@ function prepararAgenda(statusInicial) {
   let arvore;
   const iguais = (a, b) => a && b && a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
   const react = {
+    useRef(inicial) {
+      const indice = cursor++;
+      if (!(indice in estados)) estados[indice] = { current: inicial };
+      return estados[indice];
+    },
     useState(inicial) {
       const indice = cursor++;
       if (!(indice in estados)) estados[indice] = typeof inicial === 'function' ? inicial() : inicial;
@@ -68,7 +73,10 @@ function prepararAgenda(statusInicial) {
     const requireOriginal = modulo.require.bind(modulo);
     modulo.require = id => {
       if (id === 'react') return react;
-      if (id === 'react-native') return { Alert: { alert: (...dados) => alertas.push(dados) },
+      if (id === '@react-navigation/native') return { useFocusEffect: () => {} };
+      if (id === '@expo/vector-icons') return { Ionicons: 'Ionicons' };
+      if (id === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) };
+      if (id === 'react-native') return { useWindowDimensions: () => ({ width: 375, height: 812 }), Platform: { OS: 'web' },
         Image: 'Image', Modal: 'Modal', Pressable: 'Pressable', RefreshControl: 'RefreshControl',
         ScrollView: 'ScrollView', Text: 'Text', TextInput: 'TextInput', View: 'View',
         StyleSheet: { create: valor => valor } };
@@ -105,7 +113,7 @@ function prepararAgenda(statusInicial) {
     function visitar(no) {
       if (!no || typeof no !== 'object') return;
       if (Array.isArray(no)) return no.forEach(visitar);
-      if (no.type === 'Modal' && !no.props.visible) return;
+      if ((no.type === 'Modal' || no.type === 'CustomerFormSheet') && !no.props.visible) return;
       if (typeof no.type === 'function') return visitar(no.type(no.props));
       encontrados.push(no);
       visitar(no.props?.children);
@@ -132,7 +140,7 @@ test('agenda confirma pendente antes de oferecer conclusão e envia os status co
   const app = prepararAgenda('pendente');
   await app.iniciar();
   assert.ok(app.textos().includes('Pendente'));
-  assert.ok(!app.botoes().some(botao => botao.title === 'Concluir'));
+  assert.ok(!app.botoes().some(botao => botao.title === 'Finalizar'));
   const confirmacao = app.botoes().find(botao => botao.title === 'Confirmar').onPress();
   assert.equal(app.botoes().find(botao => botao.title === 'Confirmar').loading, true);
   assert.equal(app.botoes().find(botao => botao.title === 'Cancelar').disabled, true);
@@ -141,16 +149,16 @@ test('agenda confirma pendente antes de oferecer conclusão e envia os status co
   app.mutacoes.at(-1).resolver();
   await confirmacao;
   await app.estabilizar();
-  assert.ok(app.textos().includes('Confirmado'));
+  assert.ok(app.textos().includes('Agendado'));
   assert.ok(!app.botoes().some(botao => botao.title === 'Confirmar'));
-  const conclusao = app.botoes().find(botao => botao.title === 'Concluir').onPress();
+  const conclusao = app.botoes().find(botao => botao.title === 'Finalizar').onPress();
   assert.equal(app.requisicoes.at(-1).dados.status, 'concluido');
   app.mutacoes.at(-1).resolver();
   await conclusao;
   await app.estabilizar();
-  assert.ok(!app.botoes().some(botao => ['Confirmar', 'Concluir', 'Cancelar'].includes(botao.title)));
+  assert.ok(!app.botoes().some(botao => ['Confirmar', 'Finalizar', 'Cancelar'].includes(botao.title)));
   app.aba('Finalizados');
-  assert.ok(app.textos().includes('Concluido'));
+  assert.ok(app.textos().includes('Concluído'));
 });
 
 test('falha ao confirmar mantém pendente e informa o erro sem oferecer conclusão', async () => {
@@ -161,8 +169,8 @@ test('falha ao confirmar mantém pendente e informa o erro sem oferecer conclus�
   await envio;
   await app.estabilizar();
   assert.ok(app.botoes().some(botao => botao.title === 'Confirmar' && !botao.loading));
-  assert.ok(!app.botoes().some(botao => botao.title === 'Concluir'));
-  assert.deepEqual(app.alertas.at(-1), ['Nao foi possivel atualizar', 'Transição não permitida']);
+  assert.ok(!app.botoes().some(botao => botao.title === 'Finalizar'));
+  assert.ok(app.textos().includes('Transição não permitida'));
 });
 
 for (const status of ['pendente', 'confirmado']) {
@@ -170,18 +178,18 @@ for (const status of ['pendente', 'confirmado']) {
     const app = prepararAgenda(status);
     await app.iniciar();
     app.botoes().find(botao => botao.title === 'Cancelar').onPress();
-    await app.botoes().find(botao => botao.title === 'Confirmar' && botao.variant === 'danger').onPress();
+    await app.botoes().find(botao => botao.title === 'Confirmar cancelamento').onPress();
     assert.equal(app.mutacoes.length, 0);
-    assert.equal(app.alertas.at(-1)[0], 'Motivo obrigatorio');
+    assert.ok(app.textos().includes('Informe o motivo do cancelamento.'));
     app.motivo().onChangeText('  Não poderei atender  ');
-    const envio = app.botoes().find(botao => botao.title === 'Confirmar' && botao.variant === 'danger').onPress();
+    const envio = app.botoes().find(botao => botao.title === 'Confirmar cancelamento').onPress();
     assert.deepEqual(app.requisicoes.at(-1).dados, { status: 'cancelado', motivo: 'Não poderei atender' });
     app.mutacoes.at(-1).resolver();
     await envio;
     await app.estabilizar();
     app.aba('Cancelados');
     assert.ok(app.textos().includes('Cancelado'));
-    assert.ok(!app.botoes().some(botao => ['Confirmar', 'Concluir', 'Cancelar'].includes(botao.title)));
+    assert.ok(!app.botoes().some(botao => ['Confirmar', 'Finalizar', 'Cancelar'].includes(botao.title)));
   });
 }
 
@@ -190,7 +198,7 @@ for (const status of ['concluido', 'finalizado', 'cancelado']) {
     const app = prepararAgenda(status);
     await app.iniciar();
     app.aba(status === 'cancelado' ? 'Cancelados' : 'Finalizados');
-    assert.ok(!app.botoes().some(botao => ['Confirmar', 'Concluir', 'Cancelar'].includes(botao.title)));
+    assert.ok(!app.botoes().some(botao => ['Confirmar', 'Finalizar', 'Cancelar'].includes(botao.title)));
     assert.equal(app.mutacoes.length, 0);
   });
 }

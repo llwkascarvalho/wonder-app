@@ -10,6 +10,7 @@ import { CatalogImage } from '../components/catalog/CatalogImage';
 import { HeroGlows } from '../components/customer/HeroGlows';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { SearchStackParamList } from '../navigation/SearchStack';
+import { useResetScrollOnFocus } from '../navigation/useResetScrollOnFocus';
 import { listarCategorias, listarPrestadores } from '../services/catalogo';
 import { customerTheme } from '../styles/customerTheme';
 import { Categoria } from '../types/catalogo';
@@ -30,6 +31,7 @@ export function SearchScreen() {
   const [categoriaSelecionada, setCategoriaSelecionada] = useState<number | null>(null);
   const [prestadores, setPrestadores] = useState<ProviderCardModel[]>([]);
   const scrollRef = useRef<ScrollView>(null);
+  useResetScrollOnFocus(scrollRef);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const mostrandoResultados = Boolean(nome.trim() || categoriaSelecionada || mostrarTodos);

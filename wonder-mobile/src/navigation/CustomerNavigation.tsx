@@ -7,7 +7,7 @@ import { useNotifications } from '../contexts/NotificationsContext';
 import { customerTheme } from '../styles/customerTheme';
 
 const C = customerTheme.v4;
-const tabs = [
+const customerTabs = [
   { name: 'Home', label: 'Início', icon: 'home-outline' },
   { name: 'Search', label: 'Buscar', icon: 'search-outline' },
   { name: 'Appointments', label: 'Agenda', icon: 'calendar-outline' },
@@ -15,11 +15,26 @@ const tabs = [
   { name: 'Profile', label: 'Perfil', icon: 'person-outline' },
 ] as const;
 
-export function CustomerNavigation({ state, navigation }: BottomTabBarProps) {
+const providerTabs = [
+  { name: 'ProviderAgenda', label: 'Agenda', icon: 'calendar-outline' },
+  { name: 'Notifications', label: 'Avisos', icon: 'notifications-outline' },
+  { name: 'ProviderProfile', label: 'Perfil', icon: 'person-outline' },
+] as const;
+
+export function CustomerNavigation(props: BottomTabBarProps) {
+  return <NavigationBar {...props} mode="customer" />;
+}
+
+export function ProviderNavigation(props: BottomTabBarProps) {
+  return <NavigationBar {...props} mode="provider" />;
+}
+
+function NavigationBar({ state, navigation, mode }: BottomTabBarProps & { mode: 'customer' | 'provider' }) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { unreadCount } = useNotifications();
   const desktop = width >= 900;
+  const tabs = mode === 'provider' ? providerTabs : customerTabs;
   return <View style={[desktop ? styles.sidebar : styles.pill,
     desktop ? { width: width >= 1280 ? 272 : 248, paddingTop: Math.max(insets.top, 28) } :
       { bottom: 18 + insets.bottom, width: width >= 640 ? 420 : Math.min(343, width - 32) }]}>

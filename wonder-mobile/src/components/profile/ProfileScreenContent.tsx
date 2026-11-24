@@ -13,6 +13,7 @@ import { ProfileAvatar } from './ProfileAvatar';
 import { ProfileInfoCard } from './ProfileInfoCard';
 import { ProfileEditModal } from './ProfileEditModal';
 import type { UserProfileUpdate } from '../../types/profile';
+import { useResetScrollOnFocus } from '../../navigation/useResetScrollOnFocus';
 
 type ProfileScreenContentProps = {
   title?: string;
@@ -30,6 +31,8 @@ export function ProfileScreenContent({
   const [saving, setSaving] = useState(false);
   const [photoRevision, setPhotoRevision] = useState(0);
   const savingRef = useRef(false);
+  const scrollRef = useRef<ScrollView>(null);
+  useResetScrollOnFocus(scrollRef);
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
@@ -73,6 +76,7 @@ export function ProfileScreenContent({
     return (
       <View style={customerStyles.screen}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={customerStyles.scroll}
           refreshControl={isDemoSession ? undefined : <RefreshControl refreshing={loading} onRefresh={retryProfile} />}
           showsVerticalScrollIndicator={false}
@@ -137,6 +141,7 @@ export function ProfileScreenContent({
   }
   return (
     <ScrollView
+      ref={scrollRef}
       contentContainerStyle={styles.container}
       refreshControl={isDemoSession ? undefined : <RefreshControl refreshing={loading} onRefresh={retryProfile} />}
     >
@@ -191,7 +196,7 @@ const styles = StyleSheet.create({
 const customerStyles = StyleSheet.create({
   screen: { backgroundColor: customerTheme.v4.bg, flex: 1 },
   scroll: { flexGrow: 1 },
-  hero: { backgroundColor: customerTheme.v4.primary, height: 176, overflow: 'hidden' },
+  hero: { backgroundColor: customerTheme.v4.primary, minHeight: 176, overflow: 'hidden', paddingBottom: 56 },
   sheet: { backgroundColor: customerTheme.v4.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, flex: 1, marginTop: -28, paddingTop: 20 },
   sheetDesktop: { borderTopLeftRadius: 40, borderTopRightRadius: 40, marginTop: -40, paddingTop: 40 },
   container: {
