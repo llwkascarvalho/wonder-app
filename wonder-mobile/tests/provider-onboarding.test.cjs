@@ -33,6 +33,7 @@ function setup({ existing = null, initialServices = [], initialSchedules = [], p
       }
       if (url.endsWith('/servicos')) return { data: { id: nextService++, prestador_id: 7, ...payload } };
       if (url.endsWith('/horarios')) return { data: { id: nextSchedule++, prestador_id: 7, ...payload } };
+      if (url.endsWith('/horarios/lote')) return { data: payload.map((item) => ({ id: nextSchedule++, prestador_id: 7, ...item })) };
       if (url.endsWith('/enviar-aprovacao')) {
         currentProfile = { ...currentProfile, status: 'pendente', enviado_em: '2026-11-15T12:00:00', motivo_rejeicao: null };
         return { data: currentProfile };
@@ -52,6 +53,7 @@ function setup({ existing = null, initialServices = [], initialSchedules = [], p
     delete: async (url) => { calls.push({ method: 'DELETE', url }); return { data: null }; },
   };
   const mocks = {
+    '@react-navigation/native': { useFocusEffect: () => {} },
     '@expo/vector-icons': { MaterialIcons: 'MaterialIcons' },
     react: {
       useState: (initial) => { const i = cursor++; if (!(i in states)) states[i] = initial; return [states[i], (v) => { states[i] = typeof v === 'function' ? v(states[i]) : v; }]; },
@@ -109,7 +111,10 @@ async function fillIdentity(app) {
 async function fillResources(app) {
   await app.render().find('ProviderServicesStep').onSave({ nome: 'Corte', preco: 30, duracao_min: 30, categoria_id: 1 });
   await app.render().button('Avançar').onPress();
-  await app.render().find('ProviderSchedulesStep').onCreate({ dia_semana: 1, hora_inicio: '08:00', hora_fim: '12:00' });
+  await app.render().find('ProviderSchedulesStep').onCreate([
+    { dia_semana: 1, hora_inicio: '08:00', hora_fim: '12:00' },
+    { dia_semana: 1, hora_inicio: '13:00', hora_fim: '17:00' },
+  ]);
   await app.render().button('Avançar').onPress();
 }
 
@@ -138,6 +143,7 @@ test('cadastro inicial permanece pendente e recebe serviço e horário antes da 
   assert.ok(app.calls.find((call) => call.url === '/catalogo/prestadores'));
   assert.ok(app.render().find('ProviderServicesStep'));
   await fillResources(app);
+  assert.equal(app.calls.find((call) => call.url.endsWith('/horarios/lote')).payload.length, 2);
   const review = app.render().find('ProviderReviewStep');
   assert.deepEqual(review.validationErrors, []);
   await review.onSubmit();

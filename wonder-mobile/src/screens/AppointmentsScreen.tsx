@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Image, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,6 +10,7 @@ import { CustomerFeedbackCard } from '../components/customer/CustomerFeedbackCar
 import { CustomerFormSheet } from '../components/customer/CustomerFormSheet';
 import { HeroGlows } from '../components/customer/HeroGlows';
 import { LoadingIndicator } from '../components/LoadingIndicator';
+import { useResetScrollOnFocus } from '../navigation/useResetScrollOnFocus';
 import { atualizarStatusAgendamento, extrairMensagemErro, listarAgendamentos } from '../services/agendamentos';
 import { criarAvaliacaoPrestador, listarAvaliacoesPrestador } from '../services/avaliacoes';
 import { listarServicosPrestador, obterPrestador } from '../services/catalogo';
@@ -106,6 +107,8 @@ function filtrarPorAba(item: AgendamentoEnriquecido, aba: AgendaTab, agora: numb
 }
 
 export function AppointmentsScreen() {
+  const listRef = useRef<FlatList<AgendamentoEnriquecido>>(null);
+  useResetScrollOnFocus(listRef);
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -245,6 +248,7 @@ export function AppointmentsScreen() {
               <Pressable key={tab.key} accessibilityRole="button" onPress={() => {
                 setActiveTab(tab.key);
                 setDetalheId(null);
+                listRef.current?.scrollToOffset({ offset: 0, animated: false });
               }} style={[styles.tab, selected && styles.tabActive]}>
                 <Text style={[styles.tabText, selected && styles.tabTextActive]}>{tab.label}</Text>
               </Pressable>
@@ -253,6 +257,7 @@ export function AppointmentsScreen() {
         </View>
         {erro ? <View style={styles.errorCard}><Text style={styles.errorText}>{erro}</Text></View> : (
           <FlatList
+            ref={listRef}
             data={visiveis}
             keyExtractor={(item) => String(item.agendamento.id)}
             contentContainerStyle={styles.list}

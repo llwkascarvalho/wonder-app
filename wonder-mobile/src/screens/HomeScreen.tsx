@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -13,6 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationsContext';
 import type { MainTabsParamList } from '../navigation/MainTabs';
 import type { SearchStackParamList } from '../navigation/SearchStack';
+import { useResetScrollOnFocus } from '../navigation/useResetScrollOnFocus';
 import { listarCategorias, listarPrestadores } from '../services/catalogo';
 import { getProfilePhoto } from '../services/profileService';
 import { customerTheme } from '../styles/customerTheme';
@@ -45,6 +46,8 @@ function SectionTitle({ title, action, onAction }: { title: string; action?: str
   </View>;
 }
 export function HomeScreen() {
+  const scrollRef = useRef<ScrollView>(null);
+  useResetScrollOnFocus(scrollRef);
   const navigation = useNavigation<NativeStackNavigationProp<SearchStackParamList, 'HomeRoot'>>();
   const tabs = navigation.getParent<BottomTabNavigationProp<MainTabsParamList>>();
   const insets = useSafeAreaInsets();
@@ -99,7 +102,7 @@ export function HomeScreen() {
   const name = usuario?.nome?.trim().split(/\s+/)[0] || 'Cliente';
   const cards = prestadores.slice(0, 8);
   return <View style={styles.screen}>
-    <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+    <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
       <View style={[styles.hero, { paddingTop: Math.max(insets.top, desktop ? 44 : tablet ? 28 : 20), paddingBottom: desktop ? 76 : 56 }]}>
         <HeroGlows desktop={desktop} />
         <View style={[styles.wrap, { paddingHorizontal: gutter, maxWidth: desktop ? 1120 : 784 }]}>

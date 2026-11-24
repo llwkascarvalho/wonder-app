@@ -19,6 +19,7 @@ import {
   MonthlyAvailabilityCalendar,
 } from '../components/MonthlyAvailabilityCalendar';
 import { SearchStackParamList } from '../navigation/SearchStack';
+import { useResetScrollOnFocus } from '../navigation/useResetScrollOnFocus';
 import type { MainTabsParamList } from '../navigation/MainTabs';
 import {
   criarAgendamento,
@@ -71,6 +72,8 @@ function isConflictError(error: unknown) {
 }
 
 export function AgendamentoScreen() {
+  const scrollRef = useRef<ScrollView>(null);
+  useResetScrollOnFocus(scrollRef);
   const navigation = useNavigation<AgendamentoNavigationProp>();
   const route = useRoute<AgendamentoRouteProp>();
   const { prestadorId } = route.params;
@@ -304,7 +307,7 @@ export function AgendamentoScreen() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+      <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={styles.scrollContent}>
       <View style={[styles.hero, { paddingTop: desktop ? 44 : Math.max(insets.top, 56), paddingHorizontal: desktop ? 76 : 20 }]}>
       <HeroGlows desktop={desktop} />
       <View style={styles.header}>

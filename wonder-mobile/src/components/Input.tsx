@@ -39,6 +39,8 @@ export function Input({ label, value, onChangeText, error, appearance = 'default
 const styles = StyleSheet.create({
   container: {
     gap: theme.spacing.xs,
+    minWidth: 0,
+    maxWidth: '100%',
   },
   label: {
     color: theme.colors.text,
@@ -53,6 +55,8 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: theme.fontSize.md,
     minHeight: 48,
+    minWidth: 0,
+    maxWidth: '100%',
     paddingHorizontal: theme.spacing.md,
   },
   inputError: {
@@ -74,6 +78,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   customerInput: {
+    alignSelf: 'stretch',
     backgroundColor: customerTheme.v4.field,
     borderColor: 'transparent',
     borderRadius: 16,
@@ -81,7 +86,7 @@ const styles = StyleSheet.create({
     fontFamily: customerTheme.v4.fontBody,
     fontSize: 16,
     minHeight: 56,
-    width: '100%',
+    minWidth: 0,
   },
   customerError: {
     color: customerTheme.v4.danger,

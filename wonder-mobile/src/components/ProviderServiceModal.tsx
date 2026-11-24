@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useState } from 'react';
-import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { CatalogImage } from './catalog/CatalogImage';
 import { validateProfilePhoto } from '../services/profileService';
@@ -9,6 +9,7 @@ import { customerTheme } from '../styles/customerTheme';
 import { ProfilePhotoAsset } from '../types/profile';
 import { Button } from './Button';
 import { Input } from './Input';
+import { ProviderIcon } from './provider/ProviderIcon';
 
 type ServiceCategoryOption = {
   id: number;
@@ -44,6 +45,7 @@ export function ProviderServiceModal({
   onSave,
 }: ProviderServiceModalProps) {
   const customer = appearance === 'customer';
+  const { width } = useWindowDimensions();
   const [nome, setNome] = useState('');
   const [preco, setPreco] = useState('');
   const [duracao, setDuracao] = useState('');
@@ -142,37 +144,37 @@ export function ProviderServiceModal({
 
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={[styles.modalCard, customer && styles.customerModalCard]}>
+      <View style={[styles.overlay, width >= 640 && styles.overlayWide]}>
+        <View style={[styles.modalCard, customer && styles.customerModalCard, width < 640 && styles.sheetMobile]}>
           <ScrollView
-            contentContainerStyle={styles.content}
+            contentContainerStyle={[styles.content, customer && styles.customerContent]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-          <Text style={[styles.title, customer && styles.customerTitle]}>{initialService ? 'Editar serviço' : 'Cadastrar serviço'}</Text>
-          {customer ? <Text style={styles.customerSubtitle}>Apresente o serviço, defina sua duração e escolha uma categoria.</Text> : null}
+          {customer ? <View style={styles.handle} /> : null}
+          <View style={styles.titleRow}>
+            <Text style={[styles.title, customer && styles.customerTitle]}>{initialService ? 'Editar serviço' : 'Cadastro de serviço'}</Text>
+            {customer ? <Pressable accessibilityRole="button" accessibilityLabel="Fechar cadastro de serviço"
+              style={styles.closeButton} onPress={onClose} disabled={loading}>
+              <ProviderIcon name="close" color={customerTheme.v4.text} size={22} />
+            </Pressable> : null}
+          </View>
 
-          <Input appearance={appearance} label="Nome do serviço" placeholder="Corte degradado" value={nome} onChangeText={setNome} />
-          <Input
-            appearance={appearance}
-            label="Preço"
-            keyboardType="decimal-pad"
-            placeholder="45.00"
-            value={preco}
-            onChangeText={setPreco}
-          />
-          <Input
-            appearance={appearance}
-            label="Duração em minutos"
-            keyboardType="number-pad"
-            placeholder="30"
-            value={duracao}
-            onChangeText={setDuracao}
-          />
+          <Input appearance={appearance} label="Nome do serviço *" placeholder="Ex.: Corte degradê" value={nome} onChangeText={setNome} />
+          <View style={styles.fieldsRow}>
+            <View style={styles.fieldHalf}>
+              <Input appearance={appearance} label="Preço *" keyboardType="decimal-pad"
+                placeholder="45,00" value={preco} onChangeText={setPreco} />
+            </View>
+            <View style={styles.fieldHalf}>
+              <Input appearance={appearance} label="Duração (min) *" keyboardType="number-pad"
+                placeholder="30" value={duracao} onChangeText={setDuracao} />
+            </View>
+          </View>
 
           {categories?.length ? (
             <View style={styles.categorySection}>
-              <Text style={[styles.categoryLabel, customer && styles.customerCategoryLabel]}>Categoria do serviço</Text>
+              <Text style={[styles.categoryLabel, customer && styles.customerCategoryLabel]}>Categoria do serviço *</Text>
               <View style={styles.categoryList}>
                 {categories.map((categoria) => {
                   const selected = categoriaId === categoria.id;
@@ -193,24 +195,18 @@ export function ProviderServiceModal({
             </View>
           ) : null}
 
+          <Text style={[styles.categoryLabel, customer && styles.customerCategoryLabel]}>Foto do serviço (opcional)</Text>
           <View style={[styles.imageSection, customer && styles.customerImageSection]}>
             {photo ? (
               <Image source={{ uri: photo.uri }} resizeMode="cover" style={styles.imagePreview} />
             ) : initialService?.foto_url ? (
               <CatalogImage authenticated fotoUrl={initialService.foto_url} kind="service" style={styles.imagePreview} />
-            ) : null}
+            ) : customer ? <View style={styles.imageIcon}><ProviderIcon name="photo-camera" size={24} /></View> : null}
             <View style={styles.imageContent}>
-              <Text style={[styles.imageLabel, customer && styles.customerImageLabel]}>Foto do serviço</Text>
-              <Text style={styles.imageText}>Opcional · JPEG, PNG ou WebP de até 5 MiB.</Text>
-              <Button
-                appearance={appearance}
-                title={photo || initialService?.foto_url ? 'Alterar foto' : 'Selecionar foto'}
-                size="sm"
-                variant="outline"
-                onPress={handlePickPhoto}
-                loading={pickingPhoto}
-                disabled={loading}
-              />
+              <Text style={styles.imageText}>JPEG, PNG ou WebP · até 5 MB</Text>
+              <Pressable accessibilityRole="button" onPress={handlePickPhoto} disabled={loading || pickingPhoto}>
+                <Text style={styles.imageAction}>{photo || initialService?.foto_url ? 'Alterar foto' : 'Selecionar foto'}</Text>
+              </Pressable>
               {photo ? (
                 <Button appearance={appearance} title="Remover seleção" size="sm" variant="secondary" onPress={() => setPhoto(undefined)} disabled={loading} />
               ) : null}
@@ -220,8 +216,8 @@ export function ProviderServiceModal({
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <View style={styles.actions}>
-            <Button appearance={appearance} title="Cancelar" variant="secondary" onPress={onClose} disabled={loading} />
-            <Button appearance={appearance} title="Salvar" onPress={handleSave} loading={loading} />
+            <Button appearance={appearance} title="Cancelar" variant="secondary" onPress={onClose} disabled={loading} style={styles.actionButton} />
+            <Button appearance={appearance} title="Salvar" onPress={handleSave} loading={loading} style={styles.actionButton} />
           </View>
           </ScrollView>
         </View>
@@ -235,6 +231,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.35)',
     flex: 1,
+    justifyContent: 'flex-end',
+  },
+  overlayWide: {
     justifyContent: 'center',
     padding: theme.spacing.lg,
   },
@@ -242,7 +241,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.lg,
     maxHeight: '90%',
-    maxWidth: 420,
+    maxWidth: 480,
     overflow: 'hidden',
     width: '100%',
   },
@@ -251,16 +250,24 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     ...customerTheme.shadow,
   },
+  sheetMobile: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
   content: {
     gap: theme.spacing.md,
     padding: theme.spacing.lg,
   },
+  customerContent: { gap: 16, padding: 20, paddingBottom: 28 },
+  handle: { alignSelf: 'center', backgroundColor: customerTheme.v4.border, borderRadius: 3, height: 5, width: 44 },
+  titleRow: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
+  closeButton: { alignItems: 'center', backgroundColor: customerTheme.v4.field, borderRadius: 22, height: 44, justifyContent: 'center', width: 44 },
+  fieldsRow: { flexDirection: 'row', gap: 12, width: '100%' },
+  fieldHalf: { flex: 1, minWidth: 0 },
   title: {
     color: theme.colors.text,
     fontSize: theme.fontSize.xl,
     fontWeight: theme.fontWeight.bold,
     textAlign: 'center',
     textTransform: 'uppercase',
+    flexShrink: 1,
   },
   customerTitle: {
     color: customerTheme.v4.text,
@@ -268,13 +275,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     textAlign: 'left',
     textTransform: 'none',
-  },
-  customerSubtitle: {
-    color: customerTheme.v4.textMuted,
-    fontFamily: customerTheme.v4.fontBody,
-    fontSize: 15,
-    lineHeight: 21,
-    marginTop: -8,
   },
   imageSection: {
     alignItems: 'center',
@@ -285,9 +285,10 @@ const styles = StyleSheet.create({
     padding: theme.spacing.sm,
   },
   customerImageSection: {
-    backgroundColor: customerTheme.v4.bg,
+    backgroundColor: customerTheme.v4.field,
     borderRadius: 18,
   },
+  imageIcon: { alignItems: 'center', backgroundColor: customerTheme.v4.surface, borderRadius: 14, height: 56, justifyContent: 'center', width: 56 },
   imagePreview: {
     borderRadius: theme.borderRadius.md,
     height: 96,
@@ -297,16 +298,11 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: theme.spacing.xs,
   },
-  imageLabel: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.bold,
-  },
-  customerImageLabel: { color: customerTheme.v4.text, fontFamily: customerTheme.v4.fontBodyBold, fontSize: 15 },
   imageText: {
     color: theme.colors.textMuted,
     fontSize: theme.fontSize.sm,
   },
+  imageAction: { color: customerTheme.v4.primary, fontFamily: customerTheme.v4.fontBodyBold, fontSize: 15 },
   categorySection: {
     gap: theme.spacing.sm,
   },
@@ -351,6 +347,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     gap: theme.spacing.sm,
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
   },
+  actionButton: { flex: 1 },
 });

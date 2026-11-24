@@ -30,7 +30,6 @@ export type Horario = {
   hora_inicio: string;
   hora_fim: string;
 };
-
 export type Agendamento = {
   id: number;
   cliente_id: number;
@@ -64,11 +63,4 @@ export type HorarioPayload = {
   dia_semana: number;
   hora_inicio: string;
   hora_fim: string;
-};
-
-export type FotoEstabelecimento = {
-  id: number;
-  prestador_id: number;
-  foto_url: string;
-  ordem: number;
 };

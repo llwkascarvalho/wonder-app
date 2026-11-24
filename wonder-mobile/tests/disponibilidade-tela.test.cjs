@@ -74,7 +74,7 @@ function prepararTela() {
     const requireOriginal = modulo.require.bind(modulo);
     modulo.require = id => {
       if (id === 'react') return react;
-      if (id === '@react-navigation/native') return { useNavigation: () => navegacao, useRoute: () => rota };
+      if (id === '@react-navigation/native') return { useNavigation: () => navegacao, useRoute: () => rota, useFocusEffect: () => {} };
       if (id === '@expo/vector-icons') return { MaterialIcons: 'MaterialIcons' };
       if (id === 'react-native') return {
         Image: 'Image', Modal: 'Modal', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View', StyleSheet: { create: valor => valor }, useWindowDimensions: () => ({ width: 336, height: 812 }),

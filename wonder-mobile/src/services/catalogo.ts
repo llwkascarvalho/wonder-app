@@ -45,14 +45,6 @@ export async function listarCategoriasPrestador(prestadorId: number, signal?: Ab
 export async function listarFotosEstabelecimento(
   prestadorId: number
 ): Promise<FotoEstabelecimento[]> {
-  try {
-    const response = await api.get<FotoEstabelecimento[]>(
-      `/catalogo/prestadores/${prestadorId}/fotos`
-    );
-    return response.data;
-  } catch (erro) {
-    // O Core atual não oferece a galeria legada; sua ausência é opcional.
-    if ((erro as { response?: { status?: number } })?.response?.status === 404) return [];
-    throw erro;
-  }
+  const response = await api.get<FotoEstabelecimento[]>(`/catalogo/prestadores/${prestadorId}/fotos`);
+  return response.data;
 }

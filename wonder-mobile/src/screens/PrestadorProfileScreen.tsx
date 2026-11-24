@@ -1,7 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,14 +11,15 @@ import { RatingStars } from '../components/catalog/RatingStars';
 import { ServiceCard } from '../components/catalog/ServiceCard';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { SearchStackParamList } from '../navigation/SearchStack';
+import { useResetScrollOnFocus } from '../navigation/useResetScrollOnFocus';
 import { listarAvaliacoesPrestador } from '../services/avaliacoes';
 import {
-  listarCategoriasPrestador, listarHorariosPrestador,
+  listarCategoriasPrestador, listarFotosEstabelecimento, listarHorariosPrestador,
   listarServicosPrestador, obterPrestador,
 } from '../services/catalogo';
 import { customerTheme } from '../styles/customerTheme';
 import { Avaliacao } from '../types/avaliacao';
-import { Categoria, DIAS_SEMANA, Horario, Prestador, Servico } from '../types/catalogo';
+import { Categoria, DIAS_SEMANA, FotoEstabelecimento, Horario, Prestador, Servico } from '../types/catalogo';
 import { atendeHoje } from '../utils/catalogPresentation';
 import { calcularMediaAvaliacoes } from '../utils/avaliacoes';
 
@@ -30,6 +31,8 @@ type PrestadorProfileRouteProp = {
 type Navigation = NativeStackNavigationProp<SearchStackParamList, 'PrestadorProfile'>;
 
 export function PrestadorProfileScreen() {
+  const scrollRef = useRef<ScrollView>(null);
+  useResetScrollOnFocus(scrollRef);
   const navigation = useNavigation<Navigation>();
   const route = useRoute<PrestadorProfileRouteProp>();
   const insets = useSafeAreaInsets();
@@ -41,6 +44,7 @@ export function PrestadorProfileScreen() {
   const [horarios, setHorarios] = useState<Horario[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [avaliacoes, setAvaliacoes] = useState<Avaliacao[]>([]);
+  const [fotos, setFotos] = useState<FotoEstabelecimento[]>([]);
   const [aba, setAba] = useState<'sobre' | 'horarios'>('sobre');
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -51,11 +55,12 @@ export function PrestadorProfileScreen() {
       setCarregando(true);
       setErro(null);
       try {
-        const [prestadorData, servicosData, horariosData, categoriasData, avaliacoesData] =
+        const [prestadorData, servicosData, horariosData, categoriasData, avaliacoesData, fotosData] =
           await Promise.all([
             obterPrestador(prestadorId), listarServicosPrestador(prestadorId), listarHorariosPrestador(prestadorId),
             listarCategoriasPrestador(prestadorId),
             listarAvaliacoesPrestador(prestadorId).catch(() => []),
+            listarFotosEstabelecimento(prestadorId).catch(() => []),
           ]);
         if (!ativo) return;
         setPrestador(prestadorData);
@@ -63,6 +68,7 @@ export function PrestadorProfileScreen() {
         setHorarios(horariosData);
         setCategorias(categoriasData);
         setAvaliacoes(avaliacoesData);
+        setFotos(fotosData);
       } catch {
         if (ativo) setErro('Não foi possível carregar os dados do prestador.');
       } finally {
@@ -98,7 +104,7 @@ export function PrestadorProfileScreen() {
 
   return (
     <View style={styles.screen}>
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+    <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={styles.scrollContent}>
       <View style={styles.heroWrap}>
         <CatalogImage fotoUrl={banner} kind="provider" style={styles.hero} />
         <View style={[styles.heroBack, { top: desktop ? 28 : Math.max(insets.top, 56) }]}>
@@ -125,10 +131,11 @@ export function PrestadorProfileScreen() {
         </View>
 
         {aba === 'sobre' ? <>
-          {prestador.foto_url ? <>
+          {fotos.length > 0 ? <>
             <Text style={styles.sectionTitle}>Fotos</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.gallery}>
-              <CatalogImage fotoUrl={prestador.foto_url} kind="provider" style={styles.galleryImage} />
+              {fotos.map((foto) => <CatalogImage key={foto.id} fotoUrl={foto.foto_url}
+                kind="provider" style={styles.galleryImage} />)}
             </ScrollView>
           </> : null}
 

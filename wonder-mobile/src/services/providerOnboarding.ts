@@ -150,11 +150,11 @@ export async function listarMeusHorariosPrestador(): Promise<ProviderOnboardingS
   return response.data;
 }
 
-export async function criarHorarioPrestadorOnboarding(
+export async function criarHorariosPrestadorOnboarding(
   prestadorId: number,
-  payload: ProviderOnboardingSchedulePayload
-): Promise<ProviderOnboardingSchedule> {
-  const response = await api.post<ProviderOnboardingSchedule>(`/catalogo/prestadores/${prestadorId}/horarios`, payload);
+  payload: ProviderOnboardingSchedulePayload[]
+): Promise<ProviderOnboardingSchedule[]> {
+  const response = await api.post<ProviderOnboardingSchedule[]>(`/catalogo/prestadores/${prestadorId}/horarios/lote`, payload);
   return response.data;
 }
 

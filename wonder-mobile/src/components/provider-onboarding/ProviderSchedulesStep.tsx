@@ -13,7 +13,7 @@ type Props = {
   schedules: ProviderOnboardingSchedule[];
   saving: boolean;
   disabled: boolean;
-  onCreate: (payload: { dia_semana: number; hora_inicio: string; hora_fim: string }) => Promise<void>;
+  onCreate: (payload: { dia_semana: number; hora_inicio: string; hora_fim: string }[]) => Promise<void>;
   onRemove: (scheduleId: number) => Promise<void>;
 };
 

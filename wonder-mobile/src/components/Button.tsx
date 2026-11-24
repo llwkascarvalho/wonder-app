@@ -58,7 +58,7 @@ export function Button({
           color={variant === 'outline' ? theme.colors.primary : variant === 'danger' ? theme.colors.danger : theme.colors.white}
         />
       ) : (
-        <Text style={[styles.text, styles[`${variant}Text`], appearance === 'customer' && styles.customerText]}>{title}</Text>
+        <Text style={[styles.text, styles[`${variant}Text`], appearance === 'customer' && styles.customerText, appearance === 'customer' && size === 'sm' && styles.customerSmallText]}>{title}</Text>
       )}
     </Pressable>
   );
@@ -122,5 +122,6 @@ const styles = StyleSheet.create({
   customerButton: { minHeight: 52, borderRadius: 28 },
   customerSecondary: { backgroundColor: customerTheme.v4.lilac },
   customerOutline: { borderColor: customerTheme.v4.primary },
-  customerText: { fontFamily: customerTheme.v4.fontBodyBold, fontSize: 15 },
+  customerText: { fontFamily: customerTheme.v4.fontBodySemi, fontWeight: 'normal', fontSize: 16 },
+  customerSmallText: { fontSize: 15 },
 });
