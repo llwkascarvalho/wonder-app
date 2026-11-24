@@ -5,7 +5,7 @@ import { AdminProvidersScreen } from '../screens/admin/AdminProvidersScreen';
 
 export type AdminProvidersStackParamList = {
   AdminProvidersList: undefined;
-  AdminProviderDetails: { prestadorId: number };
+  AdminProviderDetails: { prestadorId: number; initialAction?: 'rejeitado' };
 };
 
 const Stack = createNativeStackNavigator<AdminProvidersStackParamList>();

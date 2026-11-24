@@ -13,7 +13,7 @@ const actionsByStatus: Record<AdminPrestadorStatus, AdminProviderStatusAction[]>
     { status: 'ativo', label: 'Aprovar', variant: 'primary' },
     {
       status: 'rascunho',
-      label: 'Solicitar correcao',
+      label: 'Solicitar correção',
       variant: 'outline',
       requiresNote: true,
     },
