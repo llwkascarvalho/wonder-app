@@ -117,9 +117,6 @@ export function ProfileEditModal({
               editable={!loading}
               placeholder="(00) 00000-0000"
             />
-            <Text style={appearance === 'customer' ? styles.customerHelper : undefined}>
-              Deixe o telefone em branco para manter o atual.
-            </Text>
             <Button appearance={appearance} title={foto ? 'Trocar foto selecionada' : 'Selecionar foto'} variant="secondary" onPress={selectPhoto} loading={picking} disabled={loading} />
             <Text style={appearance === 'customer' ? styles.customerHelper : undefined}>
               {foto ? `Foto selecionada: ${foto.fileName || 'imagem'}` : 'JPEG, PNG ou WebP de até 5 MiB.'}
