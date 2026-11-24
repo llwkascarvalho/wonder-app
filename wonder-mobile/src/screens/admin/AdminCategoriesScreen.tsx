@@ -4,17 +4,16 @@ import {
   Image,
   Modal,
   Platform,
-  RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
-import { Button } from '../../components/Button';
+import { A, AdminAction, AdminMessage, AdminPage, adminV4 } from '../../components/admin/AdminV4';
 import { Card } from '../../components/Card';
 import { CatalogImage } from '../../components/catalog/CatalogImage';
-import { Input } from '../../components/Input';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import {
   atualizarCategoriaAdmin,
@@ -72,6 +71,7 @@ export function AdminCategoriesScreen() {
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
   const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [imageRevisions, setImageRevisions] = useState<Record<number, number>>({});
 
   const categoriasAtivas = useMemo(
     () => categorias.filter((categoria) => categoria.status === 'ativa'),
@@ -208,6 +208,7 @@ export function AdminCategoriesScreen() {
             fileSize: imageToUpload.fileSize,
             file: imageToUpload.file,
           });
+          setImageRevisions(previous => ({ ...previous, [savedCategoria.id]: Date.now() }));
           setSuccess('Categoria e imagem salvas com sucesso.');
         } catch (imageError) {
           const detail = extractBackendMessage(
@@ -252,34 +253,23 @@ export function AdminCategoriesScreen() {
 
   return (
     <>
-      <ScrollView
-        contentContainerStyle={styles.container}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-      >
-        <View style={styles.header}>
-          <View style={styles.headerText}>
-            <Text style={styles.title}>Categorias</Text>
-            <Text style={styles.subtitle}>Gerencie categorias ativas e inativas.</Text>
-          </View>
-          <Button title="Nova +" size="sm" onPress={openCreateModal} />
-        </View>
+      <AdminPage title="Categorias" subtitle={`${categorias.length} categorias cadastradas.`}
+        refreshing={refreshing} onRefresh={handleRefresh} wide>
+        <AdminAction label="Nova categoria" onPress={openCreateModal} />
 
         {error ? (
-          <Card>
-            <Text style={styles.error}>{error}</Text>
-          </Card>
+          <AdminMessage danger>{error}</AdminMessage>
         ) : null}
 
         {success ? (
-          <Card>
-            <Text style={styles.success}>{success}</Text>
-          </Card>
+          <AdminMessage>{success}</AdminMessage>
         ) : null}
 
         <CategorySection
           title="Ativas"
           emptyText="Nenhuma categoria ativa."
           categorias={categoriasAtivas}
+          imageRevisions={imageRevisions}
           savingStatusId={savingStatusId}
           onEdit={openEditModal}
           onStatus={(categoria) => handleStatus(categoria, 'inativa')}
@@ -289,55 +279,48 @@ export function AdminCategoriesScreen() {
           title="Inativas"
           emptyText="Nenhuma categoria inativa."
           categorias={categoriasInativas}
+          imageRevisions={imageRevisions}
           savingStatusId={savingStatusId}
           onEdit={openEditModal}
           onStatus={(categoria) => handleStatus(categoria, 'ativa')}
         />
-      </ScrollView>
+      </AdminPage>
 
-      <Modal transparent visible={modalVisible} animationType="fade" onRequestClose={closeModal}>
+      <Modal transparent visible={modalVisible} animationType="slide" onRequestClose={closeModal}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              {editingCategoria ? 'Editar categoria' : 'Cadastrar categorias'}
+              {editingCategoria ? 'Editar categoria' : 'Nova categoria'}
             </Text>
 
-            <Input
-              label="Nome da categoria"
-              placeholder="Ex.: Cabelo masculino"
-              value={nome}
-              onChangeText={setNome}
-            />
+            <Text style={adminV4.body}>Cadastre uma categoria para organizar os serviços.</Text>
 
-            <Input
-              label="Descricao"
-              placeholder="Descricao da categoria"
-              value={descricao}
-              onChangeText={setDescricao}
-              multiline
-            />
+            <View style={styles.field}><Text style={styles.fieldLabel}>Nome da categoria *</Text>
+              <TextInput accessibilityLabel="Nome da categoria" placeholder="Ex.: Cabelo masculino" placeholderTextColor={A.textMuted}
+                value={nome} onChangeText={setNome} style={styles.fieldInput} /></View>
+            <View style={styles.field}><Text style={styles.fieldLabel}>Descrição (opcional)</Text>
+              <TextInput accessibilityLabel="Descrição" placeholder="Descreva quando esta categoria deve ser utilizada."
+                placeholderTextColor={A.textMuted} value={descricao} onChangeText={setDescricao} multiline style={[styles.fieldInput, styles.textarea]} /></View>
 
             <View style={styles.imagePreviewRow}>
               {selectedImage ? (
                 <Image source={{ uri: selectedImage.uri }} style={styles.imagePreview} />
               ) : (
-                <CatalogImage fotoUrl={editingCategoria?.foto_url} kind="category" style={styles.imagePreview} />
+                <CatalogImage fotoUrl={editingCategoria?.foto_url} kind="category" style={styles.imagePreview}
+                  revision={editingCategoria ? imageRevisions[editingCategoria.id] : undefined} />
               )}
               <View style={styles.imagePreviewContent}>
-                <Text style={styles.imagePreviewTitle}>Imagem da categoria</Text>
-                <Button
-                  title={selectedImage || editingCategoria?.foto_url ? 'Trocar imagem' : 'Selecionar imagem'}
-                  size="sm"
-                  variant="secondary"
-                  disabled={saving}
-                  onPress={handlePickImage}
-                />
+                <Text style={styles.imagePreviewTitle}>Imagem da categoria (opcional)</Text>
+                <AdminAction label={selectedImage || editingCategoria?.foto_url ? 'Trocar imagem' : 'Selecionar imagem'}
+                  compact kind="secondary" disabled={saving} onPress={handlePickImage} />
               </View>
             </View>
 
+            <Text style={adminV4.muted}>JPEG, PNG ou WebP com até 5 MB.</Text>
+            {error ? <AdminMessage danger>{error}</AdminMessage> : null}
             <View style={styles.modalActions}>
-              <Button title="Cancelar" variant="secondary" disabled={saving} onPress={closeModal} />
-              <Button title="Salvar" loading={saving} onPress={handleSave} />
+              <View style={styles.action}><AdminAction label="Cancelar" kind="secondary" disabled={saving} onPress={closeModal} /></View>
+              <View style={styles.action}><AdminAction label={saving ? 'Salvando…' : 'Salvar categoria'} disabled={saving} onPress={() => { void handleSave(); }} /></View>
             </View>
           </View>
         </View>
@@ -350,6 +333,7 @@ function CategorySection({
   title,
   emptyText,
   categorias,
+  imageRevisions,
   savingStatusId,
   onEdit,
   onStatus,
@@ -357,23 +341,28 @@ function CategorySection({
   title: string;
   emptyText: string;
   categorias: AdminCategoria[];
+  imageRevisions: Record<number, number>;
   savingStatusId: number | null;
   onEdit: (categoria: AdminCategoria) => void;
   onStatus: (categoria: AdminCategoria) => void;
 }) {
+  const { width } = useWindowDimensions();
+  const cardWidth = width >= 900 ? (Math.min(width - (width >= 1280 ? 272 : 248) - 40, 1040) - 12) / 2 : undefined;
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {categorias.length ? (
-        categorias.map((categoria) => (
+        <View style={styles.categoryGrid}>{categorias.map((categoria) => (
           <CategoryCard
             key={categoria.id}
             categoria={categoria}
+            imageRevision={imageRevisions[categoria.id]}
+            width={cardWidth}
             savingStatus={savingStatusId === categoria.id}
             onEdit={() => onEdit(categoria)}
             onStatus={() => onStatus(categoria)}
           />
-        ))
+        ))}</View>
       ) : (
         <Card>
           <Text style={styles.empty}>{emptyText}</Text>
@@ -385,11 +374,15 @@ function CategorySection({
 
 function CategoryCard({
   categoria,
+  imageRevision,
+  width,
   savingStatus,
   onEdit,
   onStatus,
 }: {
   categoria: AdminCategoria;
+  imageRevision?: number;
+  width?: number;
   savingStatus: boolean;
   onEdit: () => void;
   onStatus: () => void;
@@ -397,96 +390,56 @@ function CategoryCard({
   const ativa = categoria.status === 'ativa';
 
   return (
-    <Card style={styles.categoryCard}>
-      <CatalogImage fotoUrl={categoria.foto_url} kind="category" style={styles.categoryImage} />
-
-      <View style={styles.categoryInfo}>
-        <Text style={styles.cardTitle}>{categoria.nome}</Text>
-        {categoria.descricao ? <Text style={styles.cardText}>{categoria.descricao}</Text> : null}
-        <Text style={[styles.statusText, ativa ? styles.statusActive : styles.statusInactive]}>
-          {ativa ? 'Ativa' : 'Inativa'}
-        </Text>
+    <View style={[adminV4.card, styles.categoryCard, { width: width ?? '100%' }]}>
+      <View style={styles.categoryTop}>
+        <CatalogImage fotoUrl={categoria.foto_url} kind="category" style={styles.categoryImage} revision={imageRevision} />
+        <View style={styles.categoryInfo}>
+          <Text style={styles.cardTitle}>{categoria.nome}</Text>
+          {categoria.descricao ? <Text style={styles.cardText} numberOfLines={2}>{categoria.descricao}</Text> : null}
+          <Text style={[styles.statusText, ativa ? styles.statusActive : styles.statusInactive]}>{ativa ? 'Ativa' : 'Inativa'}</Text>
+        </View>
       </View>
-
       <View style={styles.actions}>
-        <Button title="Editar" size="sm" variant="outline" onPress={onEdit} />
-        <Button
-          title={ativa ? 'Inativar' : 'Ativar'}
-          size="sm"
-          variant={ativa ? 'danger' : 'secondary'}
-          loading={savingStatus}
-          disabled={savingStatus}
-          onPress={onStatus}
-        />
+        <View style={styles.action}><AdminAction label="Editar" compact kind="secondary" onPress={onEdit} /></View>
+        <View style={styles.action}><AdminAction label={ativa ? 'Inativar' : 'Ativar'} compact kind={ativa ? 'danger' : 'secondary'} disabled={savingStatus} onPress={onStatus} /></View>
       </View>
-    </Card>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: theme.colors.background,
-    gap: theme.spacing.md,
-    padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xxl,
-    paddingTop: theme.spacing.xxl,
-  },
-  header: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-    justifyContent: 'space-between',
-  },
-  headerText: {
-    flex: 1,
-    gap: theme.spacing.xs,
-  },
-  title: {
-    color: theme.colors.primary,
-    fontSize: theme.fontSize.xxl,
-    fontWeight: theme.fontWeight.bold,
-  },
-  subtitle: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.md,
-  },
-  section: {
-    gap: theme.spacing.sm,
-  },
+  section: { gap: 12 },
+  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   sectionTitle: {
-    color: theme.colors.primary,
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.bold,
-    textTransform: 'uppercase',
+    color: A.text,
+    fontFamily: A.fontDisplay,
+    fontSize: 22,
   },
-  categoryCard: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
+  categoryCard: { gap: 14, padding: 14 },
+  categoryTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   categoryImage: {
     backgroundColor: theme.colors.surfaceMuted,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: 16,
     height: 56,
     width: 56,
   },
   categoryInfo: {
     flex: 1,
-    gap: theme.spacing.xs,
+    gap: 4,
   },
   cardTitle: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.bold,
+    color: A.text,
+    fontFamily: A.fontDisplay,
+    fontSize: 19,
   },
   cardText: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.sm,
+    color: A.textMuted,
+    fontFamily: A.fontBody,
+    fontSize: 14,
   },
   statusText: {
-    fontSize: theme.fontSize.xs,
-    fontWeight: theme.fontWeight.bold,
-    textTransform: 'uppercase',
+    fontFamily: A.fontBodySemi,
+    fontSize: 13,
   },
   statusActive: {
     color: theme.colors.success,
@@ -494,47 +447,38 @@ const styles = StyleSheet.create({
   statusInactive: {
     color: theme.colors.textMuted,
   },
-  actions: {
-    gap: theme.spacing.xs,
-    width: 96,
-  },
+  actions: { flexDirection: 'row', gap: 10 },
+  action: { flex: 1 },
   empty: {
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.md,
     textAlign: 'center',
   },
-  error: {
-    color: theme.colors.error,
-    fontSize: theme.fontSize.sm,
-  },
-  success: {
-    color: theme.colors.success,
-    fontSize: theme.fontSize.sm,
-  },
   modalBackdrop: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.32)',
+    backgroundColor: 'rgba(46,10,87,0.62)',
     flex: 1,
-    justifyContent: 'center',
-    padding: theme.spacing.lg,
+    justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    gap: theme.spacing.md,
-    padding: theme.spacing.lg,
+    backgroundColor: A.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    gap: 16,
+    padding: 20,
+    paddingBottom: 32,
     width: '100%',
+    maxWidth: 520,
   },
   modalTitle: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.bold,
-    textTransform: 'uppercase',
+    color: A.text,
+    fontFamily: A.fontDisplay,
+    fontSize: 24,
   },
   imagePreviewRow: {
     alignItems: 'center',
-    backgroundColor: theme.colors.surfaceMuted,
-    borderRadius: theme.borderRadius.sm,
+    backgroundColor: A.field,
+    borderRadius: 16,
     flexDirection: 'row',
     gap: theme.spacing.xs,
     padding: theme.spacing.sm,
@@ -549,13 +493,18 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   imagePreviewTitle: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.bold,
+    color: A.text,
+    fontFamily: A.fontBodySemi,
+    fontSize: 15,
   },
   modalActions: {
     flexDirection: 'row',
     gap: theme.spacing.sm,
     justifyContent: 'flex-end',
   },
+  field: { gap: 8 },
+  fieldLabel: { color: A.text, fontFamily: A.fontBodySemi, fontSize: 15 },
+  fieldInput: { height: 56, borderRadius: 16, backgroundColor: A.field, paddingHorizontal: 16,
+    color: A.text, fontFamily: A.fontBody, fontSize: 16 },
+  textarea: { height: 92, paddingVertical: 14, textAlignVertical: 'top' },
 });

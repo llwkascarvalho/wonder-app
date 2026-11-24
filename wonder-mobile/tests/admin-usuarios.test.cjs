@@ -62,9 +62,23 @@ function preparar({ ativo = true, proprio = false, falha } = {}) {
     modulo.require = id => {
       if (id === 'react') return react;
       if (id === 'react-native') return { Modal: 'Modal', ScrollView: 'ScrollView', Text: 'Text', View: 'View',
+        Pressable: 'Pressable', TextInput: 'TextInput', useWindowDimensions: () => ({ width: 375 }),
         Platform: { OS: 'web' }, StyleSheet: { create: v => v } };
       if (id === '@react-navigation/native') return { useNavigation: () => ({ goBack() {} }) };
       if (id.endsWith('/AuthContext')) return { useAuth: () => ({ usuario: { keycloakId: proprio ? pessoa.id : 'admin' } }) };
+      if (id.endsWith('/components/admin/AdminV4')) return {
+        A: { text: '#24102E', textMuted: '#675B75', primary: '#5D14A6', danger: '#C62828', success: '#12805C',
+          field: '#EFEAF6', border: '#E7E0EF', lilac: '#EFE3FA', fontBody: 'Figtree', fontBodySemi: 'Figtree',
+          fontBodyBold: 'Figtree', fontDisplay: 'Bricolage Grotesque' },
+        adminV4: { card: {}, muted: {}, body: {}, heading: {} },
+        AdminAction: ({ label, accessibilityLabel, onPress, disabled }) => ({ type: 'Button', props: { title: label, accessibilityLabel, onPress, disabled } }),
+        AdminChip: ({ label, onPress }) => ({ type: 'Button', props: { title: label, onPress } }),
+        AdminMessage: ({ children }) => ({ type: 'Text', props: { children } }),
+        AdminPage: ({ children, search, onSearch }) => ({ type: 'View', props: { children: [
+          onSearch && { type: 'Input', props: { label: 'Buscar por nome, usuário ou e-mail', value: search, onChangeText: onSearch } },
+          children,
+        ] } }),
+      };
       if (id.includes('/components/')) { const nome = id.split('/').at(-1); return { [nome]: nome }; }
       if (id === './api') return { api };
       if (id === './profileService') return { appendImageFile() {} };
@@ -101,11 +115,12 @@ function preparar({ ativo = true, proprio = false, falha } = {}) {
   const app = {
     requisicoes,
     async estabilizar() { renderizar(); await new Promise(resolve => setImmediate(resolve)); renderizar(); },
-    botoes: () => nos().filter(no => no.type === 'Button').map(no => no.props),
+    botoes: () => nos().filter(no => no.type === 'Button' || no.type === 'Pressable').map(no => no.props),
     textos: () => nos().filter(no => no.type === 'Text').flatMap(no => no.props.children),
-    campo: label => nos().find(no => no.type === 'Input' && no.props.label === label).props,
+    campo: label => nos().find(no => (no.type === 'Input' && no.props.label === label)
+      || (no.type === 'TextInput' && no.props.accessibilityLabel === label)).props,
     async clicar(titulo) {
-      const botao = app.botoes().find(b => b.title === titulo);
+      const botao = app.botoes().find(b => b.title === titulo || b.accessibilityLabel?.startsWith(titulo));
       assert.ok(botao && !botao.disabled, `Botão ${titulo} disponível`);
       await botao.onPress(); await app.estabilizar();
     },
@@ -122,7 +137,7 @@ test('admin edita identidade sem alterar username ou status e atualiza a tela so
   assert.deepEqual(app.requisicoes.at(-1), { metodo: 'PUT', url: '/admin/usuarios/usuario-teste',
     dados: { nome: 'Ana', sobrenome: 'Souza', email: 'ana@example.com' } });
   assert.ok(app.textos().includes('Dados atualizados.'));
-  assert.ok(app.textos().includes('login-preservado'));
+  assert.ok(app.textos().some(texto => typeof texto === 'string' && texto.includes('login-preservado')));
 });
 
 test('desativação exige confirmação e usa status, sem exclusão física', async () => {
@@ -163,6 +178,7 @@ test('nome obrigatório é validado e e-mail duplicado mantém a edição aberta
 test('busca e paginação são enviadas ao backend', async () => {
   const app = preparar(); await app.estabilizar(); await app.clicar('Próxima');
   assert.equal(app.requisicoes.at(-1).opcoes.params.inicio, 20);
-  app.campo('Buscar por nome, usuário ou e-mail').onChangeText(' Maria '); await app.clicar('Buscar');
+  app.campo('Buscar por nome, usuário ou e-mail').onChangeText(' Maria ');
+  await app.estabilizar(); await new Promise(resolve => setTimeout(resolve, 400)); await app.estabilizar();
   assert.deepEqual(app.requisicoes.at(-1).opcoes.params, { busca: 'Maria', inicio: 0, limite: 20 });
 });

@@ -1,166 +1,52 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { Button } from '../../components/Button';
-import { Card } from '../../components/Card';
+import { A, AdminAction, AdminMessage, AdminPage, adminV4 } from '../../components/admin/AdminV4';
 import { CatalogImage } from '../../components/catalog/CatalogImage';
-import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { AdminProvidersStackParamList } from '../../navigation/AdminProvidersStack';
 import { listarPrestadoresPendentes } from '../../services/admin';
-import { theme } from '../../styles/theme';
 import { AdminPrestador } from '../../types/admin';
-import { formatBackendDateTime } from '../../utils/dateTime';
 
-type Navigation = NativeStackNavigationProp<AdminProvidersStackParamList, 'AdminProvidersList'>;
-
-function formatDate(value?: string | null): string {
-  return formatBackendDateTime(value, 'Sem data de envio', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+type Nav = NativeStackNavigationProp<AdminProvidersStackParamList, 'AdminProvidersList'>;
 
 export function AdminProvidersScreen() {
-  const navigation = useNavigation<Navigation>();
+  const navigation = useNavigation<Nav>();
   const [prestadores, setPrestadores] = useState<AdminPrestador[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
-
-  const load = useCallback(async () => {
-    setError('');
-    try {
-      setPrestadores(await listarPrestadoresPendentes());
-    } catch {
-      setError('Nao foi possivel carregar as solicitacoes pendentes.');
-    }
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState('');
+  const carregar = useCallback(async () => {
+    setErro('');
+    try { setPrestadores(await listarPrestadoresPendentes()); }
+    catch { setErro('Não foi possível carregar as solicitações.'); }
+    finally { setCarregando(false); }
   }, []);
+  useFocusEffect(useCallback(() => { setCarregando(true); void carregar(); }, [carregar]));
 
-  useFocusEffect(
-    useCallback(() => {
-      setLoading(true);
-      load().finally(() => setLoading(false));
-    }, [load])
-  );
-
-  async function handleRefresh() {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }
-
-  if (loading) {
-    return <LoadingIndicator text="Carregando solicitacoes..." />;
-  }
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Prestadores</Text>
-        <Text style={styles.subtitle}>Solicitacoes pendentes de aprovacao.</Text>
-      </View>
-
-      {error ? (
-        <Card>
-          <Text style={styles.error}>{error}</Text>
-        </Card>
-      ) : null}
-
-      <FlatList
-        data={prestadores}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-        ListEmptyComponent={
-          <Card>
-            <Text style={styles.empty}>Nenhuma solicitacao pendente.</Text>
-          </Card>
-        }
-        renderItem={({ item }) => (
-          <Card style={styles.providerCard}>
-            <CatalogImage
-              authenticated
-              fotoUrl={item.foto_url || item.solicitante_foto_url}
-              kind="provider"
-              style={styles.providerAvatar}
-            />
-            <View style={styles.providerInfo}>
-              <Text style={styles.cardTitle}>{item.nome_estab}</Text>
-              <Text style={styles.cardText}>Documento: {item.documento || 'Não informado'}</Text>
-              <Text style={styles.cardText}>Enviado: {formatDate(item.enviado_em)}</Text>
-            </View>
-            <Button
-              title="Visualizar"
-              size="sm"
-              variant="outline"
-              onPress={() => navigation.navigate('AdminProviderDetails', { prestadorId: item.id })}
-            />
-          </Card>
-        )}
-      />
-    </View>
-  );
+  return <AdminPage title="Solicitações pendentes" subtitle={carregando ? 'Carregando solicitações…' :
+    `${prestadores.length} ${prestadores.length === 1 ? 'cadastro aguardando' : 'cadastros aguardando'} análise.`} wide>
+    {erro ? <AdminMessage danger>{erro}</AdminMessage> : null}
+    {carregando ? <Text style={adminV4.muted}>Carregando…</Text> : prestadores.length ? prestadores.map(item =>
+      <View key={item.id} style={[adminV4.card, styles.card]}>
+        <View style={styles.identity}>
+          <CatalogImage authenticated fotoUrl={item.foto_url || item.solicitante_foto_url} kind="provider" style={styles.image} />
+          <View style={styles.identityText}>
+            <Text style={styles.name} numberOfLines={2}>{item.nome_estab}</Text>
+            {item.enviado_em ? <Text style={adminV4.muted}>Enviado em {new Date(item.enviado_em).toLocaleDateString('pt-BR')}</Text> : null}
+          </View>
+        </View>
+        <View style={styles.actions}>
+          <View style={styles.action}><AdminAction label="Visualizar" kind="secondary" compact onPress={() => navigation.navigate('AdminProviderDetails', { prestadorId: item.id })} /></View>
+          <View style={styles.action}><AdminAction label="Recusar" kind="danger" compact onPress={() => navigation.navigate('AdminProviderDetails', { prestadorId: item.id, initialAction: 'rejeitado' })} /></View>
+        </View>
+      </View>) : <View style={adminV4.card}><Text style={adminV4.body}>Nenhuma solicitação pendente.</Text></View>}
+  </AdminPage>;
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: theme.colors.background,
-    flex: 1,
-    gap: theme.spacing.md,
-    padding: theme.spacing.lg,
-    paddingTop: theme.spacing.xxl,
-  },
-  header: {
-    gap: theme.spacing.xs,
-  },
-  title: {
-    color: theme.colors.primary,
-    fontSize: theme.fontSize.xxl,
-    fontWeight: theme.fontWeight.bold,
-  },
-  subtitle: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.md,
-  },
-  list: {
-    gap: theme.spacing.sm,
-    paddingBottom: theme.spacing.xxl,
-  },
-  providerCard: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  providerAvatar: {
-    borderRadius: theme.borderRadius.md,
-    height: 56,
-    width: 56,
-  },
-  providerInfo: {
-    flex: 1,
-    gap: theme.spacing.xs,
-  },
-  cardTitle: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.bold,
-  },
-  cardText: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.sm,
-  },
-  empty: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.md,
-    textAlign: 'center',
-  },
-  error: {
-    color: theme.colors.error,
-    fontSize: theme.fontSize.sm,
-  },
+  card: { gap: 14, padding: 14 }, identity: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  image: { width: 56, height: 56, borderRadius: 16 }, identityText: { flex: 1, gap: 3 },
+  name: { fontFamily: A.fontDisplay, fontSize: 19, color: A.text },
+  actions: { flexDirection: 'row', gap: 10 }, action: { flex: 1 },
 });

@@ -1,203 +1,178 @@
 import { useNavigation } from '@react-navigation/native';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 
-import { Button } from '../../components/Button';
-import { Card } from '../../components/Card';
-import { Input } from '../../components/Input';
+import { A, AdminAction, AdminChip, AdminMessage, AdminPage, adminV4 } from '../../components/admin/AdminV4';
+import { AdminExportFeedback, AdminExportFeedbackState } from '../../components/admin/AdminExportFeedback';
 import { useAuth } from '../../contexts/AuthContext';
-import {
-  atualizarStatusUsuarioAdmin, atualizarUsuarioAdmin, listarUsuariosAdmin, obterUsuarioAdmin,
-} from '../../services/admin';
-import { theme } from '../../styles/theme';
+import { atualizarStatusUsuarioAdmin, atualizarUsuarioAdmin, listarUsuariosAdmin, mensagemErroExportacaoAdmin, obterUsuarioAdmin, solicitarExportacaoAdmin } from '../../services/admin';
 import { AdminUsuario, AdminUsuariosPagina } from '../../types/admin';
 
-function mensagemErro(error: unknown): string {
-  const status = (error as { response?: { status?: number } })?.response?.status;
-  if (status === 409) return 'Este e-mail já está em uso ou a alteração não é permitida.';
-  if (status === 400) return 'Confira o nome e o e-mail informados.';
-  if (status === 404) return 'Usuário não encontrado. Atualize a lista.';
-  if (status === 403) return 'Apenas administradores podem gerenciar usuários.';
-  if (status === 503) return 'Não foi possível concluir a operação agora. Atualize os dados do usuário antes de tentar novamente.';
-  return 'Não foi possível concluir a operação. Tente novamente.';
-}
+const roles = [
+  { label: 'Todos', value: '' }, { label: 'Clientes', value: 'CUSTOMER' },
+  { label: 'Prestadores', value: 'PROVIDER' }, { label: 'Admin', value: 'ADMIN' },
+];
 
 export function AdminUsersScreen() {
   const navigation = useNavigation();
+  const { width } = useWindowDimensions();
+  const desktop = width >= 900;
   const { usuario } = useAuth();
   const [busca, setBusca] = useState('');
-  const [filtro, setFiltro] = useState('');
+  const [buscaAplicada, setBuscaAplicada] = useState('');
+  const [papel, setPapel] = useState('');
   const [inicio, setInicio] = useState(0);
   const [pagina, setPagina] = useState<AdminUsuariosPagina | null>(null);
-  const [carregando, setCarregando] = useState(true);
-  const [ocupado, setOcupado] = useState(false);
-  const [erro, setErro] = useState('');
-  const [aviso, setAviso] = useState('');
   const [selecionado, setSelecionado] = useState<AdminUsuario | null>(null);
   const [nome, setNome] = useState('');
   const [sobrenome, setSobrenome] = useState('');
   const [email, setEmail] = useState('');
-  const [confirmandoStatus, setConfirmandoStatus] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
+  const [carregando, setCarregando] = useState(true);
+  const [ocupado, setOcupado] = useState(false);
+  const [exportando, setExportando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [aviso, setAviso] = useState('');
+  const [feedback, setFeedback] = useState<AdminExportFeedbackState>(null);
   const requisicao = useRef(0);
-  const montado = useRef(true);
 
-  useEffect(() => {
-    montado.current = true;
-    return () => { montado.current = false; requisicao.current += 1; };
-  }, []);
-
+  useEffect(() => { const timer = setTimeout(() => { setInicio(0); setBuscaAplicada(busca.trim()); }, 350); return () => clearTimeout(timer); }, [busca]);
   const carregar = useCallback(async () => {
     const atual = ++requisicao.current;
-    setCarregando(true);
-    setErro('');
-    setPagina(null);
-    try {
-      const dados = await listarUsuariosAdmin(filtro, inicio);
-      if (atual === requisicao.current) setPagina(dados);
-    } catch (error) {
-      if (atual === requisicao.current) setErro(mensagemErro(error));
-    } finally {
-      if (atual === requisicao.current) setCarregando(false);
-    }
-  }, [filtro, inicio]);
-
+    setCarregando(true); setErro('');
+    try { const dados = await listarUsuariosAdmin(buscaAplicada, inicio, papel || undefined); if (atual === requisicao.current) setPagina(dados); }
+    catch { if (atual === requisicao.current) setErro('Não foi possível carregar os usuários.'); }
+    finally { if (atual === requisicao.current) setCarregando(false); }
+  }, [buscaAplicada, inicio, papel]);
   useEffect(() => { void carregar(); }, [carregar]);
 
   async function abrir(id: string) {
-    if (ocupado) return;
-    setOcupado(true);
-    setErro('');
-    setAviso('');
+    setOcupado(true); setErro(''); setAviso('');
     try {
       const dados = await obterUsuarioAdmin(id);
-      if (!montado.current) return;
-      setSelecionado(dados);
-      setNome(dados.nome || '');
-      setSobrenome(dados.sobrenome || '');
-      setEmail(dados.email || '');
-      setConfirmandoStatus(false);
-    } catch (error) {
-      if (montado.current) setErro(mensagemErro(error));
-    } finally {
-      if (montado.current) setOcupado(false);
-    }
+      setSelecionado(dados); setNome(dados.nome || ''); setSobrenome(dados.sobrenome || ''); setEmail(dados.email || '');
+      setConfirmando(false);
+    } catch { setErro('Não foi possível abrir este usuário.'); }
+    finally { setOcupado(false); }
   }
 
   async function salvar(status = false) {
     if (!selecionado || ocupado) return;
-    if (!status && (!nome.trim() || !email.trim())) {
-      setErro('Informe o nome e o e-mail.');
-      return;
-    }
-    setOcupado(true);
-    setErro('');
-    setAviso('');
+    if (!status && (!nome.trim() || !email.trim())) { setErro('Informe nome e e-mail.'); return; }
+    setOcupado(true); setErro(''); setAviso('');
     try {
-      const atualizado = status
-        ? await atualizarStatusUsuarioAdmin(selecionado.id, !selecionado.ativo)
-        : await atualizarUsuarioAdmin(selecionado.id, {
-            nome: nome.trim(), sobrenome: sobrenome.trim(), email: email.trim(),
-          });
-      if (!montado.current) return;
-      setSelecionado(atualizado);
-      setNome(atualizado.nome || '');
-      setSobrenome(atualizado.sobrenome || '');
-      setEmail(atualizado.email || '');
-      setPagina((anterior) => anterior ? {
-        ...anterior, usuarios: anterior.usuarios.map((item) => item.id === atualizado.id ? atualizado : item),
-      } : anterior);
-      setConfirmandoStatus(false);
-      setAviso(status ? (atualizado.ativo ? 'Conta reativada. O usuário pode entrar novamente.'
-        : 'Conta desativada e sessões encerradas.') : 'Dados atualizados.');
+      const atualizado = status ? await atualizarStatusUsuarioAdmin(selecionado.id, !selecionado.ativo) :
+        await atualizarUsuarioAdmin(selecionado.id, { nome: nome.trim(), sobrenome: sobrenome.trim(), email: email.trim() });
+      setSelecionado(atualizado); setConfirmando(false);
+      setPagina(anterior => anterior ? { ...anterior, usuarios: anterior.usuarios.map(item => item.id === atualizado.id ? atualizado : item) } : anterior);
+      setAviso(status ? (atualizado.ativo ? 'Conta reativada.' : 'Conta desativada e sessões encerradas.') : 'Dados atualizados.');
     } catch (error) {
-      if (montado.current) setErro(mensagemErro(error));
-    } finally {
-      if (montado.current) setOcupado(false);
-    }
+      const code = (error as { response?: { status?: number } })?.response?.status;
+      setErro(code === 409 ? 'Este e-mail já está em uso ou a alteração não é permitida.' :
+        code === 503 ? 'Não foi possível concluir a operação agora. Atualize os dados do usuário antes de tentar novamente.' :
+        'Não foi possível salvar. Tente novamente.');
+    } finally { setOcupado(false); }
   }
 
-  function fechar() {
-    if (ocupado) return;
-    setSelecionado(null);
-    setConfirmandoStatus(false);
-    setErro('');
-    setAviso('');
-    void carregar();
+  async function exportar() {
+    if (exportando) return;
+    setExportando(true); setFeedback(null);
+    try {
+      await solicitarExportacaoAdmin('usuarios', { busca: buscaAplicada, papel: papel || undefined });
+      setFeedback({ kind: 'success' });
+    } catch (error) { setFeedback({ kind: 'error', message: mensagemErroExportacaoAdmin(error) }); }
+    finally { setExportando(false); }
   }
 
-  return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Button title="Voltar" variant="outline" onPress={() => navigation.goBack()} disabled={ocupado} />
-      <Text style={styles.title}>Usuários</Text>
-      <Text style={styles.text}>Gerencie as contas do Wonder. Novas contas são criadas pela opção de cadastro na tela de login.</Text>
-      <Input label="Buscar por nome, usuário ou e-mail" accessibilityLabel="Buscar usuários" value={busca}
-        onChangeText={setBusca} maxLength={255} editable={!ocupado} />
-      <Button title="Buscar" disabled={ocupado || carregando} onPress={() => {
-        if (inicio === 0 && filtro === busca.trim()) void carregar();
-        else { setInicio(0); setFiltro(busca.trim()); }
-      }} />
-      {!selecionado && erro ? <Text accessibilityRole="alert" style={styles.error}>{erro}</Text> : null}
-      {carregando ? <Text style={styles.text}>Carregando usuários...</Text> : null}
-      {!carregando && pagina?.usuarios.length === 0 ? <Text style={styles.text}>Nenhum usuário encontrado.</Text> : null}
-      {pagina?.usuarios.map((item) => (
-        <Card key={item.id}>
-          <Text style={styles.name}>{[item.nome, item.sobrenome].filter(Boolean).join(' ') || item.username}</Text>
-          <Text style={styles.text}>{item.email || 'Sem e-mail'}</Text>
-          <Text style={styles.text}>{item.ativo ? 'Ativo' : 'Inativo'}</Text>
-          <Button title="Ver e editar" variant="outline" disabled={ocupado} onPress={() => abrir(item.id)} />
-        </Card>
-      ))}
-      <View style={styles.actions}>
-        <Button title="Anterior" variant="outline" disabled={inicio === 0 || carregando || ocupado}
-          onPress={() => setInicio(Math.max(0, inicio - 20))} />
-        <Button title="Próxima" variant="outline" disabled={!pagina?.temProxima || carregando || ocupado}
-          onPress={() => setInicio(inicio + 20)} />
-      </View>
-      {!carregando && erro && !selecionado ? <Button title="Tentar novamente" onPress={carregar} /> : null}
-      <Modal visible={selecionado !== null} transparent animationType="fade" onRequestClose={fechar}>
-        <View style={styles.overlay}>
-          <ScrollView contentContainerStyle={styles.modalScroll}>
-            <View style={styles.modal}>
-              <Text style={styles.title}>Editar usuário</Text>
-              <Text style={styles.text}>Usuário: {selecionado?.username}</Text>
-              <Text style={styles.text}>Status: {selecionado?.ativo ? 'Ativo' : 'Inativo'}</Text>
-              <Input label="Nome" accessibilityLabel="Nome" value={nome} onChangeText={setNome} maxLength={255} editable={!ocupado} />
-              <Input label="Sobrenome" accessibilityLabel="Sobrenome" value={sobrenome} onChangeText={setSobrenome} maxLength={255} editable={!ocupado} />
-              <Input label="E-mail" accessibilityLabel="E-mail" value={email} onChangeText={setEmail}
-                keyboardType="email-address" autoCapitalize="none" maxLength={254} editable={!ocupado} />
-              {erro ? <Text accessibilityRole="alert" style={styles.error}>{erro}</Text> : null}
-              {aviso ? <Text accessibilityRole="alert" style={styles.text}>{aviso}</Text> : null}
-              <Button title="Salvar dados" loading={ocupado} onPress={() => salvar()} />
-              {selecionado?.id === usuario?.keycloakId ? <Text style={styles.text}>Você não pode desativar sua própria conta.</Text> : (
-                confirmandoStatus ? <View style={styles.confirmation}>
-                  <Text style={styles.text}>{selecionado?.ativo
-                    ? 'Desativar esta conta e encerrar suas sessões? O perfil e o histórico serão preservados.'
-                    : 'Reativar esta conta? Será necessário fazer um novo login.'}</Text>
-                  <Button title={selecionado?.ativo ? 'Confirmar desativação' : 'Confirmar reativação'}
-                    variant={selecionado?.ativo ? 'danger' : 'primary'} disabled={ocupado} onPress={() => salvar(true)} />
-                  <Button title="Voltar à edição" variant="outline" disabled={ocupado} onPress={() => setConfirmandoStatus(false)} />
-                </View> : <Button title={selecionado?.ativo ? 'Desativar conta' : 'Reativar conta'}
-                  variant={selecionado?.ativo ? 'danger' : 'outline'} disabled={ocupado} onPress={() => setConfirmandoStatus(true)} />
-              )}
-              <Button title="Fechar" variant="outline" disabled={ocupado} onPress={fechar} />
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
+  return <><AdminPage title="Usuários" back={() => navigation.goBack()} search={busca} onSearch={setBusca} wide>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+      {roles.map(option => <AdminChip key={option.value} label={option.label} active={papel === option.value}
+        onPress={() => { setPapel(option.value); setInicio(0); }} />)}
     </ScrollView>
-  );
+    <View style={styles.summary}><Text style={styles.count}>{pagina?.total ?? '—'} <Text style={adminV4.muted}>resultados</Text></Text>
+      <AdminAction label={exportando ? 'Solicitando…' : 'Exportar CSV'} compact kind="secondary" disabled={carregando || exportando} onPress={() => { void exportar(); }} /></View>
+    {erro && !selecionado ? <AdminMessage danger>{erro}</AdminMessage> : null}
+    {aviso && !selecionado ? <AdminMessage>{aviso}</AdminMessage> : null}
+    <View style={[adminV4.card, styles.list]}>
+      {desktop && !carregando && !!pagina?.usuarios.length ? <View style={styles.tableHead}>
+        <Text style={[styles.tableLabel, { flex: 2 }]}>Usuário</Text><Text style={[styles.tableLabel, { flex: 2 }]}>E-mail</Text>
+        <Text style={[styles.tableLabel, { flex: 1 }]}>Status</Text>
+      </View> : null}
+      {carregando ? <Text style={adminV4.muted}>Carregando usuários…</Text> :
+        pagina?.usuarios.length ? pagina.usuarios.map((item, index) => <Pressable key={item.id} accessibilityRole="button"
+          accessibilityLabel={`Ver e editar ${[item.nome, item.sobrenome].filter(Boolean).join(' ') || item.username}`}
+          onPress={() => { void abrir(item.id); }} style={[styles.item, index > 0 && styles.divider]}>
+          <View style={[styles.identity, desktop && { flex: 2 }]}>
+            <View style={styles.avatar}><Text style={styles.initials}>{[item.nome?.[0], item.sobrenome?.[0]].filter(Boolean).join('').toUpperCase() || item.username.slice(0, 2).toUpperCase()}</Text></View>
+            <View style={styles.itemText}><Text style={styles.name} numberOfLines={1}>{[item.nome, item.sobrenome].filter(Boolean).join(' ') || item.username}</Text>
+              {!desktop ? <Text style={adminV4.muted} numberOfLines={1}>{item.email || 'Sem e-mail'}</Text> : null}</View>
+          </View>
+          {desktop ? <Text style={[adminV4.body, { flex: 2 }]} numberOfLines={1}>{item.email || 'Sem e-mail'}</Text> : null}
+          <View style={desktop ? { flex: 1, alignItems: 'flex-start' } : undefined}>
+            <Text style={[styles.status, item.ativo && styles.activeStatus]}>{item.ativo ? 'Ativo' : 'Inativo'}</Text>
+          </View>
+        </Pressable>) : <Text style={adminV4.muted}>Nenhum usuário encontrado.</Text>}
+    </View>
+    <View style={styles.pager}>
+      <AdminAction label="‹" accessibilityLabel="Anterior" compact kind="secondary" disabled={inicio === 0 || carregando} onPress={() => setInicio(Math.max(0, inicio - 20))} />
+      <Text style={styles.pageLabel}>Página {Math.floor(inicio / 20) + 1}{pagina ? ` de ${Math.max(1, Math.ceil(pagina.total / 20))}` : ''}</Text>
+      <AdminAction label="›" accessibilityLabel="Próxima" compact disabled={!pagina?.temProxima || carregando} onPress={() => setInicio(inicio + 20)} />
+    </View>
+    <Modal visible={!!selecionado} transparent animationType="slide" onRequestClose={() => setSelecionado(null)}>
+      <View style={styles.overlay}><ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled">
+        <View style={styles.modal}>
+          <View style={styles.handle} /><Text style={adminV4.heading}>Editar usuário</Text>
+          <Text style={adminV4.muted}>{selecionado?.username} · {selecionado?.ativo ? 'Ativo' : 'Inativo'}</Text>
+          <Field label="Nome" value={nome} onChange={setNome} />
+          <Field label="Sobrenome" value={sobrenome} onChange={setSobrenome} />
+          <Field label="E-mail" value={email} onChange={setEmail} email />
+          {erro ? <AdminMessage danger>{erro}</AdminMessage> : null}{aviso ? <AdminMessage>{aviso}</AdminMessage> : null}
+          <AdminAction label={ocupado ? 'Salvando…' : 'Salvar dados'} disabled={ocupado} onPress={() => { void salvar(); }} />
+          {selecionado?.id === usuario?.keycloakId ? <Text style={adminV4.muted}>Você não pode desativar sua própria conta.</Text> :
+            confirmando ? <View style={styles.confirmation}>
+              <Text style={adminV4.body}>{selecionado?.ativo ? 'Desativar esta conta e encerrar suas sessões?' : 'Reativar esta conta?'}</Text>
+              <AdminAction label={selecionado?.ativo ? 'Confirmar desativação' : 'Confirmar reativação'}
+                kind={selecionado?.ativo ? 'danger' : 'primary'} disabled={ocupado} onPress={() => { void salvar(true); }} />
+              <AdminAction label="Voltar" kind="secondary" onPress={() => setConfirmando(false)} />
+            </View> : <AdminAction label={selecionado?.ativo ? 'Desativar conta' : 'Reativar conta'}
+              kind={selecionado?.ativo ? 'danger' : 'secondary'} onPress={() => setConfirmando(true)} />}
+          <AdminAction label="Fechar" kind="secondary" disabled={ocupado} onPress={() => { setSelecionado(null); setErro(''); setAviso(''); void carregar(); }} />
+        </View>
+      </ScrollView></View>
+    </Modal>
+  </AdminPage>
+    <AdminExportFeedback feedback={feedback} onClose={() => setFeedback(null)} />
+  </>;
+}
+
+function Field({ label, value, onChange, email }: { label: string; value: string; onChange: (value: string) => void; email?: boolean }) {
+  return <View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text>
+    <TextInput accessibilityLabel={label} value={value} onChangeText={onChange} style={styles.input}
+      keyboardType={email ? 'email-address' : 'default'} autoCapitalize={email ? 'none' : 'sentences'} /></View>;
 }
 
 const styles = StyleSheet.create({
-  container: { padding: theme.spacing.lg, paddingTop: theme.spacing.xxl, gap: theme.spacing.md, backgroundColor: theme.colors.background },
-  title: { fontSize: theme.fontSize.xxl, fontWeight: theme.fontWeight.bold, color: theme.colors.primary },
-  name: { fontSize: theme.fontSize.lg, fontWeight: theme.fontWeight.bold, color: theme.colors.text },
-  text: { fontSize: theme.fontSize.md, color: theme.colors.textSecondary },
-  error: { fontSize: theme.fontSize.md, color: theme.colors.error },
-  actions: { flexDirection: 'row', gap: theme.spacing.md, justifyContent: 'space-between' },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
-  modalScroll: { flexGrow: 1, justifyContent: 'center', padding: theme.spacing.lg },
-  modal: { backgroundColor: theme.colors.surface, padding: theme.spacing.lg, borderRadius: theme.borderRadius.lg,
-    width: '100%', maxWidth: 560, alignSelf: 'center', gap: theme.spacing.md },
-  confirmation: { gap: theme.spacing.md },
+  chips: { gap: 10, paddingVertical: 2 }, summary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  count: { color: A.text, fontFamily: A.fontDisplay, fontSize: 22 }, list: { paddingVertical: 2 },
+  tableHead: { flexDirection: 'row', backgroundColor: A.field, marginHorizontal: -16, marginTop: -2,
+    paddingHorizontal: 16, paddingVertical: 14, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  tableLabel: { color: A.textMuted, fontFamily: A.fontBodySemi, fontSize: 13, textTransform: 'uppercase' },
+  item: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14 },
+  identity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 },
+  divider: { borderTopWidth: 1, borderTopColor: A.border },
+  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: A.lilac, alignItems: 'center', justifyContent: 'center' },
+  initials: { color: A.primary, fontFamily: A.fontBodyBold, fontSize: 14 },
+  itemText: { flex: 1, minWidth: 0, gap: 2 }, name: { color: A.text, fontFamily: A.fontBodyBold, fontSize: 16 },
+  status: { overflow: 'hidden', borderRadius: 13, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#FDE7EA', color: A.danger,
+    fontFamily: A.fontBodySemi, fontSize: 13 }, activeStatus: { backgroundColor: '#DDF5EA', color: A.success },
+  pager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
+  pageLabel: { color: A.text, fontFamily: A.fontBodySemi, fontSize: 15 },
+  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#2E0A579E' },
+  modalScroll: { flexGrow: 1, justifyContent: 'flex-end' },
+  modal: { width: '100%', maxWidth: 520, alignSelf: 'center', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    backgroundColor: '#fff', padding: 20, paddingBottom: 32, gap: 16 },
+  handle: { width: 44, height: 5, borderRadius: 3, backgroundColor: A.border, alignSelf: 'center' },
+  field: { gap: 8 }, fieldLabel: { color: A.text, fontFamily: A.fontBodySemi, fontSize: 15 },
+  input: { height: 56, borderRadius: 16, backgroundColor: A.field, paddingHorizontal: 16, color: A.text, fontFamily: A.fontBody, fontSize: 16 },
+  confirmation: { gap: 12 },
 });

@@ -15,7 +15,50 @@ export type AdminUsuariosPagina = {
   inicio: number;
   limite: number;
   temProxima: boolean;
+  total: number;
 };
+
+export type AdminPrestadoresPagina = {
+  prestadores: Array<{
+    id: number;
+    usuario_id: string;
+    nome_estab: string;
+    responsavel_nome: string | null;
+    status: AdminPrestadorStatus;
+    foto_url: string | null;
+    criado_em: string | null;
+  }>;
+  inicio: number;
+  limite: number;
+  temProxima: boolean;
+  total: number;
+};
+
+export type AdminDashboardIndicadores = {
+  total_usuarios: number;
+  total_prestadores: number;
+  prestadores_pendentes: number;
+  atendimentos_concluidos_mes: number;
+  mes_referencia: string;
+};
+
+export type AdminTotaisAgendamentos = {
+  pendente: number;
+  confirmado: number;
+  cancelado: number;
+  concluido: number;
+};
+
+export type AdminDashboardAgendamentos = {
+  data_inicio: string;
+  data_fim: string;
+  total_agendamentos: number;
+  media_por_dia: number;
+  totais_por_status: AdminTotaisAgendamentos;
+  dias: Array<{ data: string; total_agendamentos: number; totais_por_status: AdminTotaisAgendamentos }>;
+};
+
+export type AdminExportacaoSolicitada = { exportacao_id: string; mensagem: string };
 
 export type AdminUsuarioPayload = { nome: string; sobrenome: string; email: string };
 

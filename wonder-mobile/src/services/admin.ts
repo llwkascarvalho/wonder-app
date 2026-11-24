@@ -5,10 +5,14 @@ import {
   AdminCategoria,
   AdminCategoriaPayload,
   AdminCategoriaStatusPayload,
+  AdminDashboardAgendamentos,
+  AdminDashboardIndicadores,
+  AdminExportacaoSolicitada,
   AdminLogAuditoria,
   AdminMonitoramentoBanco,
   AdminPrestador,
   AdminPrestadorDetalhe,
+  AdminPrestadoresPagina,
   AdminResumoAuditoria,
   AdminStatusPayload,
   AdminUsuario,
@@ -16,11 +20,53 @@ import {
   AdminUsuarioPayload,
 } from '../types/admin';
 
-export async function listarUsuariosAdmin(busca = '', inicio = 0): Promise<AdminUsuariosPagina> {
+export async function listarUsuariosAdmin(busca = '', inicio = 0, papel?: string): Promise<AdminUsuariosPagina> {
   const response = await api.get<AdminUsuariosPagina>('/admin/usuarios', {
-    params: { busca, inicio, limite: 20 },
+    params: { busca, inicio, limite: 20, ...(papel ? { papel } : {}) },
   });
   return response.data;
+}
+
+export async function listarPrestadoresAdmin(params: {
+  busca?: string; status?: string; data_inicio?: string; data_fim?: string; inicio?: number;
+}): Promise<AdminPrestadoresPagina> {
+  const response = await api.get<AdminPrestadoresPagina>('/admin/prestadores', {
+    params: { ...params, limite: 20 },
+  });
+  return response.data;
+}
+
+export async function obterIndicadoresAdmin(): Promise<AdminDashboardIndicadores> {
+  const response = await api.get<AdminDashboardIndicadores>('/admin/dashboard/indicadores');
+  return response.data;
+}
+
+export async function obterAgendamentosAdmin(data_inicio: string, data_fim: string): Promise<AdminDashboardAgendamentos> {
+  const response = await api.get<AdminDashboardAgendamentos>('/admin/dashboard/agendamentos', {
+    params: { data_inicio, data_fim },
+  });
+  return response.data;
+}
+
+export async function solicitarExportacaoAdmin(
+  tipo: 'usuarios' | 'prestadores' | 'agendamentos',
+  params: Record<string, string | undefined>
+): Promise<AdminExportacaoSolicitada> {
+  const path = tipo === 'agendamentos' ? '/admin/dashboard/agendamentos/exportacoes' : `/admin/${tipo}/exportacoes`;
+  const response = await api.post<AdminExportacaoSolicitada>(path, null, { params });
+  return response.data;
+}
+
+export function mensagemErroExportacaoAdmin(error: unknown): string {
+  const response = (error as { response?: { status?: number; data?: { detail?: string; message?: string } } })?.response;
+  const detalhe = response?.data?.detail || response?.data?.message || '';
+  if (response?.status === 400 && detalhe.includes('e-mail cadastrado')) {
+    return 'Esta conta não tem e-mail cadastrado no Keycloak. Atualize o perfil e tente novamente.';
+  }
+  if (response?.status === 401) return 'Sua sessão expirou. Entre novamente para solicitar a exportação.';
+  if (response?.status === 403) return 'Sua conta não tem permissão para solicitar esta exportação.';
+  if (response?.status === 503) return 'O serviço de exportação está indisponível. Tente novamente em instantes.';
+  return 'Não foi possível solicitar a exportação. Tente novamente ou confira o serviço.';
 }
 
 export async function obterUsuarioAdmin(id: string): Promise<AdminUsuario> {
